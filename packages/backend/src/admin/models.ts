@@ -158,6 +158,11 @@ export async function testModel(model: string) {
     return { model, ok: true, ms: Date.now() - started, error: null };
   } catch (error) {
     // The message names the provider's refusal (HTTP status, balance); the request carries no key.
-    return { model, ok: false, ms: Date.now() - started, error: String((error as Error).message).slice(0, 400) };
+    const message = String((error as Error).message);
+    // The valve is the deployment's: say what to change instead of the internal message.
+    const error_ = /Model calls are disabled/.test(message)
+      ? "模型调用总开关还没打开：在服务器 .env 里把 MODEL_CALLS_ENABLED 改成 true，重启 api 和 worker 后再测试（COLLECT_ENABLED 可以继续关着，不会开始采集）"
+      : message.slice(0, 400);
+    return { model, ok: false, ms: Date.now() - started, error: error_ };
   }
 }

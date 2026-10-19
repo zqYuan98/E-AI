@@ -33,7 +33,9 @@ function boot({ identity, login, session }: { identity: Identity | null; login: 
   async function check(): Promise<boolean> {
     if (!identity || leaving) return false;
     const attempt = ++revision;
-    hide();
+    // A routine check (timer, focus, after a request) leaves the page as it is: hiding it every time made it flicker.
+    // The page is hidden when the tab goes to the background (below) and stays so until the check passes, and
+    // go() hides it when the session is gone.
     try {
       const res = await nativeFetch(session, { cache: "no-store", credentials: "same-origin", redirect: "manual", signal: AbortSignal.timeout(5000) });
       const current = res.ok ? await res.json() : null;
