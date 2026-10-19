@@ -25,9 +25,20 @@ export const meta: Route.MetaFunction = () => [{ title: `${SITE.name} 后台` },
 
 export const headers: Route.HeadersFunction = () => ({ "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" });
 
+/** The modules' admin groups; groups of the same name from several modules are one group, in module order. */
+function moduleGroups(): Array<{ group: string; items: AdminNavEntry[] }> {
+  const out: Array<{ group: string; items: AdminNavEntry[] }> = [];
+  for (const g of webModules().flatMap((m) => m.admin?.groups ?? [])) {
+    const same = out.find((o) => o.group === g.group);
+    if (same) same.items.push(...g.items);
+    else out.push({ group: g.group, items: [...g.items] });
+  }
+  return out;
+}
+
 /** The admin navigation: the modules' own groups first, their content entries after 信源. */
 const nav = (): Array<{ group: string; items: AdminNavEntry[] }> => [
-  ...webModules().flatMap((m) => m.admin?.groups ?? []),
+  ...moduleGroups(),
   {
     group: "内容",
     items: [

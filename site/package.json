@@ -6,6 +6,7 @@
   "dependencies": {
     "@aihot/access": "*",
     "@aihot/policy": "*",
+    "@aihot/research": "*",
     "@aihot/wechat": "*"
   },
   "exports": {
