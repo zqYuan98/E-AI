@@ -7,6 +7,7 @@ import { PRESETS } from "@aihot/site/models";
 import { config, credential } from "../config.ts";
 import { sha256 } from "../lib/ids.ts";
 import { parseModelProviders } from "./model-providers.ts";
+import { loadStoredProviders } from "./model-store.ts";
 import { assertAccepted, paidRequest, ProviderRejectedError, rejectReceivedResponse } from "./receipts.ts";
 
 export interface ModelSpec {
@@ -17,6 +18,8 @@ export interface ModelSpec {
   /** The address itself, for a provider the deployment adds (MODEL_PROVIDERS); presets name an environment variable instead. */
   baseUrl?: string;
   apiKeyEnv: string;
+  /** The key itself, for a provider entered on the admin page (opened from the database); others name an environment variable. */
+  apiKey?: string;
   /** Extra request fields, e.g. switching reasoning off for short structured tasks. */
   extra?: Record<string, unknown>;
   /** Output tokens added to every call's own limit for a reasoning model, which reasons before it answers. */
@@ -73,6 +76,47 @@ export const MODELS: Record<string, ModelSpec> = {
   // Providers the deployment adds without a code change.
   ...providers,
 };
+
+/** Keys of the providers entered on the admin page that are in MODELS now. */
+const stored = new Set<string>();
+let storedAt = 0;
+let storedLoading: Promise<void> | null = null;
+
+/**
+ * Brings the admin page's providers (database) into MODELS, at most every 30 seconds per process, so a change made
+ * in the api reaches the worker within that time. A read that fails keeps what was loaded and retries soon.
+ */
+export async function refreshStoredModels(force = false): Promise<void> {
+  if (!force && Date.now() - storedAt < 30_000) return;
+  storedLoading ??= (async () => {
+    try {
+      const rows = await loadStoredProviders();
+      for (const key of stored) delete MODELS[key];
+      stored.clear();
+      for (const r of rows) {
+        if (!r.enabled || !r.apiKey || MODELS[r.key]) continue;
+        MODELS[r.key] = {
+          key: r.key, service: "llm", model: r.model, baseUrl: r.baseUrl, baseUrlEnv: "model_providers", apiKeyEnv: "model_providers", apiKey: r.apiKey,
+          ...(r.extra ? { extra: r.extra } : {}), ...(r.reasoningTokens ? { reasoningTokens: r.reasoningTokens } : {}), jsonMode: r.jsonMode, vision: r.vision,
+        };
+        stored.add(r.key);
+      }
+      storedAt = Date.now();
+    } catch (error) {
+      storedAt = Date.now() - 25_000;
+      console.error(JSON.stringify({ level: "error", msg: "model providers not loaded", err: String((error as Error).message).slice(0, 200) }));
+    } finally {
+      storedLoading = null;
+    }
+  })();
+  await storedLoading;
+}
+
+/** The next call reloads the admin page's providers (after a change). */
+export const invalidateStoredModels = () => { storedAt = 0; };
+
+/** Keys of the providers that come from MODEL_PROVIDERS (environment), as opposed to the admin page. */
+export const envProviderKeys = () => Object.keys(providers);
 
 export type ContentPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
 
@@ -150,11 +194,12 @@ function isConnectFailure(error: unknown): boolean {
 }
 
 export async function chatJson<S extends z.ZodType>(opts: ChatJsonOptions<S>): Promise<ChatJsonResult<z.infer<S>>> {
+  if (!MODELS[opts.model]) await refreshStoredModels(true); // a provider added on the admin page after this process loaded
   const spec = MODELS[opts.model];
   if (!spec) throw new Error(`Unknown model ${opts.model}`);
   if (!config.modelCallsEnabled) throw new Error("Model calls are disabled (MODEL_CALLS_ENABLED=false)");
   const baseUrl = spec.baseUrl ?? credential("models", spec.baseUrlEnv);
-  const apiKey = credential("models", spec.apiKeyEnv);
+  const apiKey = spec.apiKey ?? credential("models", spec.apiKeyEnv);
   if (!baseUrl || !apiKey || !spec.model) throw new Error(`Model ${opts.model} is not configured (${spec.baseUrlEnv}, ${spec.apiKeyEnv}${spec.key === "default" ? ", LLM_MODEL" : ""})`);
 
   const temperature = opts.temperature ?? 0.2;

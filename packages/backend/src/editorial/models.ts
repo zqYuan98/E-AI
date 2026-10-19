@@ -5,7 +5,7 @@
 import { DEFAULTS } from "@aihot/site/models";
 import { sql } from "../db.ts";
 import { serverModules } from "../modules.ts";
-import { MODELS } from "../providers/llm.ts";
+import { invalidateStoredModels, MODELS, refreshStoredModels } from "../providers/llm.ts";
 
 export interface Capability {
   /** The step's name on the admin page, with an explanation in full-width brackets if it needs one; alerts use the name alone. */
@@ -51,6 +51,7 @@ export function stepsOnService(service: string): string[] {
 let cache: { at: number; overrides: Record<string, string> } | null = null;
 
 async function overrides(): Promise<Record<string, string>> {
+  await refreshStoredModels(); // providers entered on the admin page are models too
   if (cache && Date.now() - cache.at < 60_000) return cache.overrides;
   const rows = await sql<{ key: string; value: { model?: string } }[]>`SELECT key, value FROM settings WHERE key LIKE 'models.%'`;
   const map: Record<string, string> = {};
@@ -61,6 +62,7 @@ async function overrides(): Promise<Record<string, string>> {
 
 export function invalidateModelCache() {
   cache = null;
+  invalidateStoredModels();
 }
 
 /** Whether a registered model explicitly declares image input support. Unspecified means text-only. */

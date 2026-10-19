@@ -6,7 +6,7 @@ import { SITE } from "@aihot/site";
 import { adminGet } from "../../lib/admin.server";
 import { useAdminAction } from "../../features/admin/action";
 import { bj, money, num } from "../../features/admin/format";
-import { AdminPage, Badge, Button, Card, DataTable, Empty, Field, FilterChips, ReasonDialog, Select } from "../../features/admin/ui";
+import { AdminPage, Badge, Button, Card, DataTable, Empty, Field, FilterChips, Input, ReasonDialog, Select, Textarea } from "../../features/admin/ui";
 import { webModules } from "../../site-modules";
 
 
@@ -26,6 +26,23 @@ function Unpriced() {
   if (prices) return <Link to={prices} className="whitespace-nowrap text-ink-4 hover:text-accent">未定价</Link>;
   return <span className="whitespace-nowrap text-ink-4" title="服务商没有返回费用，按 token 数和你的模型单价自己估算">未定价</span>;
 }
+type Provider = AdminModels["providers"][number];
+interface ProviderForm { key: string; label: string; model: string; baseUrl: string; apiKey: string; extra: string; reasoningTokens: string; jsonMode: boolean; vision: boolean; enabled: boolean }
+const BLANK: ProviderForm = { key: "", label: "", model: "", baseUrl: "", apiKey: "", extra: "", reasoningTokens: "", jsonMode: true, vision: false, enabled: true };
+// Addresses of common OpenAI-compatible services; the page only fills the address in, the model name and key are the admin's.
+const VENDORS: Array<{ name: string; baseUrl: string }> = [
+  { name: "硅基流动", baseUrl: "https://api.siliconflow.cn/v1" },
+  { name: "阿里云百炼", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1" },
+  { name: "智谱", baseUrl: "https://open.bigmodel.cn/api/paas/v4" },
+  { name: "月之暗面 Kimi", baseUrl: "https://api.moonshot.cn/v1" },
+  { name: "火山方舟", baseUrl: "https://ark.cn-beijing.volces.com/api/v3" },
+  { name: "DeepSeek", baseUrl: "https://api.deepseek.com/v1" },
+  { name: "OpenAI", baseUrl: "https://api.openai.com/v1" },
+];
+const toForm = (p: Provider): ProviderForm => ({
+  key: p.key, label: p.label, model: p.model, baseUrl: p.baseUrl, apiKey: "", extra: p.extra ? JSON.stringify(p.extra) : "",
+  reasoningTokens: p.reasoningTokens ? String(p.reasoningTokens) : "", jsonMode: p.jsonMode, vision: p.vision, enabled: p.enabled,
+});
 const secs = (ms: number | null) => (ms == null ? "—" : ms >= 10_000 ? `${Math.round(ms / 1000)} s` : `${(ms / 1000).toFixed(1)} s`);
 
 export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
@@ -36,6 +53,17 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
   const [all, setAll] = useState<string>(m.choices[0]?.key ?? "default");
   const [allOpen, setAllOpen] = useState(false);
   const [checked, setChecked] = useState<{ model: string; ok: boolean; ms: number; error: string | null } | null>(null);
+  // Providers entered on this page: add, edit, stop, remove.
+  const [form, setForm] = useState<{ isNew: boolean; values: ProviderForm } | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [toggling, setToggling] = useState<Provider | null>(null);
+  const [removing, setRemoving] = useState<Provider | null>(null);
+  const setField = <K extends keyof ProviderForm>(name: K, value: ProviderForm[K]) => setForm((f) => (f ? { ...f, values: { ...f.values, [name]: value } } : f));
+  const testModelKey = async (model: string) => {
+    setAll(model);
+    const r = await run<{ model: string; ok: boolean; ms: number; error: string | null }>("POST", "/api/admin/model-test", { model }, { label: "check", revalidate: false });
+    if (r) setChecked(r);
+  };
   const labelOf = (key: string) => m.capabilities.find((c) => `capability:${c.key}` === key)?.label ?? key;
 
   return (
@@ -44,9 +72,50 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
       subtitle="每项能力当前用哪个模型、来自哪里（后台切换 > 环境变量 > 代码默认），以及近期的成功率、耗时与费用。切换只影响之后的新任务，已有结果不重算；换精选模型前先看 SelectBench 同批对比。"
       actions={<FilterChips param="days" options={[{ value: "1", label: "24 小时" }, { value: "", label: "7 天" }, { value: "30", label: "30 天" }]} />}
     >
+      <Card
+        title="模型服务商"
+        className="mb-5"
+        right={<Button size="sm" tone="primary" onClick={() => { setFormError(null); setForm({ isNew: true, values: BLANK }); }}>添加服务商</Button>}
+        pad={false}
+      >
+        <p className="px-4 pt-3 text-[13px] leading-6 text-ink-3">
+          任何 OpenAI 兼容的接口都可以加。密钥加密保存在服务器上，保存后页面看不到、只能重新填写；每次改动都写入审计记录。
+        </p>
+        {m.providers.length ? (
+          <DataTable
+            dense
+            rows={m.providers}
+            rowKey={(p) => p.key}
+            columns={[
+              { key: "n", label: "名称", render: (p) => <span className="whitespace-nowrap">{p.label}<span className="ml-1.5 font-mono text-[11.5px] text-ink-4">{p.key}</span></span> },
+              { key: "m", label: "模型", render: (p) => <span className="font-mono text-[12px]">{p.model}</span> },
+              { key: "u", label: "地址", render: (p) => <span className="font-mono text-[11.5px] text-ink-3">{p.baseUrl || "—"}</span> },
+              { key: "k", label: "密钥", render: (p) => (p.keyReadable ? <span className="font-mono text-[11.5px] text-ink-3">{p.keyHint}</span> : <Badge tone="bad" title="服务器的 SESSION_SECRET 变过，原来保存的密钥打不开，请重新填写">需重新填密钥</Badge>) },
+              { key: "s", label: "状态", render: (p) => (p.source === "env" ? <Badge tone="info" title="在服务器的 MODEL_PROVIDERS 里配置，页面只能看和测试">环境变量</Badge> : p.enabled ? <Badge tone="ok">启用</Badge> : <Badge tone="muted">已停用</Badge>) },
+              { key: "y", label: "在用的步骤", render: (p) => (p.usedBy.length ? <span className="text-[12px] text-ink-2">{p.usedBy.join("、")}</span> : <span className="text-ink-4">—</span>) },
+              {
+                key: "a",
+                label: "",
+                align: "right",
+                render: (p) => (
+                  <span className="inline-flex gap-1.5">
+                    <Button size="sm" busy={pending === "check"} disabled={!p.enabled || !p.keyReadable} onClick={() => testModelKey(p.key)}>测试</Button>
+                    {p.source === "admin" && <Button size="sm" onClick={() => { setFormError(null); setForm({ isNew: false, values: toForm(p) }); }}>编辑</Button>}
+                    {p.source === "admin" && <Button size="sm" onClick={() => setToggling(p)}>{p.enabled ? "停用" : "启用"}</Button>}
+                    {p.source === "admin" && <Button size="sm" tone="danger" onClick={() => setRemoving(p)}>删除</Button>}
+                  </span>
+                ),
+              },
+            ]}
+          />
+        ) : (
+          <Empty>还没有添加服务商。点右上角“添加服务商”，填地址、模型名和密钥即可。</Empty>
+        )}
+      </Card>
+
       <Card title="更换模型服务商（整体切换）" className="mb-5">
         <p className="mb-3 text-[13px] leading-6 text-ink-3">
-          当前服务商额度用完或要换一家时：先“测试连通”确认地址、密钥和余额可用，再“全部步骤切换”。新增服务商在服务器的 <span className="font-mono">MODEL_PROVIDERS</span> 环境变量里配置（见部署文档），重启后出现在下拉里。
+          当前服务商额度用完或要换一家时：先“测试连通”确认地址、密钥和余额可用，再“全部步骤切换”。
         </p>
         {m.providersError && (
           <p className="mb-3 text-[13px] leading-6 text-hot">
@@ -178,6 +247,102 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
           )}
         </Card>
       </div>
+
+      <ReasonDialog
+        open={!!form}
+        title={form?.isNew ? "添加模型服务商" : `编辑：${form?.values.key ?? ""}`}
+        description="保存后立即可以测试；worker 最多 30 秒内也会用上。"
+        confirmLabel="保存"
+        busy={pending === "provider"}
+        onClose={() => setForm(null)}
+        onSubmit={async (reason) => {
+          if (!form) return false;
+          const v = form.values;
+          let extra: Record<string, unknown> | null = null;
+          if (v.extra.trim()) {
+            try {
+              const parsed = JSON.parse(v.extra);
+              if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error();
+              extra = parsed;
+            } catch { setFormError("额外请求字段要写成 JSON 对象，例如 {\"enable_thinking\": false}"); return false; }
+          }
+          const tokens = v.reasoningTokens.trim();
+          if (tokens && !/^\d+$/.test(tokens)) { setFormError("推理额度要写成非负整数，例如 4000"); return false; }
+          setFormError(null);
+          const body = {
+            label: v.label, model: v.model, baseUrl: v.baseUrl, ...(v.apiKey ? { apiKey: v.apiKey } : {}), extra,
+            reasoningTokens: tokens ? Number(tokens) : null, jsonMode: v.jsonMode, vision: v.vision, enabled: v.enabled, reason,
+          };
+          const r = await run("PUT", `/api/admin/model-providers/${encodeURIComponent(v.key)}`, body, { label: "provider", success: form.isNew ? "已添加" : "已保存" });
+          return r !== null;
+        }}
+      >
+        {form && (
+          <>
+            {form.isNew && (
+              <Field label="常用服务商（只填地址）">
+                <Select value="" onChange={(e) => { const vendor = VENDORS.find((x) => x.baseUrl === e.target.value); if (vendor) { setField("baseUrl", vendor.baseUrl); if (!form.values.label) setField("label", vendor.name); } }}>
+                  <option value="">选择后自动填写下面的地址</option>
+                  {VENDORS.map((x) => <option key={x.baseUrl} value={x.baseUrl}>{x.name}</option>)}
+                </Select>
+              </Field>
+            )}
+            <Field label="标识" hint="小写字母、数字、. _ -，创建后不能改；在模型下拉里显示这个名字">
+              <Input value={form.values.key} disabled={!form.isNew} onChange={(e) => setField("key", e.target.value.trim().toLowerCase())} placeholder="例如 sf-deepseek" maxLength={49} />
+            </Field>
+            <Field label="名称"><Input value={form.values.label} onChange={(e) => setField("label", e.target.value)} placeholder="例如 硅基流动 DeepSeek" maxLength={60} /></Field>
+            <Field label="接口地址" hint="到 /chat/completions 之前的部分，例如 https://api.siliconflow.cn/v1">
+              <Input value={form.values.baseUrl} onChange={(e) => setField("baseUrl", e.target.value)} placeholder="https://…/v1" />
+            </Field>
+            <Field label="模型名" hint="服务商文档里的模型 ID，例如 deepseek-ai/DeepSeek-V3">
+              <Input value={form.values.model} onChange={(e) => setField("model", e.target.value)} />
+            </Field>
+            <Field label="API 密钥" hint={form.isNew ? "只保存加密后的内容，保存后不能再查看" : "不填就保留原来的密钥；填了会替换"}>
+              <Input type="password" autoComplete="off" value={form.values.apiKey} onChange={(e) => setField("apiKey", e.target.value.trim())} placeholder={form.isNew ? "sk-…" : "不修改请留空"} />
+            </Field>
+            <div className="flex flex-wrap gap-x-5 gap-y-2 text-[13px] text-ink-2">
+              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.values.jsonMode} onChange={(e) => setField("jsonMode", e.target.checked)} />支持 JSON 模式</label>
+              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.values.vision} onChange={(e) => setField("vision", e.target.checked)} />能看图</label>
+              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.values.enabled} onChange={(e) => setField("enabled", e.target.checked)} />启用</label>
+            </div>
+            <Field label="额外请求字段（可选，JSON）" hint="比如关掉推理：{&quot;enable_thinking&quot;: false}">
+              <Textarea rows={2} value={form.values.extra} onChange={(e) => setField("extra", e.target.value)} />
+            </Field>
+            <Field label="推理额度（可选）" hint="推理模型先想再答，额外给推理留的输出 token；调用报 finish_reason=length 时填，例如 4000">
+              <Input inputMode="numeric" value={form.values.reasoningTokens} onChange={(e) => setField("reasoningTokens", e.target.value)} />
+            </Field>
+            {formError && <p role="alert" className="text-[13px] text-hot">{formError}</p>}
+          </>
+        )}
+      </ReasonDialog>
+
+      <ReasonDialog
+        open={!!toggling}
+        title={`${toggling?.enabled ? "停用" : "启用"}：${toggling?.label ?? ""}`}
+        description={toggling?.enabled && toggling.usedBy.length ? `正在被这些步骤使用：${toggling.usedBy.join("、")}。停用后它们会回到各自的默认模型。` : "停用后不会再被调用，随时可以重新启用。"}
+        confirmLabel={toggling?.enabled ? "停用" : "启用"}
+        busy={pending === "provider"}
+        onClose={() => setToggling(null)}
+        onSubmit={async (reason) => {
+          if (!toggling) return false;
+          const p = toggling;
+          const r = await run("PUT", `/api/admin/model-providers/${encodeURIComponent(p.key)}`, {
+            label: p.label, model: p.model, baseUrl: p.baseUrl, extra: p.extra, reasoningTokens: p.reasoningTokens, jsonMode: p.jsonMode, vision: p.vision, enabled: !p.enabled, reason,
+          }, { label: "provider", success: p.enabled ? "已停用" : "已启用" });
+          return r !== null;
+        }}
+      />
+
+      <ReasonDialog
+        open={!!removing}
+        danger
+        title={`删除：${removing?.label ?? ""}`}
+        description={removing?.usedBy.length ? `还有步骤在用它：${removing.usedBy.join("、")}。先把这些步骤切换到别的模型，才能删除。` : "删除后密钥也一并删除，不能恢复。"}
+        confirmLabel="删除"
+        busy={pending === "provider"}
+        onClose={() => setRemoving(null)}
+        onSubmit={async (reason) => (await run("POST", `/api/admin/model-providers/${encodeURIComponent(removing!.key)}/delete`, { reason }, { label: "provider", success: "已删除" })) !== null}
+      />
 
       <ReasonDialog
         open={allOpen}

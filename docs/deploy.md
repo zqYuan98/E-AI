@@ -109,20 +109,29 @@ MCP 默认接受 `SITE_URL` 的主机以及 `localhost`、`127.0.0.1`、`[::1]`�
 
 ### 更换大模型服务商
 
-一个服务商额度用完或要换一家时，不需要改代码：
+一个服务商额度用完或要换一家时，不需要改代码，也不需要登录服务器：
 
-1. 在 `.env` 里加密钥，并在 `MODEL_PROVIDERS` 里登记这家服务（任何 OpenAI 兼容接口都行，密钥只写变量名，不写在 JSON 里），重启 api 和 worker：
+1. 后台“模型与评测” → “模型服务商” → “添加服务商”。任何 OpenAI 兼容的接口都行：选一个常用服务商自动填地址（也可以手填），再填标识、模型名和 API 密钥。需要时展开的字段：额外请求字段（JSON，如关掉推理 `{"enable_thinking": false}`）、推理额度（推理模型额外的输出 token）、是否支持 JSON 模式、能否看图。
+2. 在列表里点这一行的“测试”（一次很小的真实调用，确认地址、密钥和余额都可用）。
+3. 到下面的“更换模型服务商（整体切换）”，选它，点“全部步骤切换”。也可以只给某几步换，比如精选评分换一家、其余留着。
+4. 之前因为余额不足而处理失败的内容，到后台“运行”页点“全部重新处理”。
 
-   ```bash
-   SILICONFLOW_API_KEY=sk-…
-   MODEL_PROVIDERS=[{"key":"sf-deepseek","model":"deepseek-ai/DeepSeek-V3","baseUrl":"https://api.siliconflow.cn/v1","apiKeyEnv":"SILICONFLOW_API_KEY"}]
-   ```
+页面里的服务商保存在数据库的 `model_providers` 表，**密钥用 AES-256-GCM 加密，加密密钥由服务器的 `SESSION_SECRET` 派生**：页面保存后看不到密钥，只显示最后 4 位；备份和数据库拷贝里只有密文；每次添加、修改、停用、删除都写进审计记录（不含密钥）。
 
-   写错时站点照常运行，只是这些模型不加载：后台“模型与评测”页会用红字写出哪里不对，api 和 worker 日志里有 `MODEL_PROVIDERS ignored`。
+- **`SESSION_SECRET` 不要随便换**：换了以后已保存的密钥全部打不开，列表里会显示“需重新填密钥”，要逐个重新填一遍。
+- 停用的服务商不会被调用，正在用它的步骤回到各自的默认模型；有步骤在用的服务商不能删除，先把那些步骤切走。
+- api 里的改动立即生效，worker 最多 30 秒内跟上。
 
-   可选字段：`extra`（额外请求字段，如关掉推理 `{"enable_thinking":false}`）、`reasoningTokens`（推理模型额外的输出额度）、`jsonMode`（接口不支持 JSON 模式时填 `false`）、`vision`（能看图）。自定义的模型都算在默认模型服务（`llm`）名下：共用它的调用上限（后台“设置”里调）和欠费告警。
-2. 后台“模型与评测” → “更换模型服务商”：选这个模型，点“测试连通”（一次很小的真实调用，确认地址、密钥和余额），通过后点“全部步骤切换”。也可以只给某几步换，比如精选评分换一家、其余留着。
-3. 之前因为余额不足而处理失败的内容，到后台“运行”页点“全部重新处理”。
+不想让密钥进数据库的话，也可以放在 `.env` 里：用 `MODEL_PROVIDERS` 登记（密钥只写变量名，另起一行写密钥本身），改完重启 api 和 worker。这样登记的服务商页面上只能看和测试，不能改：
+
+```bash
+SILICONFLOW_API_KEY=sk-…
+MODEL_PROVIDERS=[{"key":"sf-deepseek","model":"deepseek-ai/DeepSeek-V3","baseUrl":"https://api.siliconflow.cn/v1","apiKeyEnv":"SILICONFLOW_API_KEY"}]
+```
+
+写错时站点照常运行，只是这些模型不加载：页面会用红字写出哪里不对，api 和 worker 日志里有 `MODEL_PROVIDERS ignored`。可选字段同上（`extra`、`reasoningTokens`、`jsonMode`、`vision`）。
+
+所有自定义模型都算在默认模型服务（`llm`）名下：共用它的调用上限（后台“设置”里调）和欠费告警。
 
 只改 `.env` 里的 `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL` 也能换默认模型，但精选评分和周报月报在站点配置里指向了 DeepSeek 的预设，不会跟着变，要在后台单独切换。换模型后精选门槛需要用标注样本重新校准（`docs/selection.md`）。
 

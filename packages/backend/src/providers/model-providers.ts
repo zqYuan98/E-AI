@@ -48,3 +48,31 @@ export function parseModelProviders(raw: string | null | undefined, taken: Reado
   }
   return parsed.data.map((p) => ({ ...p, service: "llm" }));
 }
+
+/** A provider entered on the admin page (stored in the database, key sealed). An omitted apiKey keeps the saved one. */
+const StoredInput = z.object({
+  label: z.string().trim().min(1).max(60),
+  model: z.string().trim().min(1).max(200),
+  baseUrl: z.string().trim().url().refine((u) => /^https?:\/\//.test(u), "baseUrl must be http(s)").transform((u) => u.replace(/\/+$/, "")),
+  apiKey: z.string().min(8).max(512).regex(/^[\x21-\x7e]+$/, "the key has spaces or unusual characters").optional(),
+  extra: z.record(z.string(), z.unknown()).nullable().optional(),
+  reasoningTokens: z.number().int().min(0).max(100_000).nullable().optional(),
+  jsonMode: z.boolean().default(true),
+  vision: z.boolean().default(false),
+  enabled: z.boolean().default(true),
+}).strict();
+export type StoredProviderInput = z.infer<typeof StoredInput>;
+
+export const PROVIDER_KEY = /^[a-z0-9][a-z0-9._-]{1,48}$/;
+
+export function parseStoredProviderInput(raw: unknown): StoredProviderInput {
+  const parsed = StoredInput.safeParse(raw);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0]!;
+    throw Object.assign(new Error(`${issue.path.join(".") || "input"}: ${issue.message}`), { statusCode: 400 });
+  }
+  return parsed.data;
+}
+
+/** What the page shows of a saved key: the last four characters, never the key. */
+export const keyHint = (apiKey: string) => (apiKey.length >= 12 ? `…${apiKey.slice(-4)}` : "已保存");

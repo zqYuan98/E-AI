@@ -6,7 +6,8 @@ import type { AdminModels, BeforeJson } from "@aihot/contracts/admin";
 import { sql } from "../db.ts";
 import { capabilities, capabilityAcceptsModel, invalidateModelCache, modelSources } from "../editorial/models.ts";
 import { z } from "zod";
-import { chatJson, MODELS, modelProvidersError } from "../providers/llm.ts";
+import { chatJson, MODELS, modelProvidersError, refreshStoredModels } from "../providers/llm.ts";
+import { listProviders } from "./model-providers.ts";
 import { audit } from "../audit.ts";
 
 interface UsageRow {
@@ -31,6 +32,7 @@ interface UsageRow {
 }
 
 export async function modelsOverview(days = 7): Promise<BeforeJson<AdminModels>> {
+  await refreshStoredModels(true);
   const since = new Date(Date.now() - days * 86400_000);
   const [sources, usage, prices, history, benches] = await Promise.all([
     modelSources(),
@@ -97,11 +99,12 @@ export async function modelsOverview(days = 7): Promise<BeforeJson<AdminModels>>
       })),
   }));
   const choices = Object.values(MODELS).map((m) => ({ key: m.key, service: m.service, vision: !!m.vision }));
-  return { days, capabilities: steps, choices, providersError: modelProvidersError, history, benches };
+  return { days, capabilities: steps, choices, providersError: modelProvidersError, providers: await listProviders(), history, benches };
 }
 
 /** Switches a capability to another registered model (or back to the environment/default when null). */
 export async function switchModel(capability: string, model: string | null, reason: string, actor: string) {
+  await refreshStoredModels();
   const c = capabilities()[capability];
   if (!c) throw Object.assign(new Error("unknown capability"), { statusCode: 400 });
   if (!reason.trim()) throw Object.assign(new Error("a reason is required"), { statusCode: 400 });
@@ -127,6 +130,7 @@ export async function switchModel(capability: string, model: string | null, reas
  * switched and audited like a single switch; steps that need images are skipped when the model cannot read them.
  */
 export async function switchAllModels(model: string, reason: string, actor: string) {
+  await refreshStoredModels(true);
   const spec = MODELS[model];
   if (!spec) throw Object.assign(new Error("unknown model"), { statusCode: 400 });
   if (!reason.trim()) throw Object.assign(new Error("a reason is required"), { statusCode: 400 });
@@ -142,6 +146,7 @@ export async function switchAllModels(model: string, reason: string, actor: stri
 
 /** One tiny paid call to a registered model, to see whether its address, key and balance work before switching to it. */
 export async function testModel(model: string) {
+  await refreshStoredModels(true);
   if (!MODELS[model]) throw Object.assign(new Error("unknown model"), { statusCode: 400 });
   const started = Date.now();
   try {
