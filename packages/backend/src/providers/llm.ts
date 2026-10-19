@@ -1,11 +1,12 @@
 // OpenAI-compatible chat calls, always through receipts. One model is enough: `default` is whatever the
 // deployment names in LLM_BASE_URL / LLM_API_KEY / LLM_MODEL, and every capability uses it unless the
 // site, an environment variable or the admin's model page picks one of the site's named presets
-// (site/models.ts).
+// (site/models.ts) or one of the providers the deployment adds in MODEL_PROVIDERS.
 import type { z } from "zod";
 import { PRESETS } from "@aihot/site/models";
 import { config, credential } from "../config.ts";
 import { sha256 } from "../lib/ids.ts";
+import { parseModelProviders } from "./model-providers.ts";
 import { assertAccepted, paidRequest, ProviderRejectedError, rejectReceivedResponse } from "./receipts.ts";
 
 export interface ModelSpec {
@@ -13,6 +14,8 @@ export interface ModelSpec {
   service: string;
   model: string;
   baseUrlEnv: string;
+  /** The address itself, for a provider the deployment adds (MODEL_PROVIDERS); presets name an environment variable instead. */
+  baseUrl?: string;
   apiKeyEnv: string;
   /** Extra request fields, e.g. switching reasoning off for short structured tasks. */
   extra?: Record<string, unknown>;
@@ -37,6 +40,24 @@ function reasoningTokensFromEnv(value: string | undefined): number | undefined {
   return Number(value);
 }
 
+const presets: Record<string, ModelSpec> = Object.fromEntries(Object.entries(PRESETS).map(([key, preset]) => [key, { key, ...preset }]));
+/**
+ * Why MODEL_PROVIDERS was not used, for the admin's model page. A typo there must not take the site (and its
+ * sign-in) down: the error is logged, the providers are left out and steps on them fall back to their defaults.
+ */
+export let modelProvidersError: string | null = null;
+const providers: Record<string, ModelSpec> = (() => {
+  try {
+    return Object.fromEntries(
+      parseModelProviders(credential("models", "MODEL_PROVIDERS"), new Set(Object.keys(presets))).map(({ key, ...p }) => [key, { key, baseUrlEnv: "MODEL_PROVIDERS", ...p }]),
+    );
+  } catch (error) {
+    modelProvidersError = (error as Error).message;
+    console.error(JSON.stringify({ level: "error", msg: "MODEL_PROVIDERS ignored", err: modelProvidersError }));
+    return {};
+  }
+})();
+
 export const MODELS: Record<string, ModelSpec> = {
   // Read from the environment at call time.
   default: {
@@ -48,7 +69,9 @@ export const MODELS: Record<string, ModelSpec> = {
     get vision() { return process.env.LLM_VISION === "true"; },
   },
   // The pack's named presets, each with its own address and key.
-  ...Object.fromEntries(Object.entries(PRESETS).map(([key, preset]) => [key, { key, ...preset }])),
+  ...presets,
+  // Providers the deployment adds without a code change.
+  ...providers,
 };
 
 export type ContentPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
@@ -130,7 +153,7 @@ export async function chatJson<S extends z.ZodType>(opts: ChatJsonOptions<S>): P
   const spec = MODELS[opts.model];
   if (!spec) throw new Error(`Unknown model ${opts.model}`);
   if (!config.modelCallsEnabled) throw new Error("Model calls are disabled (MODEL_CALLS_ENABLED=false)");
-  const baseUrl = credential("models", spec.baseUrlEnv);
+  const baseUrl = spec.baseUrl ?? credential("models", spec.baseUrlEnv);
   const apiKey = credential("models", spec.apiKeyEnv);
   if (!baseUrl || !apiKey || !spec.model) throw new Error(`Model ${opts.model} is not configured (${spec.baseUrlEnv}, ${spec.apiKeyEnv}${spec.key === "default" ? ", LLM_MODEL" : ""})`);
 

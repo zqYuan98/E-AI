@@ -47,7 +47,9 @@ export function useAdminAction() {
         }
         const text = await res.text();
         const json = text ? JSON.parse(text) : null;
-        if (!res.ok) throw new AdminError(json?.detail ?? `请求失败（${res.status}）`);
+        if (!res.ok) throw new AdminError(path.startsWith("/api/admin/access/")
+          ? ({ 400: "成员信息不符合要求，请检查后重试。", 403: "权限或会话校验失败，请重新登录管理员账号。", 404: "成员不存在。", 409: "用户名已存在。", 429: "操作太频繁，请稍后重试。" } as Record<number, string>)[res.status] ?? "成员服务暂不可用，请稍后重试。"
+          : json?.detail ?? `请求失败（${res.status}）`);
         keys.current.delete(label);
         if (opts.success) toast(opts.success, "ok");
         if (opts.revalidate !== false) revalidator.revalidate();

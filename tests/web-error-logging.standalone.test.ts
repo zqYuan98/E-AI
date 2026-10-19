@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { data } from "react-router";
 import { handleError } from "../apps/web/app/lib/errors.server.ts";
 import { apiGet, loadOr404 } from "../apps/web/app/lib/api.server.ts";
+import { ACCESS, PRIVATE_HEADERS } from "../apps/web/app/lib/access.ts";
 
 test("expected route refusals and cancelled requests stay quiet; real errors keep request and stack", (t) => {
   const lines: string[] = [];
@@ -36,7 +37,7 @@ test("SSR fetch timeouts keep the upstream path and stack before the existing 50
   const error = new DOMException("The operation was aborted due to timeout", "TimeoutError");
   t.mock.method(globalThis, "fetch", async () => { throw error; });
   await assert.rejects(loadOr404("/api/site/timeline?q=query-only-secret-9386&aihot_actor=query-only-secret-9386"), (thrown) => {
-    assert.deepEqual(thrown, data({ message: "unavailable" }, { status: 503 }));
+    assert.deepEqual(thrown, data({ message: "unavailable" }, ACCESS ? { status: 503, headers: PRIVATE_HEADERS } : { status: 503 }));
     return true;
   });
   assert.equal(lines.length, 1);

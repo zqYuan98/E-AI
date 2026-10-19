@@ -3,6 +3,11 @@
   "private": true,
   "type": "module",
   "sideEffects": false,
+  "dependencies": {
+    "@aihot/access": "*",
+    "@aihot/policy": "*",
+    "@aihot/wechat": "*"
+  },
   "exports": {
     ".": "./site.ts",
     "./models": "./models.ts",

@@ -1,3 +1,4 @@
+import { ACCESS } from "../lib/access";
 import { useEffect, useState } from "react";
 import { IntentLink } from "../components/ui/IntentLink";
 import { useLoaderData, useNavigate, useSearchParams } from "react-router";
@@ -58,7 +59,7 @@ const useTag = TAG?.useValue ?? (() => null);
 
 export async function loader({ request }: Route.LoaderArgs) {
   // Only whether the api answers, within three seconds.
-  const healthy = await apiGet("/api/health", { signal: AbortSignal.any([request.signal, AbortSignal.timeout(3000)]) }).then(() => true, () => false);
+  const healthy = await apiGet("/api/health", { request, signal: AbortSignal.any([request.signal, AbortSignal.timeout(3000)]) }).then(() => true, () => false);
   return cachedPage(300, {
     healthy,
     // The examples show the configured public address, the same on the server and in the browser; what
@@ -80,13 +81,21 @@ export function meta({ location }: Route.MetaArgs) {
   const path = listPath("/agent", { tab: tab !== FIRST ? tab : null });
   return pageMeta({
     title: "Agent 接入",
-    description: `把 ${SITE.name} 接进你的 Agent：${TRACKS.map((t) => t.name).join("、")} ${WAYS}种方式，匿名只读，无需 API Key，一分钟接好。`,
+    description: ACCESS ? "内部站接口说明：需要授权会话，暂不开放 MCP 接入。" : `把 ${SITE.name} 接进你的 Agent：${TRACKS.map((t) => t.name).join("、")} ${WAYS}种方式，匿名只读，无需 API Key，一分钟接好。`,
     path,
     image: "/og/pages/agent.png",
   });
 }
 
 export default function AgentPage() {
+  return ACCESS ? <InternalAgent /> : <PublicAgentPage />;
+}
+
+function InternalAgent() {
+  return <div className="mx-auto max-w-[var(--page-max-reading)] py-8"><PhoneBar back={{ to: "/more", label: "我的" }} title="内部接口说明" /><Kicker>内部访问</Kicker><h1 className="mt-4 text-[26px] font-semibold text-ink">接口与成员权限</h1><div className="mt-6 space-y-5 text-[14px] leading-7 text-ink-3"><p>本工作空间不是匿名公开站点。网页、资料下载、RSS 与只读 API 都需要有效的成员或管理员会话；链接本身不授予访问权。</p><p><strong className="text-ink">MCP 暂未开放。</strong>当前版本拒绝 MCP POST 请求，因此不能直接配置远程 MCP 客户端使用；不会要求你把浏览器 Cookie 复制给第三方客户端。</p><p>成员仅有读取权限，账号由管理员创建、停用和重置。不要把内部资料、会话 Cookie 或任何密钥转发给未授权人员或第三方服务。</p><p>在接口客户端登录、令牌管理与授权范围完成验收前，请通过本站阅读和检索资料。</p></div></div>;
+}
+
+function PublicAgentPage() {
   const { healthy, base, now } = useLoaderData<typeof loader>();
   const [params] = useSearchParams();
   const navigate = useNavigate();

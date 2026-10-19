@@ -60,6 +60,69 @@ MCP 默认接受 `SITE_URL` 的主机以及 `localhost`、`127.0.0.1`、`[::1]`�
 
 前面有 Nginx、CDN 这类缓存时，要遵循应用返回的缓存期限（`Cache-Control`）：公开网页、导航数据、API、RSS、条目 Markdown、报告分享图、站点地图，以及接入说明 `/api/v1/agent` 和 `/openapi-v1.json`（五分钟到期后也要重新验证），都不要另加更长的缓存期，不要在到期后离线返回旧内容，也不要在转发旧响应时重新起算它的寿命；不要让代理和 CDN 叠加缓存动态内容。框架不代管自建站的 CDN，也不替它清缓存。
 
+### 内网部署（装了 access 模块、和别的业务共用服务器）
+
+站点装了 `modules/access` 时，所有页面和接口都要登录。和别的业务共用一台服务器时，用独立的项目名，并叠上 `deploy/internal.compose.yml`：镜像名不和别的项目重名，数据库、文件和证书放在数据盘的目录里，数据库密码必须填，容器日志有上限，web 带健康检查。
+
+对外只开一个 HTTPS 端口，不占 80/443：Caddy 在容器里终结 TLS，用自己的证书颁发机构签发证书（非标准端口没法用 Let’s Encrypt 验证）。下面以子域名 `power.notvitamin.com`（解析到这台服务器）和端口 18443 为例；换子域名只改 `SITE_URL` 和 `SITE_DOMAIN`。
+
+1. `.env` 里除了必填项，再写：
+
+   ```bash
+   SITE_URL=https://power.notvitamin.com:18443   # 必须和同事浏览器里输入的地址一字不差（含端口），否则登录被拒（403）
+   SITE_DOMAIN=power.notvitamin.com
+   CADDYFILE=./deploy/Caddyfile.internal
+   CADDY_HTTPS=192.168.0.37:18443                # 对外的唯一端口，绑内网网卡；先确认空闲
+   CADDY_HTTP=127.0.0.1:18081                    # 用不到，只是不占 80
+   SITE_TLS=internal                             # Caddy 自带证书；有公司证书时写 "/certs/fullchain.pem /certs/key.pem" 并设 CERT_DIR
+   PORT=127.0.0.1:18110                          # web 只给本机的 Caddy 和检查用，不能对外（见下）
+   TRUST_PROXY=true                              # 访客地址从 Caddy 的 X-Forwarded-For 读，登录限流按它计数
+   POWERAI_DATA_ROOT=/rdata/powerai-ai-internal
+   COLLECT_ENABLED=false                         # 首次启动先关着，确认登录、成员和页面正常，再打开
+   MODEL_CALLS_ENABLED=false
+   ```
+
+   `TRUST_PROXY=true` 时 web 采信转发头，所以 `PORT` 只能绑 `127.0.0.1`：直接对外的话，访客可以自报地址绕过登录限流。
+
+2. 启动（先确认 `id -u`：data 目录要让容器里的 node 用户 uid 1000 可写，不是 1000 时请服务器管理员 `chown 1000:1000` 这个目录）：
+
+   ```bash
+   mkdir -p /rdata/powerai-ai-internal/{db,data,caddy}
+   C="docker compose -p powerai-ai-internal -f docker-compose.yml -f deploy/internal.compose.yml --profile https"
+   $C build && $C run --rm setup && $C up -d
+   $C ps                                                          # web 显示 healthy
+   $C exec -T web node scripts/smoke.ts --base http://127.0.0.1:3000   # 匿名边界：页面跳登录页、接口 401
+   ```
+
+3. 证书：导出 Caddy 的根证书，发给同事装到“受信任的根证书颁发机构”（Windows 双击 `.crt` 安装；macOS 用钥匙串设为始终信任；手机在设置里安装并信任）。根证书存在数据盘的 `caddy/` 下，重建容器不会变；丢了它就要重新分发。
+
+   ```bash
+   $C exec -T caddy cat /data/caddy/pki/authorities/local/root.crt > powerai-root.crt
+   ```
+
+4. 首个管理员用 `.env` 里的 `ADMIN_PASSWORD` 从 `https://power.notvitamin.com:18443/admin/login` 登录，在后台“访问控制 → 成员管理”里给同事建账号（口令至少 12 位）。同事登录后只能阅读和提交反馈；RSS、MCP 和公开 API 在内部站点都需要登录，暂不对外。用 IP 或别的地址打开会被拒绝。
+
+5. 确认模型服务商可用（见下一节）后，把 `COLLECT_ENABLED`、`MODEL_CALLS_ENABLED` 改成 `true`，`$C up -d` 生效；上线当天按“备份”一节手动做一份并演练恢复。
+
+### 更换大模型服务商
+
+一个服务商额度用完或要换一家时，不需要改代码：
+
+1. 在 `.env` 里加密钥，并在 `MODEL_PROVIDERS` 里登记这家服务（任何 OpenAI 兼容接口都行，密钥只写变量名，不写在 JSON 里），重启 api 和 worker：
+
+   ```bash
+   SILICONFLOW_API_KEY=sk-…
+   MODEL_PROVIDERS=[{"key":"sf-deepseek","model":"deepseek-ai/DeepSeek-V3","baseUrl":"https://api.siliconflow.cn/v1","apiKeyEnv":"SILICONFLOW_API_KEY"}]
+   ```
+
+   写错时站点照常运行，只是这些模型不加载：后台“模型与评测”页会用红字写出哪里不对，api 和 worker 日志里有 `MODEL_PROVIDERS ignored`。
+
+   可选字段：`extra`（额外请求字段，如关掉推理 `{"enable_thinking":false}`）、`reasoningTokens`（推理模型额外的输出额度）、`jsonMode`（接口不支持 JSON 模式时填 `false`）、`vision`（能看图）。自定义的模型都算在默认模型服务（`llm`）名下：共用它的调用上限（后台“设置”里调）和欠费告警。
+2. 后台“模型与评测” → “更换模型服务商”：选这个模型，点“测试连通”（一次很小的真实调用，确认地址、密钥和余额），通过后点“全部步骤切换”。也可以只给某几步换，比如精选评分换一家、其余留着。
+3. 之前因为余额不足而处理失败的内容，到后台“运行”页点“全部重新处理”。
+
+只改 `.env` 里的 `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL` 也能换默认模型，但精选评分和周报月报在站点配置里指向了 DeepSeek 的预设，不会跟着变，要在后台单独切换。换模型后精选门槛需要用标注样本重新校准（`docs/selection.md`）。
+
 ### 更新
 
 正文原生视频修复会为已有可用视频补播放控件，并去掉空播放器，不写回文章、不调用模型。旧版清洗时已经丢弃的媒体地址无法从存档恢复；升级不批量重新抽取，已有成功正文会跳过抽取，内容哈希相同时重新抽取也可能保留原 HTML。后续新正文按[信源说明](sources.md)保留原生视频，文件继续由浏览器直连原站，签名地址可能过期。
@@ -187,7 +250,30 @@ MCP 的 `subscriptions/listen` 现在立即返回 HTTP 404 和 JSON-RPC `-32601 
 
 ### 备份
 
-在 `.env` 里配置 `DB_BACKUP_STORE_*`（任何 S3 兼容的对象存储），每天 04:10 自动备份到那里。`DB_BACKUP_STORE_SECRET_ID`、`DB_BACKUP_STORE_SECRET_KEY`、`DB_BACKUP_STORE_BUCKET`、`DB_BACKUP_STORE_REGION` 四项都要填；不填 `DB_BACKUP_STORE_DOMAIN` 时按腾讯云 COS 拼地址（`<桶名>.cos.<地域>.myqcloud.com`），用其他 S3 兼容存储时，把这个存储桶的访问域名（含桶名，例如 AWS S3 的 `<桶名>.s3.<地域>.amazonaws.com`）填进 `DB_BACKUP_STORE_DOMAIN`。
+装了 `modules/access` 的内部站点不往外传备份：每天 04:10 在数据目录的 `backups/` 下做一份本地快照（`aihot-snapshot-<时间>-<随机>/`，内有 `.dump`、文件包 `.tar.gz` 和记录校验值的 `manifest.json`），保留最近 3 份，即使配置了 `DB_BACKUP_STORE_*` 也不上传。本地快照和数据在同一块盘上，请另行把 `backups/` 定期复制到另一台机器。上线前手动做一份并演练恢复：
+
+```bash
+$C exec -T worker node scripts/backup.ts
+```
+
+恢复演练（恢复到临时库，不碰正在运行的库）：
+
+```bash
+SNAP=$($C exec -T worker sh -c 'ls -d /data/backups/aihot-snapshot-* | tail -1')
+$C exec -T db createdb -U aihot drill
+$C exec -T worker sh -c "cat $SNAP/aihot-*.dump" | $C exec -T db pg_restore -U aihot -d drill --no-owner
+$C exec -T db psql -U aihot -d drill -c "SELECT count(*) FROM access_members"   # 和线上的成员数一致
+$C exec -T worker sh -c "tar -tzf $SNAP/aihot-files-*.tar.gz" | head            # 文件包可读
+$C exec -T db dropdb -U aihot drill
+```
+
+复制到另一台机器（备份文件属于容器里的 node 用户，经容器读出，不需要 sudo）：
+
+```bash
+$C exec -T worker tar -C /data -cf - backups | ssh 备份机 'cat > powerai-backups-$(date +%F).tar'
+```
+
+公开站点在 `.env` 里配置 `DB_BACKUP_STORE_*`（任何 S3 兼容的对象存储），每天 04:10 自动备份到那里。`DB_BACKUP_STORE_SECRET_ID`、`DB_BACKUP_STORE_SECRET_KEY`、`DB_BACKUP_STORE_BUCKET`、`DB_BACKUP_STORE_REGION` 四项都要填；不填 `DB_BACKUP_STORE_DOMAIN` 时按腾讯云 COS 拼地址（`<桶名>.cos.<地域>.myqcloud.com`），用其他 S3 兼容存储时，把这个存储桶的访问域名（含桶名，例如 AWS S3 的 `<桶名>.s3.<地域>.amazonaws.com`）填进 `DB_BACKUP_STORE_DOMAIN`。
 
 一次完整备份包含同一时间戳的数据库 `.dump` 和文件包 `.tar.gz`，文件名取自数据库名：Docker 里数据库叫 `aihot`，所以是 `aihot-<时间>.dump` 和 `aihot-files-<时间>.tar.gz`。文件包保留 `uploads/` 以及仍存本地的 `feedback-screenshots/`，不包含图片缓存或本地备份目录。已经转发到飞书的图片只保留数据库中的外部引用，文件包不保存飞书上的图片。
 

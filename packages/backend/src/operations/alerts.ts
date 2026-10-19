@@ -14,7 +14,7 @@ import { stepsOnService } from "../editorial/models.ts";
 import { backupConfigured } from "./backup.ts";
 import { GROUPING_WARN_AFTER_MS, waitingSelectedNews } from "./grouping.ts";
 import { upstreamFindings } from "../media/upstream.ts";
-import { responder, serverModules } from "../modules.ts";
+import { remoteBackupDenied, responder, serverModules } from "../modules.ts";
 import { sourceHealth, sourceHealthList } from "../sources/health.ts";
 
 const REPEAT_MS: Record<Exclude<Level, "later">, number> = { now: 3600_000, today: 24 * 3600_000 };
@@ -134,17 +134,24 @@ export async function collectFindings(now = Date.now()): Promise<Finding[]> {
     });
   }
 
-  if (backupConfigured()) {
-    const [b] = await sql<{ value: { at: string; uploaded: boolean; filesError?: string } }[]>`SELECT value FROM settings WHERE key = 'backup.last'`;
+  const localOnlyBackup = remoteBackupDenied();
+  if (localOnlyBackup || backupConfigured()) {
+    const [b] = await sql<{ value: { at: string; uploaded: boolean; local?: boolean; filesError?: string; retentionError?: string } }[]>`SELECT value FROM settings WHERE key = 'backup.last'`;
     // A failed archive updates backup.last too. Reuse the run history so repeated failures cannot
     // reset the age; before the first success, count from the first attempt rather than from now.
-    const [runs] = await sql<{ last_ok: Date | null; first_attempt: Date | null }[]>`
-      SELECT max(finished_at) FILTER (WHERE status = 'ok') AS last_ok, min(started_at) AS first_attempt
+    const [runs] = await sql<{ last_ok: Date | null; last_failed: Date | null; first_attempt: Date | null }[]>`
+      SELECT max(finished_at) FILTER (WHERE status = 'ok') AS last_ok,
+        max(finished_at) FILTER (WHERE status = 'failed') AS last_failed, min(started_at) AS first_attempt
       FROM job_runs WHERE job = 'ops.backup'`;
-    const lastOk = Math.max(runs?.last_ok?.getTime() ?? 0, b?.value.uploaded ? Date.parse(b.value.at) : 0);
+    const complete = localOnlyBackup ? b?.value.local === true : b?.value.uploaded === true;
+    const lastOk = Math.max(runs?.last_ok?.getTime() ?? 0, complete ? Date.parse(b!.value.at) : 0);
+    const latestFailed = (runs?.last_failed?.getTime() ?? 0) > lastOk;
     const since = lastOk || runs?.first_attempt?.getTime() || now;
     const age = now - since;
-    const state = b?.value.filesError ? `数据库已上传，附件打包失败：${b.value.filesError}` : b?.value.uploaded === false ? "未上传" : "";
+    const state = b?.value.filesError
+      ? `${localOnlyBackup ? "本地备份不完整" : "数据库已上传，附件打包失败"}：${b.value.filesError}`
+      : b?.value.retentionError ? `备份已完成，但旧快照清理失败：${b.value.retentionError}`
+      : latestFailed ? "最近一次备份失败" : !complete ? (localOnlyBackup ? "尚无完整的本地备份" : "未上传") : "";
     if (age > 50 * 3600_000) {
       out.push({
         key: "backup.failed",
@@ -156,8 +163,11 @@ export async function collectFindings(now = Date.now()): Promise<Finding[]> {
         detail: `${lastOk ? "最近一次成功" : "首次备份尝试"} ${beijingStamp(since)}${state ? `；${state}` : ""}；看 ops.backup 的运行记录`,
         since: new Date(since),
       });
-    } else if (!b || !b.value.uploaded || age > 30 * 3600_000) {
-      out.push({ key: "backup.stale", level: "later", title: "数据库备份超过一天没成功", detail: b ? `最近一次 ${beijingStamp(b.value.at)}${state ? `（${state}）` : ""}；看 ops.backup` : "还没有成功的备份记录" });
+    } else if (!complete || latestFailed || age > 30 * 3600_000) {
+      const detail = latestFailed
+        ? `最近一次失败 ${beijingStamp(runs!.last_failed!)}${lastOk ? `；最近一次成功 ${beijingStamp(lastOk)}` : "；尚无成功备份"}${state ? `；${state}` : ""}；看 ops.backup`
+        : b ? `最近一次 ${beijingStamp(b.value.at)}${state ? `（${state}）` : ""}；看 ops.backup` : "还没有成功的备份记录";
+      out.push({ key: "backup.stale", level: "later", title: latestFailed ? "最近一次数据库备份失败" : "数据库备份超过一天没成功", detail });
     }
   }
 
@@ -192,8 +202,8 @@ export async function collectFindings(now = Date.now()): Promise<Finding[]> {
     }
   }
   const [r] = await sql<{ receipts: number; services: string | null; deliveries: number }[]>`
-    SELECT (SELECT count(*)::int FROM receipts WHERE status = 'unknown') AS receipts,
-           (SELECT string_agg(DISTINCT service || '/' || purpose, '、') FROM receipts WHERE status = 'unknown') AS services,
+    SELECT (SELECT count(*)::int FROM receipts WHERE status = 'unknown' AND purpose <> 'model_check') AS receipts,
+           (SELECT string_agg(DISTINCT service || '/' || purpose, '、') FROM receipts WHERE status = 'unknown' AND purpose <> 'model_check') AS services,
            (SELECT count(*)::int FROM deliveries WHERE status = 'unknown') AS deliveries`;
   if (r!.receipts > 0) {
     out.push({ key: "receipts.unknown", level: "later", title: `${r!.receipts} 个付费请求的结果尚未确认`, detail: `${r!.services}；可能影响内容处理，后台“运行”页查看影响；自动恢复后仍未知的请求需核对后放行` });
@@ -242,9 +252,12 @@ export const providerConsole = (service: string) => PROVIDERS[service]?.where ??
 async function providerFindings(): Promise<Finding[]> {
   const out: Finding[] = [];
   const refused = await sql<{ service: string; n: number; last: string }[]>`
-    SELECT service, count(*)::int AS n, (array_agg(left(error, 200) ORDER BY started_at DESC))[1] AS last FROM receipt_attempts
-    WHERE status = 'failed' AND started_at > now() - interval '1 hour'
-      AND error ~* '(HTTP 40[123]\\M|insufficient|balance|arrear|good standing|欠费|余额)'
+    SELECT a.service, count(*)::int AS n, (array_agg(left(a.error, 200) ORDER BY a.started_at DESC))[1] AS last
+    FROM receipt_attempts a JOIN receipts r ON r.id = a.receipt_id
+    WHERE a.status = 'failed' AND a.started_at > now() - interval '1 hour'
+      AND a.error ~* '(HTTP 40[123]\\M|insufficient|balance|arrear|good standing|欠费|余额)'
+      -- An admin's connectivity check of a model (admin/models.ts testModel) is not an outage of the service in use.
+      AND r.purpose <> 'model_check'
     GROUP BY 1 HAVING count(*) >= 3`;
   for (const p of refused) {
     out.push({
@@ -254,7 +267,7 @@ async function providerFindings(): Promise<Finding[]> {
       title: `${providerName(p.service)} 拒绝服务，可能欠费或账号失效`,
       impact: providerStops(p.service),
       heals: "不会",
-      action: `去${providerConsole(p.service)}看余额和账号状态，充值或恢复后系统会自动继续；两样都正常的话，发起一次维护查原因`,
+      action: `去${providerConsole(p.service)}看余额和账号状态，充值或恢复后新内容会自动继续，被拒期间处理失败的内容要在后台“运行”页点“全部重新处理”；两样都正常的话，发起一次维护查原因`,
       detail: `最近 1 小时被拒 ${p.n} 次：${p.last}`,
     });
   }

@@ -2,6 +2,12 @@ import {
   isRouteErrorResponse, Link, Links, Meta, Outlet, Scripts, ScrollRestoration, useLoaderData, useLocation, useNavigation, useRouteError, useRouteLoaderData,
   type ShouldRevalidateFunction,
 } from "react-router";
+import { pageTarget, pageGuard } from "@aihot/contracts/access";
+import { ACCESS } from "./lib/access";
+import { requireAccess } from "./lib/access.server";
+import { adminGet } from "./lib/admin.server";
+import type { AdminMe } from "@aihot/contracts/admin";
+import { accessBootScript } from "./lib/access-browser";
 import type { SiteMeta } from "@aihot/contracts/site";
 import { SITE } from "@aihot/site";
 import { RingMark } from "@aihot/site/brand/Logo.tsx";
@@ -25,25 +31,34 @@ export const links: Route.LinksFunction = () => [
   { rel: "icon", href: "/favicon.ico", sizes: "any" },
   { rel: "icon", type: "image/png", href: "/icon.png" },
   { rel: "apple-touch-icon", href: "/apple-icon.png" },
-  { rel: "manifest", href: "/manifest.webmanifest" },
-  { rel: "alternate", type: "application/rss+xml", title: `${SITE.name} — 精选`, href: "/feed.xml" },
+  // Browsers fetch the manifest without cookies; an internal site would only answer 401.
+  ...(ACCESS ? [] : [{ rel: "manifest", href: "/manifest.webmanifest" }]),
+  // Feed readers cannot carry a member session.
+  ...(ACCESS ? [] : [{ rel: "alternate", type: "application/rss+xml", title: `${SITE.name} — 精选`, href: "/feed.xml" }]),
 ];
 
 /** The release rendering this document: once a newer one is deployed, a render error reloads the page (entry.client). */
 export async function loader({ request }: Route.LoaderArgs) {
   const release = process.env.AIHOT_RELEASE ?? null;
+  const path = pageTarget(new URL(request.url).pathname)?.path ?? "/";
+  const login = ACCESS && (pageGuard(ACCESS, path) === "open" || /^\/admin\/login\/?$/i.test(path));
+  const principal = ACCESS && !login ? await requireAccess(request) : null;
+  const adminSession = ACCESS && !login && /^\/admin(?:\/|$)/i.test(path) ? await adminGet<AdminMe>(request, "/api/admin/me") : null;
+  if (login || adminSession) return { changelogVersion: null, release, principal, adminSession };
   try {
     const meta = await apiGet<SiteMeta>("/api/site/meta", {
+      request,
       headers: Object.assign({}, ...webModules().map((m) => m.root?.documentHeaders?.(request) ?? {})),
       signal: request.signal,
     });
-    return { ...meta, release };
-  } catch {
-    return { changelogVersion: null, release };
+    return { ...meta, release, principal, adminSession };
+  } catch (error) {
+    if (ACCESS) throw error;
+    return { changelogVersion: null, release, principal, adminSession };
   }
 }
 
-export const shouldRevalidate: ShouldRevalidateFunction = () => false;
+export const shouldRevalidate: ShouldRevalidateFunction = () => !!ACCESS;
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const site = useRouteLoaderData<typeof loader>("root");
@@ -59,12 +74,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="apple-mobile-web-app-title" content={SITE.name} />
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         {webModules().map((m) => m.root?.bootScript && <script key={m.name} dangerouslySetInnerHTML={{ __html: m.root.bootScript }} />)}
+        {ACCESS && <>
+          <meta name="robots" content="noindex, nofollow" />
+          <style>{"html[data-access-paused] body{visibility:hidden!important}"}</style>
+          <script dangerouslySetInnerHTML={{ __html: accessBootScript(site?.principal ? { id: site.principal.id, csrf: site.principal.csrf, ...(site.adminSession ? { adminCsrf: site.adminSession.csrf } : {}) } : null, ACCESS.loginPath, ACCESS.sessionPath) }} />
+        </>}
         <Meta />
         <Links />
       </head>
       <body>
         {children}
-        <ScrollRestoration getKey={(location) => location.key} />
+        {!ACCESS && <ScrollRestoration getKey={(location) => location.key} />}
         <Scripts />
       </body>
     </html>
@@ -121,7 +141,7 @@ export default function App() {
     return () => document.removeEventListener("touchstart", noop);
   }, []);
   // The admin has its own chrome.
-  if (pathname === "/admin" || pathname.startsWith("/admin/")) return <Outlet />;
+  if (/^\/admin(?:\/|$)/i.test(pathname) || (ACCESS && pageGuard(ACCESS, pathname) === "open")) return <Outlet />;
   return (
     <>
       <SiteShell changelogVersion={meta.changelogVersion}>

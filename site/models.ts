@@ -60,4 +60,5 @@ export const PRESETS: Record<string, ModelPreset> = {
  * 每一步默认用的模型（步骤见后台“模型与评测”页），值是上面的名字或 default。没写的步骤用 default。
  * 例：{ score: "glm-5.3-flash-selection", groupReview: "mimo-v2.6-flash" }
  */
-export const DEFAULTS: Record<string, string> = {};
+// 默认模型是 .env 里的 DeepSeek Flash（关推理），预筛、写作、结构化、归组、事件综述都用它；评分和周报月报要多想一步，用开推理的 Flash。
+export const DEFAULTS: Record<string, string> = { score: "deepseek-flash-think", report: "deepseek-flash-think" };

@@ -1,3 +1,4 @@
+import { ACCESS } from "../../lib/access";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { SITE } from "@aihot/site";
@@ -23,7 +24,7 @@ function SideLink({ item, dot }: { item: NavItem; dot: boolean }) {
   return (
     <Link
       to={item.to}
-      prefetch="intent"
+      reloadDocument={!!ACCESS} prefetch={ACCESS ? "none" : "intent"}
       aria-current={isActive ? "page" : undefined}
       className={`flex h-10 items-center gap-2.5 rounded-control px-2.5 text-[14px] transition-colors duration-150 ${
         isActive ? "bg-accent/10 font-semibold text-ink dark:bg-accent-soft" : "font-medium text-ink-3 hover:bg-bg-sunk hover:text-ink"

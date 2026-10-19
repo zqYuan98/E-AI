@@ -1,6 +1,7 @@
 // Reader state kept only in this browser, and the site's one guarded way to browser storage. Keep the
 // keys and formats once readers have data under them: existing readers' data must stay readable as-is.
 // Storage failures degrade silently.
+import { ACCESS } from "./access.ts";
 import { useEffect, useSyncExternalStore } from "react";
 import { beijingDate } from "@aihot/contracts/time";
 
@@ -44,6 +45,7 @@ function storage(kind: StorageKind): Storage | null {
 
 /** A stored string; null when it is missing or storage is unavailable. */
 export function readRaw(key: string, kind: StorageKind = "local"): string | null {
+  if (ACCESS && key !== KEYS.theme) return null;
   try {
     return storage(kind)?.getItem(key) ?? null;
   } catch {
@@ -64,6 +66,7 @@ export function readJson(key: string, kind: StorageKind = "local"): unknown {
 
 /** Stores a string, or removes the key for null; false when nothing was saved (storage full or unavailable). */
 export function writeRaw(key: string, value: string | null, kind: StorageKind = "local"): boolean {
+  if (ACCESS && key !== KEYS.theme && value !== null) return false;
   try {
     const s = storage(kind);
     if (!s) return false;
@@ -77,8 +80,10 @@ export function writeRaw(key: string, value: string | null, kind: StorageKind = 
 
 /** The keys in this browser's storage; none when it is unavailable. */
 export function storedKeys(kind: StorageKind): string[] {
-  const s = storage(kind);
-  return s ? Array.from({ length: s.length }, (_, i) => s.key(i)!) : [];
+  try {
+    const s = storage(kind);
+    return s ? Array.from({ length: s.length }, (_, i) => s.key(i)!).filter(Boolean) : [];
+  } catch { return []; }
 }
 
 // change notification (same tab via events, other tabs via the storage event)

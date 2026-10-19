@@ -34,7 +34,7 @@ const api = createServer((req, res) => {
   if (url.pathname === "/api/site/items/video-fixture") {
     const detail: SiteItemDetail = {
       id: "video-fixture", title: "原生视频检查", summary: "固定摘要", reason: "固定推荐理由", source: { name: "Fixture" },
-      publishedAt: at, timelineAt: at, discoveredAt: at, category: "ai-models", tags: [], score: 80, selected: true,
+      publishedAt: at, timelineAt: at, discoveredAt: at, category: "models", tags: [], score: 80, selected: true,
       channel: "news", x: null, originalTitle: "Video fixture", links: { original: "https://example.org/article" },
       story: null, readingMode: "full", author: null, outline: [], relatedStories: [], topics: [], indexable: true,
       markdownAvailable: true, group: null, hasTranslation: true, bodyLanguage: "zh",
@@ -65,11 +65,12 @@ after(async () => {
 for (const engine of ["Chromium", "WebKit"] as const) {
   test(`${engine}: native video waits for interaction, selects a supported source, plays and pauses`, async () => {
     const browser = engine === "Chromium" ? chrome : safari;
-    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const context = await browser.newContext({ proxy: { server: web.origin, bypass: "127.0.0.1,localhost" }, viewport: { width: 390, height: 844 } });
     const page = await context.newPage();
     const beforeRequests = mediaRequests;
     try {
-      await page.goto(web.origin + "/items/video-fixture");
+      // The test deliberately keeps media unloaded; readiness is the DOM, not a media load event.
+      await page.goto(web.origin + "/items/video-fixture", { waitUntil: "domcontentloaded" });
       const video = page.locator(".prose video");
       await expect(video).toBeVisible();
       await expect(video).toHaveAttribute("preload", "none");

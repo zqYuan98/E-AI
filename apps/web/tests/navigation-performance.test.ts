@@ -12,12 +12,12 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { before, after, test } from "node:test";
-import { chromium, webkit, expect, type Browser } from "@playwright/test";
+import { chromium, webkit, expect, type Browser, type BrowserContextOptions } from "@playwright/test";
 import type { FeedItemSummary, SiteItemDetail, ReportDetail } from "@aihot/contracts/site";
 import { startWebServer, type WebServer } from "./web-server.ts";
 
 const at = '2026-10-04T08:00:00.000Z';
-const item: FeedItemSummary = {id:'navigation-fixture',title:'性能检查文章',summary:'固定摘要',reason:'固定推荐理由',source:{name:'Fixture'},publishedAt:at,timelineAt:at,category:'ai-models',tags:[],score:80,selected:true,channel:'news',x:null};
+const item: FeedItemSummary = {id:'navigation-fixture',title:'性能检查文章',summary:'固定摘要',reason:'固定推荐理由',source:{name:'Fixture'},publishedAt:at,timelineAt:at,category:'models',tags:[],score:80,selected:true,channel:'news',x:null};
 const detail: SiteItemDetail = {...item,x:null,originalTitle:'Fixture article',links:{original:'https://example.org/article'},discoveredAt:at,story:null,readingMode:'full',author:null,body:{zh:'<p>固定正文</p>',original:null,zhKind:'translation',complete:true},outline:[],relatedStories:[],topics:[],indexable:true,markdownAvailable:true,group:null,hasTranslation:true,bodyLanguage:'zh'};
 const codeSource='import json\n\nwith open("data.json") as file:\n    data = json.load(file)\n\nfor record in data:\n    print(record["title"])\n';
 const readerBody=Array.from({length:30},(_,i)=>`<p>阅读段落 ${i}：先阅读文章，再查看后面的代码和图片。正文保持可读，图片和代码在需要时增强。</p>`).join('')
@@ -83,10 +83,16 @@ after(async()=>{
   await web?.stop();
 });
 
+// No HTTP interception: it disables browser caching and invalidates the prefetch assertions.
+// Non-loopback URLs go to the fake web server, which is not a forward proxy; CONNECT is rejected.
+function localContext(browser: Browser, options: BrowserContextOptions = {}) {
+  return browser.newContext({ ...options, proxy: { server: origin, bypass: "127.0.0.1,localhost" } });
+}
+
 // One engine per behaviour: WebKit for what phone readers do (iPhone Safari), Chromium for desktop-only
 // intent such as hover. The router and caches are the same code in both.
 test('SSR list and visited query variants return offline without another read',async()=>{
-  const context=await safari.newContext({viewport:{width:390,height:844}});
+  const context=await localContext(safari, {viewport:{width:390,height:844}});
   const page=await context.newPage();
   try{
     await page.goto(origin+'/');
@@ -98,20 +104,21 @@ test('SSR list and visited query variants return offline without another read',a
     await expect(page.getByRole('link',{name:'性能检查文章',exact:true})).toBeVisible({timeout:1500});
     await context.setOffline(false);
     await page.getByRole('button',{name:/^筛选/}).click();
-    await page.getByRole('link',{name:'模型',exact:true}).click();
-    await expect(page.getByRole('link',{name:'分类 ai-models',exact:true})).toBeVisible();
+    await page.getByRole('link',{name:'大模型',exact:true}).click();
+    await expect(page.getByRole('link',{name:'分类 models',exact:true})).toBeVisible();
     await page.getByRole('button',{name:/^筛选/}).click();
-    await page.getByRole('link',{name:'产品',exact:true}).click();
-    await expect(page.getByRole('link',{name:'分类 ai-products',exact:true})).toBeVisible();
+    await page.getByRole('link',{name:'场景落地',exact:true}).click();
+    await expect(page.getByRole('link',{name:'分类 applications',exact:true})).toBeVisible();
     await context.setOffline(true);
     await page.goBack();
-    await expect(page.getByRole('link',{name:'分类 ai-models',exact:true})).toBeVisible({timeout:1500});
-    await expect(page.locator('link[rel=canonical]')).toHaveAttribute('href',origin+'/?category=ai-models');
+    await expect(page.getByRole('link',{name:'分类 models',exact:true})).toBeVisible({timeout:1500});
+    await expect(page.locator('link[rel=canonical]')).toHaveAttribute('href',origin+'/?category=models');
   }finally{await context.close();}
 });
 
 test('hover still fetches article data, touches that move do not, and failed prefetch does not replace the current page',async()=>{
-  const context=await chrome.newContext();const page=await context.newPage();
+  const context=await localContext(chrome);
+  const page=await context.newPage();
   try{
     await page.goto(origin+'/');
     const link=page.getByRole('link',{name:'性能检查文章',exact:true});
@@ -124,7 +131,7 @@ test('hover still fetches article data, touches that move do not, and failed pre
     assert.equal(hits.slice(start).filter(x=>x.startsWith('/api/site/items/')).length,1);
     await link.click();await expect(page.getByText('固定正文',{exact:true})).toBeVisible();
     assert.equal(hits.slice(start).filter(x=>x.startsWith('/api/site/items/')).length,1,'navigation reuses its intent-prefetched response');
-    const fresh=await chrome.newContext();const freshPage=await fresh.newPage();
+    const fresh=await localContext(chrome);const freshPage=await fresh.newPage();
     try{
       await freshPage.goto(origin+'/');failing='/api/site/items/navigation-fixture';
       const failed=freshPage.waitForResponse(r=>r.url().includes('/items/navigation-fixture.data')&&r.status()===503);
@@ -135,7 +142,7 @@ test('hover still fetches article data, touches that move do not, and failed pre
 });
 
 test('SSR all-pages and report kinds return offline with their own content',async()=>{
-  const context=await chrome.newContext();const page=await context.newPage();
+  const context=await localContext(chrome);const page=await context.newPage();
   try{
     await page.goto(origin+'/all');
     await page.locator('a[href="/all?page=2"]').first().click();
@@ -153,29 +160,29 @@ test('SSR all-pages and report kinds return offline with their own content',asyn
 // A prefetch of the newly selected link must not be mistaken for an explicit refresh of that page.
 // Disable HTTP reuse here: otherwise the browser cache can hide a lost document-level result.
 test('intent on a selected link preserves visited data and the next revisit starts no data request',async()=>{
-  const context=await chrome.newContext();const page=await context.newPage();
+  const context=await localContext(chrome);const page=await context.newPage();
   const requests:string[]=[];
   await context.route('**/*.data*',route=>route.continue());
   page.on('request',request=>{if(request.url().includes('.data'))requests.push(request.url());});
   try{
     await page.goto(origin+'/');
-    await page.getByRole('link',{name:'模型',exact:true}).click();
-    await expect(page.getByRole('link',{name:'分类 ai-models',exact:true})).toBeVisible();
-    await page.getByRole('link',{name:'模型',exact:true}).focus();
+    await page.getByRole('link',{name:'大模型',exact:true}).click();
+    await expect(page.getByRole('link',{name:'分类 models',exact:true})).toBeVisible();
+    await page.getByRole('link',{name:'大模型',exact:true}).focus();
     await page.waitForTimeout(150);
-    await page.getByRole('link',{name:'产品',exact:true}).click();
-    await expect(page.getByRole('link',{name:'分类 ai-products',exact:true})).toBeVisible();
-    await page.getByRole('link',{name:'产品',exact:true}).focus();
+    await page.getByRole('link',{name:'场景落地',exact:true}).click();
+    await expect(page.getByRole('link',{name:'分类 applications',exact:true})).toBeVisible();
+    await page.getByRole('link',{name:'场景落地',exact:true}).focus();
     await page.waitForTimeout(150);
     const before=requests.length;
-    await page.getByRole('link',{name:'模型',exact:true}).click();
-    await expect(page.getByRole('link',{name:'分类 ai-models',exact:true})).toBeVisible();
+    await page.getByRole('link',{name:'大模型',exact:true}).click();
+    await expect(page.getByRole('link',{name:'分类 models',exact:true})).toBeVisible();
     assert.deepEqual(requests.slice(before),[],'neither prefetch nor navigation may evict and reload a still-valid visited page');
   }finally{await context.close();}
 });
 
 test('a revisit never renews the original deadline; an expired read shows an error and a reload asks again',async()=>{
-  const context=await chrome.newContext();const page=await context.newPage();
+  const context=await localContext(chrome);const page=await context.newPage();
   try{
     await page.clock.install();ttl=1;
     await page.goto(origin+'/');
@@ -189,7 +196,7 @@ test('a revisit never renews the original deadline; an expired read shows an err
 });
 
 test('SSR freshness spent in an upstream cache is not renewed by HTML hydration',async()=>{
-  const context=await chrome.newContext();const page=await context.newPage();
+  const context=await localContext(chrome);const page=await context.newPage();
   try{
     ttl=0;await page.goto(origin+'/');
     await page.getByRole('link',{name:'性能检查文章',exact:true}).click();await expect(page.getByText('固定正文',{exact:true})).toBeVisible();
@@ -200,7 +207,7 @@ test('SSR freshness spent in an upstream cache is not renewed by HTML hydration'
 });
 
 test('Agent tabs finish offline with matching canonical; invalid direct tabs and anchored links keep a panel',async()=>{
-  const context=await chrome.newContext();const page=await context.newPage();
+  const context=await localContext(chrome);const page=await context.newPage();
   try{
     await page.goto(origin+'/agent');
     await context.setOffline(true);
@@ -227,7 +234,7 @@ test('Agent tabs finish offline with matching canonical; invalid direct tabs and
 });
 
 test('phone suggestions load only on opening, use one small read, retry failures and update on reopening',async()=>{
-  const context=await safari.newContext({viewport:{width:390,height:844}});const page=await context.newPage();
+  const context=await localContext(safari, {viewport:{width:390,height:844}});const page=await context.newPage();
   try{
     suggestionsVersion=1;await page.goto(origin+'/');
     assert.equal(hits.filter(x=>x==='/api/site/search/suggestions').length,0);
@@ -250,7 +257,7 @@ test('phone suggestions load only on opening, use one small read, retry failures
 });
 
 test('reader enhancements wait for visible code and update only the picture that loaded',async()=>{
-  const context=await safari.newContext({viewport:{width:390,height:844}});
+  const context=await localContext(safari, {viewport:{width:390,height:844}});
   const page=await context.newPage();
   const scripts:string[]=[];page.on('request',r=>{if(r.url().includes('/assets/')&&r.url().includes('highlight-'))scripts.push(r.url());});
   await page.route('**/reader-image/*.svg',route=>route.fulfill({contentType:'image/svg+xml',body:`<svg xmlns="http://www.w3.org/2000/svg" width="${route.request().url().endsWith('/tiny.svg')?16:640}" height="360"><rect width="640" height="360" fill="red"/></svg>`}));
@@ -283,7 +290,7 @@ test('reader enhancements wait for visible code and update only the picture that
 });
 
 test('deep reading returns to its anchor, including folded dates',async()=>{
-  const context=await safari.newContext({viewport:{width:390,height:844}});
+  const context=await localContext(safari, {viewport:{width:390,height:844}});
   const page=await context.newPage();
   try{
     await page.goto(origin+'/?tag=long-reading');
@@ -301,5 +308,5 @@ test('deep reading returns to its anchor, including folded dates',async()=>{
     await expect(page.locator('[data-card-key]')).toHaveCount(120);
     await expect.poll(()=>page.locator(`[data-card-key="${before.key}"]`).evaluate((e,top)=>Math.abs(e.getBoundingClientRect().top-top),before.top)).toBeLessThan(2);
     await expect(page.getByRole('button',{name:'展开10月4日',exact:true})).toBeVisible();
-  }finally{await context.close();}
+  }catch(error){throw new Error(`return URL ${page.url()}, visible document ${(await page.locator('body').innerText().catch(()=> '[renderer unavailable]')).slice(0,1000)}`,{cause:error});}finally{await context.close();}
 });

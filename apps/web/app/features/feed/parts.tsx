@@ -5,6 +5,7 @@ import { IconBookmark } from "../../components/icons";
 import { SourceAvatar } from "../../components/ui/SourceAvatar";
 import { Lightbox } from "../../components/ui/Lightbox";
 import { toggleStar, useIsStarred } from "../../lib/local-state";
+import { ACCESS } from "../../lib/access";
 
 /** The source's name, or, for X, avatar + display name + @handle. */
 export function SourceLine({ item, className = "" }: { item: Pick<FeedItemSummary, "source" | "x" | "channel">; className?: string }) {
@@ -70,6 +71,7 @@ export function useStar(item: Starrable) {
 /** Bookmark toggle kept in this browser (收藏): 26px, or sized by `size` or by `className`. */
 export function StarButton({ item, size, className = "size-[26px]" }: { item: Starrable; size?: number; className?: string }) {
   const { on, toggle, pulse } = useStar(item);
+  if (ACCESS) return null; // An internal site keeps no bookmarks in the browser.
   return (
     <button
       type="button"

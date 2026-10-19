@@ -40,7 +40,15 @@ export async function buildApp(): Promise<FastifyInstance> {
     trustProxy: true,
     genReqId: () => randomUUID(),
     bodyLimit: 10 * 1024 * 1024,
-    routerOptions: { ignoreTrailingSlash: false, maxParamLength: 300 },
+    routerOptions: {
+      ignoreTrailingSlash: false, maxParamLength: 300,
+      // Malformed percent-encoding is rejected by the router before Fastify hooks exist. Do not echo
+      // the target or leave that error cacheable; there is no business handler to authenticate here.
+      onBadUrl: (_path, req, res) => {
+        res.writeHead(400, { "Content-Type": "application/problem+json", "Cache-Control": "private, no-store", "X-Accel-Expires": "0" });
+        res.end(req.method === "HEAD" ? undefined : JSON.stringify({ type: "/problems/invalid-request", title: "Bad request", status: 400, code: "invalid_request", detail: "The request could not be processed." }));
+      },
+    },
   });
 
   app.setChildLoggerFactory((logger, bindings, options, request) => {
@@ -65,6 +73,9 @@ export async function buildApp(): Promise<FastifyInstance> {
     }
     for (const m of serverModules()) m.on?.requestAnswered?.(req, reply, path);
   });
+
+  // Access must precede even redirects/probe replies, not just business handlers.
+  for (const m of serverModules()) m.httpBefore?.(app);
 
   // Central redirect table (shared with the web server).
   app.addHook("onRequest", async (req, reply) => {

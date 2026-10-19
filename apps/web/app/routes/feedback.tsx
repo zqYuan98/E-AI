@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router";
+import { Link, useRouteLoaderData, useSearchParams } from "react-router";
 import { SITE } from "@aihot/site";
 import { Presence } from "../components/ui/Presence";
 import { edgeTtl } from "../lib/api.server";
@@ -11,6 +11,7 @@ import { AsideCard, ReadingLayout } from "../components/ui/Page";
 import { PhoneBar } from "../components/shell/PhoneBar";
 import type { Screen } from "../components/shell/screens";
 import { webModules } from "../site-modules";
+import { ACCESS } from "../lib/access";
 
 export const handle: Screen = { tab: "me", name: "反馈" };
 
@@ -92,6 +93,8 @@ const MAX_TEXT = 2000;
 
 export default function FeedbackPage() {
   const [params] = useSearchParams();
+  // An internal site accepts feedback from signed-in readers with their session's CSRF token.
+  const csrf = (useRouteLoaderData("root") as { principal?: { csrf: string } | null } | undefined)?.principal?.csrf;
   const [draft, setDraft] = useState<Draft>({ content: "", email: "", pageUrl: params.get("from") ?? "" });
   const [shot, setShot] = useState<{ file: File; url: string } | null>(null);
   const [state, setState] = useState<{ kind: "idle" | "sending" | "done" | "error"; message?: string; id?: number }>({ kind: "idle" });
@@ -146,7 +149,7 @@ export default function FeedbackPage() {
       form.set("email", draft.email);
       form.set("pageUrl", draft.pageUrl);
       if (shot) form.set("screenshot", shot.file);
-      const res = await fetch("/api/site/feedback", { method: "POST", body: form });
+      const res = await fetch("/api/site/feedback", { method: "POST", body: form, headers: ACCESS && csrf ? { "x-csrf-token": csrf } : undefined });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) return setState({ kind: "error", message: body.detail ?? "提交失败，请稍后再试。" });
       writeDraft(null);

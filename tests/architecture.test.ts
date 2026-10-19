@@ -144,7 +144,7 @@ const matches = (text: string, pattern: RegExp) => [...text.matchAll(pattern)].m
 const NAMED = /["']([A-Z][A-Z0-9_]+)["']/g;
 const SUBSTITUTED = /\$\{([A-Z][A-Z0-9_]+)|\{\$([A-Z][A-Z0-9_]+)\}/g;
 const COMPOSE = "docker-compose.yml";
-const DEPLOYMENT = [COMPOSE, "deploy/Caddyfile"].filter((file) => existsSync(path.join(ROOT, file)));
+const DEPLOYMENT = [COMPOSE, "deploy/Caddyfile", "deploy/internal.compose.yml", "deploy/Caddyfile.internal"].filter((file) => existsSync(path.join(ROOT, file)));
 const tracked = (pattern: string) => execFileSync("git", ["ls-files", "--", pattern], { cwd: ROOT, encoding: "utf8" }).split("\n").filter(Boolean);
 
 test("every environment variable the code reads is listed in a template, and every listed one is read", () => {

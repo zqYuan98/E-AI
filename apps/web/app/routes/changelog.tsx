@@ -20,7 +20,7 @@ export const { clientLoader, shouldRevalidate } = pageReuse<typeof loader>();
 type Release = ChangelogRelease;
 
 export async function loader({ request }: { request: Request }) {
-  return cachedPage(300, await apiGet<ChangelogResponse>("/api/site/changelog", { signal: request.signal }));
+  return cachedPage(300, await apiGet<ChangelogResponse>("/api/site/changelog", { request, signal: request.signal }));
 }
 
 export function meta() {

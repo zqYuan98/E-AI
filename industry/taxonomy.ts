@@ -11,12 +11,14 @@
  * feedLabel 是分类 RSS 标题里的名字（不写就用 label）。公开接口、RSS 和 MCP 里要把一类并进另一类发布，写在站点设置里（site/site.ts 的 PUBLIC_CATEGORIES）。
  */
 export const CATEGORIES = [
-  { key: "ai-models", label: "模型", feedLabel: "AI 模型", section: "模型发布/更新", guide: "模型本身的发布、版本、权重开放、能力或价格变化，以及既有榜单上的模型成绩。公布一次跑分不是发布新基准，也不是教程。" },
-  { key: "ai-products", label: "产品", feedLabel: "AI 产品", section: "产品发布/更新", guide: "可使用的 AI 产品、功能、应用、工具、API、平台和工程组件的发布更新。模型厂商发布的推理框架、算子库、硬件适配组件仍是产品，不能因为厂商名归成模型。" },
-  { key: "industry", label: "行业", feedLabel: "行业动态", section: "行业动态", guide: "已发生的公司经营、融资并购、人事、合作、诉讼、政策、真实安全事故及调查进展。新闻由当事人发帖、带有态度，也不因此变成观点。" },
-  { key: "paper", label: "论文", feedLabel: "论文", section: "论文研究", guide: "以新研究方法、实验设计与发现为核心的论文、技术报告、新基准或研究数据集。系统性红队实验属于研究；既有榜单成绩归模型，真实事故的新闻调查归行业。" },
-  { key: "tip", label: "教程", section: "技巧与观点", guide: "读者可以照着使用的方法、提示词、工具用法、工程实践复盘与技术讲解。重点是可复用的做法；单纯发布工具归产品，只有态度和预测而无做法归观点。", commentary: true },
-  { key: "opinion", label: "观点", section: "技巧与观点", guide: "重点是作者的解释、判断、主张、预测、评论或访谈观点。讨论市场不自动归行业，作者是名人不自动归观点。", commentary: true },
+  { key: "models", label: "大模型", feedLabel: "电力大模型", section: "大模型与平台", guide: "电力、能源行业大模型、智能体和 AI 平台本身的发布、版本升级、开放接入和能力变化，包括通用大模型厂商推出的电力专版、电网企业把通用大模型接入自家平台。只是在某个业务里用了大模型，归场景落地。" },
+  { key: "applications", label: "场景落地", feedLabel: "电力 AI 应用", section: "场景落地", guide: "AI 在发电、输电、变电、配电、用电、调度、营销、基建、安全管控等具体业务里投运或试运行，重点是做了什么、用在哪、有多大规模或效果。还只是招标采购的归招采示范，只是发布平台本身的归大模型。" },
+  { key: "procurement", label: "招采示范", feedLabel: "电力 AI 招采", section: "招采与示范", guide: "与 AI 相关的招标公告、中标结果、采购意向，以及试点示范项目的申报、立项、评选和验收。项目已经投运并讲效果的归场景落地。" },
+  { key: "policy", label: "政策标准", feedLabel: "政策与标准", section: "政策标准", guide: "国家和地方主管部门关于人工智能与能源、电力的政策文件、行动方案和监管要求，电网和发电企业的 AI 规划与专项行动，以及国标、行标、团标、企标的发布和征求意见。领导讲话没有新文件、新要求的，不归这里。" },
+  { key: "compute", label: "算电协同", feedLabel: "算电协同", section: "算电协同", guide: "AI 算力与电力的关系：智算中心和数据中心的用电负荷、供电与绿电直供、算力与电力协同调度、相关电价、规划和项目。只是数据中心建设、和电力无关的，不归这里。" },
+  { key: "industry", label: "产业动态", feedLabel: "产业动态", section: "产业动态", guide: "已发生的企业经营活动：合作签约、融资并购、财报和业绩里的 AI 业务、组织与人事、产品商用和订单，以及会议上有具体发布的消息。没有具体发布的会议通稿、领导调研不算有效信息。" },
+  { key: "research", label: "研究进展", feedLabel: "研究进展", section: "研究进展", guide: "以新方法、实验和发现为核心的论文、技术报告、竞赛结果，以及开源模型、开源数据集和实验室成果。已经部署到生产业务并讲效果的归场景落地。" },
+  { key: "opinion", label: "观点解读", feedLabel: "观点解读", section: "观点解读", guide: "重点是作者的分析、判断、预测、经验复盘或访谈观点，包括政策解读和行业趋势文章。文章里报道了一项新的具体发生时，按那项发生归类。", commentary: true },
 ] as const satisfies ReadonlyArray<{ key: string; label: string; feedLabel?: string; section: string; guide: string; commentary?: true }>;
 
 /**
@@ -24,44 +26,52 @@ export const CATEGORIES = [
  * category 是类别，tag 是标签，两者都对上才算；unit 接在数字后面。
  * 没有这样一类的行业设成 null，报头就不显示这个数。
  */
-export const RELEASE: { category: string; tag: string; unit: string } | null = { category: "ai-models", tag: "模型发布", unit: "个新模型" };
+export const RELEASE: { category: string; tag: string; unit: string } | null = { category: "models", tag: "大模型发布", unit: "个大模型发布" };
 
 /** 周报月报的总述可以直接写、不必在报道里找到出处的行业通用词（小写）。站名会自动算进去。 */
-export const PLAIN_TERMS: readonly string[] = ["ai", "api", "llm", "gpu", "agi", "ceo", "ipo"];
+export const PLAIN_TERMS: readonly string[] = [
+  "ai", "api", "gpu", "5g", "ceo", "ipo", "人工智能", "大模型", "智能体", "新型电力系统", "电网", "电力", "能源", "算力", "数字化",
+];
 
 /**
  * 内容理解一步给每篇资料判的“内容类型”（写在 prompts/content-understanding.md 里，改了类型要同步改那份提示词）。
  * 评分提示词（prompts/selection-score.md）按类型给五个维度不同的权重。
  */
-export const ITEM_TYPES = ["model_release", "product_launch", "tool_or_prompt", "research_paper", "industry_event", "opinion_analysis", "tutorial_explainer"] as const;
+export const ITEM_TYPES = [
+  "model_release", "product_launch", "deployment_case", "procurement", "policy_standard", "research_paper", "industry_event", "opinion_analysis",
+] as const;
 
 // ── 标签词表 ────────────────────────────────────────────────────────────────────────────
 
 /** 每篇资料的第一个标签必须是这些“分类标签”之一。 */
 export const CATEGORY_TAGS = [
-  "产品更新", "模型发布", "论文/研究", "开源/仓库", "教程/实践", "现象/趋势", "大佬观点", "评测/基准", "安全/对齐", "行业动态", "政策/监管",
-  "非AI/通用工具", "其他",
+  "大模型发布", "产品/平台", "场景应用", "招标/中标", "试点示范", "政策/规划", "标准规范", "算电协同", "研究/论文", "开源/数据集",
+  "行业动态", "观点/解读", "非AI/普通电力", "其他",
 ] as const;
 
 /** 可选的主题标签。 */
 export const TOPIC_TAGS = [
-  "Agent", "编码", "推理", "多模态", "语音", "视频", "图像生成", "RAG", "端侧", "数据/训练", "搜索", "部署/工程", "开源生态", "具身智能", "MCP/工具调用",
+  "智能巡检", "无人机", "电力机器人", "AI视觉", "调度", "功率预测", "负荷预测", "设备运维", "输电", "变电", "配网", "新能源", "储能",
+  "虚拟电厂", "电力市场", "营销客服", "安全生产", "基建施工", "数字孪生", "智能体", "知识库/RAG", "算力/数据中心", "网络与数据安全", "计量/用电",
 ] as const;
 
 /** 可选的实体标签（公司、机构、平台）。 */
-export const ENTITY_TAGS = ["OpenAI", "Anthropic", "DeepSeek", "DeepMind", "Google", "Meta", "Microsoft", "xAI", "Hugging Face", "GitHub", "arXiv"] as const;
+export const ENTITY_TAGS = [
+  "国家电网", "南方电网", "国家能源局", "国家发改委", "中电联", "国家能源集团", "华能", "国家电投", "华为", "百度", "阿里云", "DeepSeek",
+] as const;
 
 /** 模型常写的近义词，统一成词表里的写法。 */
 export const TAG_SYNONYMS: Readonly<Record<string, string>> = {
-  "教程/玩法": "教程/实践", "技巧/最佳实践": "教程/实践", "合作/生态": "行业动态", "融资/收购": "行业动态", "公司动态": "行业动态",
-  合作: "行业动态", 生态: "行业动态", 融资: "行业动态", 收购: "行业动态", 投资: "行业动态", 并购: "行业动态",
-  政策: "政策/监管", 监管: "政策/监管", 法规: "政策/监管", 安全: "安全/对齐", 对齐: "安全/对齐",
-  论文: "论文/研究", 研究: "论文/研究", paper: "论文/研究", papers: "论文/研究",
-  "open-source": "开源/仓库", 开源: "开源/仓库", 仓库: "开源/仓库", repo: "开源/仓库",
-  教程: "教程/实践", 玩法: "教程/实践", 指南: "教程/实践", 技巧: "教程/实践", 最佳实践: "教程/实践", 实践: "教程/实践",
-  产品: "产品更新", 更新: "产品更新", 发布: "模型发布", 模型: "模型发布", 趋势: "现象/趋势", 现象: "现象/趋势", 观点: "大佬观点",
-  视频生成: "视频", 非ai: "非AI/通用工具", "non-ai": "非AI/通用工具", 通用工具: "非AI/通用工具", 工程工具: "非AI/通用工具",
-  安全扫描: "非AI/通用工具", devops: "非AI/通用工具", 行业: "行业动态", 动态: "行业动态",
+  大模型: "大模型发布", 模型发布: "大模型发布", 模型: "大模型发布", 产品: "产品/平台", 平台: "产品/平台", 产品发布: "产品/平台", 产品更新: "产品/平台",
+  应用: "场景应用", 案例: "场景应用", 落地: "场景应用", 应用案例: "场景应用", 招标: "招标/中标", 中标: "招标/中标", 采购: "招标/中标",
+  招采: "招标/中标", 示范: "试点示范", 试点: "试点示范", 政策: "政策/规划", 规划: "政策/规划", 监管: "政策/规划", "政策/监管": "政策/规划",
+  标准: "标准规范", 规范: "标准规范", 论文: "研究/论文", 研究: "研究/论文", "论文/研究": "研究/论文", 开源: "开源/数据集", 数据集: "开源/数据集",
+  "开源/仓库": "开源/数据集", 合作: "行业动态", 融资: "行业动态", 收购: "行业动态", 签约: "行业动态", 公司动态: "行业动态", 企业动态: "行业动态",
+  观点: "观点/解读", 解读: "观点/解读", 评论: "观点/解读", 访谈: "观点/解读", 趋势: "观点/解读", 非ai: "非AI/普通电力", "non-ai": "非AI/普通电力",
+  巡检: "智能巡检", 机器人: "电力机器人", 视觉: "AI视觉", 图像识别: "AI视觉", 计算机视觉: "AI视觉", agent: "智能体", 智能代理: "智能体",
+  rag: "知识库/RAG", 知识库: "知识库/RAG", 算力: "算力/数据中心", 数据中心: "算力/数据中心", 智算中心: "算力/数据中心", 网络安全: "网络与数据安全",
+  数据安全: "网络与数据安全", 光伏: "新能源", 风电: "新能源", 电力现货: "电力市场", 电力交易: "电力市场", 客服: "营销客服", 营销: "营销客服",
+  运维: "设备运维", 检修: "设备运维", 配电: "配网", 配电网: "配网", 输电线路: "输电", 变电站: "变电", 电网调度: "调度", 新能源功率预测: "功率预测",
 };
 
 // ── 公司与主体 ──────────────────────────────────────────────────────────────────────────
@@ -72,24 +82,31 @@ export const TAG_SYNONYMS: Readonly<Record<string, string>> = {
  * 把事实的主体对到发布方时也认它们。
  */
 export const ENTITIES: Record<string, { name: string; displayTag: string | null; aliases: string[]; otherNames?: string[] }> = {
-  "world-labs": { name: "World Labs", displayTag: null, aliases: ["World Labs"] },
-  "thinking-machines": { name: "Thinking Machines Lab", displayTag: null, aliases: ["Thinking Machines"] },
-  amd: { name: "AMD", displayTag: null, aliases: ["AMD", "Advanced Micro Devices"] },
-  openai: { name: "OpenAI", displayTag: "OpenAI", aliases: ["OpenAI", "ChatGPT", "Sora", "Codex", "GPT"], otherNames: ["OpenAI Developers"] },
-  anthropic: { name: "Anthropic", displayTag: "Anthropic", aliases: ["Anthropic", "Claude"], otherNames: ["Claude Code"] },
-  google: { name: "Google", displayTag: "Google", aliases: ["Google", "DeepMind", "Gemini", "谷歌"], otherNames: ["Google DeepMind", "Google Research", "Google AI", "Google Labs", "Google Cloud"] },
+  sgcc: { name: "国家电网", displayTag: "国家电网", aliases: ["国家电网", "国网", "State Grid", "光明电力大模型"], otherNames: ["国家电网有限公司", "国家电网报", "国网能源研究院", "中国电力科学研究院", "国网信通产业集团", "国网智能电网研究院"] },
+  csg: { name: "南方电网", displayTag: "南方电网", aliases: ["南方电网", "南网", "China Southern Power Grid", "大瓦特"], otherNames: ["中国南方电网有限责任公司", "南方电网报", "南网数研院", "南方电网数字电网集团", "南方电网科学研究院"] },
+  nea: { name: "国家能源局", displayTag: "国家能源局", aliases: ["国家能源局", "能源局", "NEA"] },
+  ndrc: { name: "国家发改委", displayTag: "国家发改委", aliases: ["国家发展改革委", "国家发改委", "发改委", "NDRC"] },
+  miit: { name: "工业和信息化部", displayTag: null, aliases: ["工业和信息化部", "工信部", "MIIT"] },
+  cec: { name: "中电联", displayTag: "中电联", aliases: ["中国电力企业联合会", "中电联", "CEC"] },
+  "chn-energy": { name: "国家能源集团", displayTag: "国家能源集团", aliases: ["国家能源集团", "国家能源投资集团", "CHN Energy"] },
+  huaneng: { name: "华能", displayTag: "华能", aliases: ["中国华能", "华能集团", "华能"] },
+  datang: { name: "大唐", displayTag: null, aliases: ["中国大唐", "大唐集团"] },
+  huadian: { name: "华电", displayTag: null, aliases: ["中国华电", "华电集团"] },
+  spic: { name: "国家电投", displayTag: "国家电投", aliases: ["国家电投", "国家电力投资集团", "SPIC"] },
+  ctg: { name: "三峡集团", displayTag: null, aliases: ["中国三峡集团", "三峡集团", "长江电力"] },
+  powerchina: { name: "中国电建", displayTag: null, aliases: ["中国电建", "中国电力建设集团", "POWERCHINA"] },
+  ceec: { name: "中国能建", displayTag: null, aliases: ["中国能建", "中国能源建设集团", "CEEC"] },
+  nari: { name: "国电南瑞", displayTag: null, aliases: ["国电南瑞", "南瑞集团", "南瑞", "NARI"] },
+  xjgc: { name: "许继电气", displayTag: null, aliases: ["许继电气", "许继集团", "许继"] },
+  longshine: { name: "朗新科技", displayTag: null, aliases: ["朗新科技", "朗新"] },
+  ygsoft: { name: "远光软件", displayTag: null, aliases: ["远光软件", "远光"] },
+  huawei: { name: "华为", displayTag: "华为", aliases: ["华为", "Huawei", "盘古", "华为数字能源", "华为云"] },
+  baidu: { name: "百度", displayTag: "百度", aliases: ["百度", "Baidu", "文心", "百度智能云"] },
+  alibaba: { name: "阿里云", displayTag: "阿里云", aliases: ["阿里云", "阿里巴巴", "通义", "千问", "Qwen"] },
+  tencent: { name: "腾讯", displayTag: null, aliases: ["腾讯", "腾讯云", "混元", "Tencent"] },
+  iflytek: { name: "科大讯飞", displayTag: null, aliases: ["科大讯飞", "讯飞", "星火", "iFLYTEK"] },
   deepseek: { name: "DeepSeek", displayTag: "DeepSeek", aliases: ["DeepSeek", "深度求索"] },
-  qwen: { name: "千问 Qwen", displayTag: null, aliases: ["Qwen", "通义", "阿里"], otherNames: ["通义千问", "千问", "千问APP", "Qwen Team", "通义实验室", "阿里巴巴", "Alibaba", "阿里云", "Alibaba Cloud"] },
-  kimi: { name: "Kimi / 月之暗面", displayTag: null, aliases: ["Kimi", "月之暗面", "Moonshot"], otherNames: ["Moonshot AI"] },
-  minimax: { name: "MiniMax", displayTag: null, aliases: ["MiniMax", "海螺"], otherNames: ["稀宇科技"] },
-  zhipu: { name: "智谱 GLM", displayTag: null, aliases: ["智谱", "GLM", "Z.ai"], otherNames: ["智谱AI", "Zhipu", "Zhipu AI"] },
-  xai: { name: "xAI", displayTag: "xAI", aliases: ["xAI", "Grok"], otherNames: ["SpaceXAI"] },
-  meta: { name: "Meta", displayTag: "Meta", aliases: ["Meta", "Llama"], otherNames: ["Meta AI", "AI at Meta"] },
-  microsoft: { name: "Microsoft", displayTag: "Microsoft", aliases: ["Microsoft", "微软", "Copilot"], otherNames: ["Microsoft Research", "Microsoft AI"] },
   nvidia: { name: "NVIDIA", displayTag: null, aliases: ["NVIDIA", "英伟达"] },
-  "hugging-face": { name: "Hugging Face", displayTag: "Hugging Face", aliases: ["Hugging Face"], otherNames: ["HuggingFace"] },
-  cursor: { name: "Cursor", displayTag: null, aliases: ["Cursor", "Anysphere"] },
-  openrouter: { name: "OpenRouter", displayTag: null, aliases: ["OpenRouter"] },
 };
 
 /**
@@ -97,57 +114,52 @@ export const ENTITIES: Record<string, { name: string; displayTag: string | null;
  * 行业没有这个问题时可以留空数组。
  */
 export const IDENTITY_LEXICON: ReadonlyArray<{ id: string; name: string; patterns: RegExp[] }> = [
-  { id: "openai", name: "OpenAI", patterns: [/openai|chatgpt|\bgpt-?[o\d]|\bsora\b|\bcodex\b/i] },
-  { id: "anthropic", name: "Anthropic", patterns: [/anthropic|\bclaude\b/i, /\b(?:opus|sonnet|haiku)\s*\d+(?:[.\-]\d+)*\b/i, /\bfable\s*\d+(?:[.\-]\d+)*\b|\bmythos\b/i] },
-  { id: "google", name: "Google / Gemini", patterns: [/google|deepmind|\bgemini\b|notebooklm|\bveo\s?\d|\bAlphaFold\b|\bAMIE\b/i] },
+  { id: "sgcc", name: "国家电网", patterns: [/国家电网|国网|state\s?grid|光明电力大模型/i] },
+  { id: "csg", name: "南方电网", patterns: [/南方电网|南网|southern\s?power\s?grid|大瓦特/i] },
+  { id: "chn-energy", name: "国家能源集团", patterns: [/国家能源集团|国家能源投资集团|chn\s?energy/i] },
+  { id: "huaneng", name: "华能", patterns: [/华能/] },
+  { id: "datang", name: "大唐", patterns: [/大唐/] },
+  { id: "huadian", name: "华电", patterns: [/华电/] },
+  { id: "spic", name: "国家电投", patterns: [/国家电投|国家电力投资|\bspic\b/i] },
+  { id: "ctg", name: "三峡集团", patterns: [/三峡集团|中国三峡|长江电力/] },
+  { id: "powerchina", name: "中国电建", patterns: [/中国电建|电力建设集团|powerchina/i] },
+  { id: "ceec", name: "中国能建", patterns: [/中国能建|能源建设集团|\bceec\b/i] },
+  { id: "nari", name: "国电南瑞", patterns: [/南瑞|\bnari\b/i] },
+  { id: "xjgc", name: "许继", patterns: [/许继/] },
+  { id: "longshine", name: "朗新科技", patterns: [/朗新/] },
+  { id: "ygsoft", name: "远光软件", patterns: [/远光软件/] },
+  { id: "huawei", name: "华为", patterns: [/华为|huawei|盘古/i] },
+  { id: "baidu", name: "百度", patterns: [/百度|baidu|文心|\bernie\b/i] },
+  { id: "alibaba", name: "阿里云 / 通义", patterns: [/阿里|alibaba|通义|千问|\bqwen/i] },
+  { id: "tencent", name: "腾讯", patterns: [/腾讯|tencent|混元|hunyuan/i] },
+  { id: "iflytek", name: "科大讯飞", patterns: [/讯飞|iflytek|星火大模型/i] },
   { id: "deepseek", name: "DeepSeek", patterns: [/deepseek|深度求索/i] },
-  { id: "xai", name: "xAI / Grok", patterns: [/\bxai\b|\bgrok\b/i] },
-  { id: "meta", name: "Meta / Llama", patterns: [/\bMeta\b/, /\bmeta\s?ai\b|\bllama\b/i] },
-  { id: "microsoft", name: "Microsoft / Copilot", patterns: [/microsoft|copilot|微软/i] },
-  { id: "nvidia", name: "NVIDIA", patterns: [/nvidia|英伟达|\bnemotron\b|\bnemo\b|\bblackwell\b|\brubin(?:\s+ultra)?\b|\bcuda\b/i] },
-  { id: "qwen", name: "千问 Qwen", patterns: [/\bqwen|通义|千问/i] },
-  { id: "hugging-face", name: "Hugging Face", patterns: [/hugging\s?face/i] },
-  { id: "cursor", name: "Cursor", patterns: [/\bCursor\b/] },
-  { id: "kimi", name: "Kimi / 月之暗面", patterns: [/\bkimi\b|月之暗面|\bmoonshot\s?ai\b/i] },
-  { id: "openrouter", name: "OpenRouter", patterns: [/openrouter/i] },
-  { id: "minimax", name: "MiniMax", patterns: [/minimax/i] },
-  { id: "zhipu", name: "智谱 GLM", patterns: [/智谱|\bglm-?[4-9]/i] },
-  { id: "hunyuan", name: "腾讯混元", patterns: [/混元|hunyuan/i] },
-  { id: "doubao", name: "字节豆包", patterns: [/豆包|doubao|字节跳动|bytedance/i] },
-  { id: "mistral", name: "Mistral", patterns: [/mistral/i] },
-  { id: "perplexity", name: "Perplexity", patterns: [/\bPerplexity\b/] },
-  { id: "runway", name: "Runway", patterns: [/\brunway\b/i] },
-  { id: "suno", name: "Suno", patterns: [/\bsuno\b/i] },
-  { id: "midjourney", name: "Midjourney", patterns: [/midjourney/i] },
-  { id: "stability-ai", name: "Stability AI", patterns: [/stability\s?ai/i] },
-  { id: "elevenlabs", name: "ElevenLabs", patterns: [/eleven\s?labs/i] },
-  { id: "vllm", name: "vLLM", patterns: [/\bvllm\b/i] },
-  { id: "ollama", name: "Ollama", patterns: [/\bollama\b/i] },
-  { id: "windsurf", name: "Windsurf", patterns: [/windsurf/i] },
-  { id: "devin", name: "Devin", patterns: [/\bdevin\b/i] },
-  { id: "manus", name: "Manus", patterns: [/\bmanus\b/i] },
-  { id: "apple", name: "Apple AI", patterns: [/\bapple\s?(intelligence|silicon|ai)\b|苹果(智能|\s?AI)/i] },
-  { id: "amazon", name: "Amazon / AWS", patterns: [/amazon|\baws\b|亚马逊/i] },
-  { id: "baidu", name: "百度文心", patterns: [/百度|baidu|文心|\bernie\s?bot\b/i] },
+  { id: "zhipu", name: "智谱", patterns: [/智谱|\bglm-?[4-9]/i] },
+  { id: "doubao", name: "字节豆包", patterns: [/豆包|doubao|字节跳动|bytedance|火山引擎/i] },
+  { id: "sensetime", name: "商汤", patterns: [/商汤|sensetime/i] },
+  { id: "nvidia", name: "NVIDIA", patterns: [/nvidia|英伟达/i] },
+  { id: "openai", name: "OpenAI", patterns: [/openai|chatgpt/i] },
 ];
 
 /** 这些域名上的文章，发布方就是对应的公司（托管平台如 GitHub、arXiv 不算）。 */
 export const PUBLISHER_DOMAINS: ReadonlyArray<{ entityId: string; domains: readonly string[] }> = [
-  { entityId: "openai", domains: ["openai.com"] },
-  { entityId: "anthropic", domains: ["anthropic.com", "claude.com"] },
-  { entityId: "google", domains: ["deepmind.google", "ai.google", "blog.google"] },
-  { entityId: "deepseek", domains: ["deepseek.com"] },
-  { entityId: "xai", domains: ["x.ai"] },
-  { entityId: "meta", domains: ["ai.meta.com"] },
-  { entityId: "microsoft", domains: ["microsoft.com"] },
-  { entityId: "nvidia", domains: ["nvidia.com"] },
-  { entityId: "qwen", domains: ["qwen.ai"] },
-  { entityId: "cursor", domains: ["cursor.com"] },
-  { entityId: "openrouter", domains: ["openrouter.ai"] },
+  { entityId: "sgcc", domains: ["sgcc.com.cn"] },
+  { entityId: "csg", domains: ["csg.cn"] },
+  { entityId: "nea", domains: ["nea.gov.cn"] },
+  { entityId: "ndrc", domains: ["ndrc.gov.cn"] },
+  { entityId: "miit", domains: ["miit.gov.cn"] },
+  { entityId: "cec", domains: ["cec.org.cn"] },
+  { entityId: "chn-energy", domains: ["chnenergy.com.cn"] },
+  { entityId: "huaneng", domains: ["chng.com.cn"] },
+  { entityId: "spic", domains: ["spic.com.cn"] },
+  { entityId: "ctg", domains: ["ctg.com.cn"] },
+  { entityId: "powerchina", domains: ["powerchina.cn"] },
+  { entityId: "ceec", domains: ["ceec.net.cn"] },
+  { entityId: "huawei", domains: ["huawei.com"] },
 ];
 
 /** 原文里的这些写法也算提到了对应公司。 */
 export const IDENTITY_CONTEXT_ALIASES: ReadonlyArray<{ entityId: string; pattern: RegExp }> = [
-  { entityId: "meta", pattern: /@AIatMeta\b/i },
-  { entityId: "zhipu", pattern: /\bZhipu(?:\s+AI\b|['’]s\b)/i },
+  { entityId: "sgcc", pattern: /国网\S{1,6}(?:电力|公司)/ },
+  { entityId: "csg", pattern: /(?:广东|广西|云南|贵州|海南|深圳)电网/ },
 ];

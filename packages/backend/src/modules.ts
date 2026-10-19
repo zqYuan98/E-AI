@@ -144,6 +144,24 @@ export interface EngineHooks {
   exitServed: (exit: string, req: FastifyRequest) => void;
 }
 
+/**
+ * A module's part of the backups (operations/backup.ts). With no module giving one, backups are as the engine
+ * makes them: only where the object store is configured, and uploaded there.
+ */
+export interface ModuleBackup {
+  /**
+   * Folders of its files under the data folder (AIHOT_DATA_DIR), relative and written with "/" ("research"),
+   * packed into the file archive beside the engine's. A missing one has nothing to keep.
+   */
+  dirs?: readonly string[];
+  /**
+   * "deny": nothing of a backup leaves this server, neither the database nor the files, even with the object
+   * store configured. The daily backup is then made and kept here, and succeeds without a store. One installed
+   * module denying is enough.
+   */
+  remote?: "deny";
+}
+
 /** What a topic page asks a module's part of it (publication/topics.ts loadTopicPage). */
 export interface TopicPageAsk {
   topic: Topic;
@@ -197,6 +215,12 @@ export interface RequestNotices {
 export interface ServerModule {
   /** Its folder under modules/. */
   name: string;
+  /**
+   * Hooks every request passes before any route, the engine's or a module's: an access guard's onRequest, say.
+   * apps/api/src/app.ts calls it once, before the engine's redirect/probe hooks and its first route.
+   * Its routes still go in `http`.
+   */
+  httpBefore?: (app: FastifyInstance) => void;
   /** Its HTTP routes, and hooks on the app such as what to flush when it closes, registered before the engine's v1 fallbacks (apps/api/src/app.ts). */
   http?: (app: FastifyInstance) => void;
   agent?: {
@@ -207,6 +231,8 @@ export interface ServerModule {
     requests?: string[];
   };
   llms?: () => Promise<LlmsLines> | LlmsLines;
+  /** Search indexing submissions (operations/indexnow.ts): one module denying stops all URL submission. */
+  indexing?: { submit: "deny" };
   sitemap?: {
     /** After the engine's content pages (the topics), before the site's own (agent, about, terms). */
     pages?: SitemapEntry[];
@@ -234,6 +260,8 @@ export interface ServerModule {
   responder?: Responder;
   /** Its share of the daily retention run (operations/retention.ts): what it deleted or aggregated. */
   retention?: (now: Date) => Promise<Record<string, unknown>>;
+  /** Its part of the backups (ModuleBackup). */
+  backup?: ModuleBackup;
   on?: Partial<EngineHooks>;
   /** Topic pages (publication/topics.ts). */
   topics?: {
@@ -298,6 +326,34 @@ export function serverModules(): readonly ServerModule[] {
 /** The first installed module's responder, if any. */
 export function responder(): Responder | null {
   return installed.find((m) => m.responder)?.responder ?? null;
+}
+
+/**
+ * The folders the installed modules back up (ModuleBackup.dirs), in the site's order and each once. One that is
+ * not a plain relative path, or that lies in backups/ where the archives are written, throws.
+ */
+export function backupDirs(): string[] {
+  const dirs = new Set<string>();
+  for (const m of installed) {
+    for (const dir of m.backup?.dirs ?? []) {
+      const parts = dir.split("/");
+      if (!parts.every((part) => /^\w[\w.-]*$/.test(part)) || parts[0]!.toLowerCase() === "backups") {
+        throw new Error(`module ${m.name}: backup folder "${dir}" must be a relative path under the data folder, outside backups/`);
+      }
+      dirs.add(dir);
+    }
+  }
+  return [...dirs];
+}
+
+/** Whether an installed module denies remote backups (ModuleBackup.remote): one is enough. */
+export function remoteBackupDenied(): boolean {
+  return installed.some((m) => m.backup?.remote === "deny");
+}
+
+/** No module veto means public indexing is allowed, independently of backup policy. */
+export function indexSubmissionDenied(): boolean {
+  return installed.some((m) => m.indexing?.submit === "deny");
 }
 
 /** The first installed module's reminder for the person behind this request, at this exit. */

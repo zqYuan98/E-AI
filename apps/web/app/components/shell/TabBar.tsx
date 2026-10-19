@@ -1,3 +1,4 @@
+import { ACCESS } from "../../lib/access";
 import { useEffect, useLayoutEffect, useRef, useSyncExternalStore } from "react";
 import { Link, useLocation, useRevalidator } from "react-router";
 import { tabs, type TabKey } from "./nav";
@@ -46,7 +47,7 @@ export function TabBar({ changelogVersion }: { changelogVersion: string | null }
             <Link
               key={t.key}
               to={t.to}
-              prefetch="intent"
+              reloadDocument={!!ACCESS} prefetch={ACCESS ? "none" : "intent"}
               aria-current={on ? "page" : undefined}
               viewTransition={on && pathname !== t.to}
               onClick={(event) => {

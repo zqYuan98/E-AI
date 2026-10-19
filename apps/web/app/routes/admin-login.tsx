@@ -16,7 +16,7 @@ const ERRORS: Record<string, string> = {
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const returnTo = url.searchParams.get("return") ?? "/admin";
-  const options = await apiGet<{ password: boolean; feishu: boolean }>("/api/auth/options", { signal: request.signal }).catch(() => ({ password: true, feishu: false }));
+  const options = await apiGet<{ password: boolean; feishu: boolean }>("/api/auth/options", { request, signal: request.signal }).catch(() => ({ password: true, feishu: false }));
   return { returnTo: returnTo.startsWith("/admin") ? returnTo : "/admin", error: url.searchParams.get("error"), ...options };
 }
 

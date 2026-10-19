@@ -1,3 +1,4 @@
+import { ACCESS } from "../lib/access";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import type { ItemAvailability } from "@aihot/contracts/site";
@@ -32,6 +33,10 @@ function reportText(r: ImportReport): string {
 }
 
 export default function StarredPage() {
+  if (ACCESS) return <div className="py-8"><PhoneBar title="收藏" /><h1 className="text-[22px] font-semibold text-ink">内部模式不保存本机收藏</h1><p className="mt-4 text-[14px] leading-7 text-ink-3">为避免退出或切换账号后留下内部内容，当前版本禁用浏览器中的资料快照、收藏和搜索记录。请使用站内搜索重新查找。</p></div>;
+  return <PublicStarredPage />;
+}
+function PublicStarredPage() {
   const starred = useStarred();
   const [mounted, setMounted] = useState(false);
   const [availability, setAvailability] = useState<Record<string, ItemAvailability>>({});

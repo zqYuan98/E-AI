@@ -26,8 +26,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const key = params.key ?? "";
   if (!PATTERN[kind].test(key)) throw data({ message: "not_found" }, { status: 404 });
   const [report, { items: index }] = await Promise.all([
-    loadOr404<ReportDetail>(`/api/site/reports/${kind}/${key}`, { signal: request.signal }),
-    apiGet<ReportNavigationResponse>(`/api/site/reports/${kind}/navigation/${key}`, { signal: request.signal }),
+    loadOr404<ReportDetail>(`/api/site/reports/${kind}/${key}`, { request, signal: request.signal }),
+    apiGet<ReportNavigationResponse>(`/api/site/reports/${kind}/navigation/${key}`, { request, signal: request.signal }),
   ]);
   return cachedPage(3600, { report, index, today: beijingDate(Date.now()) });
 }

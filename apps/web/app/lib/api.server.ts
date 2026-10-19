@@ -1,7 +1,9 @@
 // Server-side HTTP client for route loaders, and the cache lifetimes routes give their pages. The web
 // process never touches the database; SSR reads the api over loopback with keep-alive, one or two
 // requests per page.
-import { data, redirect, type HeadersArgs } from "react-router";
+import { data, redirect, redirectDocument, type HeadersArgs } from "react-router";
+import { loginLocation, pageTarget } from "@aihot/contracts/access";
+import { ACCESS, PRIVATE_HEADERS } from "./access.ts";
 import { logError } from "./errors.server.ts";
 
 /** Where the api listens (API_BASE_URL, set by the deployment); development uses the default. */
@@ -20,12 +22,17 @@ class ApiError extends Error {
   }
 }
 
-export async function apiGet<T>(path: string, init?: { signal?: AbortSignal; headers?: Record<string, string>; responseHeaders?: Headers }): Promise<T> {
+// SSR loaders always pass their Request. Legacy non-request callers stay strictly anonymous.
+export async function apiGet<T>(path: string, init: { request?: Request; signal?: AbortSignal; headers?: Record<string, string>; responseHeaders?: Headers } = {}): Promise<T> {
+  const headers = new Headers({ accept: "application/json", ...init.headers });
+  headers.delete("cookie");
+  if (ACCESS && init.request) headers.set("cookie", init.request.headers.get("cookie") ?? "");
   try {
     const res = await fetch(`${API_BASE_URL}${path}`, {
-      headers: { accept: "application/json", "x-aihot-ssr": "1", ...init?.headers },
+      headers,
+      cache: ACCESS ? "no-store" : undefined,
       redirect: "manual",
-      signal: init?.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000),
+      signal: AbortSignal.any([...(init.request ? [init.request.signal] : []), ...(init.signal ? [init.signal] : []), AbortSignal.timeout(15_000)]),
     });
     if (!res.ok) {
       const body = (await res.json().catch(() => null)) as { mergedInto?: string } | null;
@@ -34,10 +41,18 @@ export async function apiGet<T>(path: string, init?: { signal?: AbortSignal; hea
     res.headers.forEach((value, name) => init?.responseHeaders?.set(name, value));
     return (await res.json()) as T;
   } catch (error) {
-    if (!init?.signal?.aborted && (!(error instanceof ApiError) || error.status >= 500)) {
+    if (!(error instanceof Response) && !(error && typeof error === "object" && "type" in error) && !init?.signal?.aborted && (!(error instanceof ApiError) || error.status >= 500)) {
       logError(error, { msg: "ssr api request failed", method: "GET", path,
         ...(error instanceof ApiError ? { status: error.status, upstreamRequestId: error.requestId } : {}),
       });
+    }
+    if (ACCESS) {
+      if (error instanceof ApiError && error.status === 401) {
+        const url = new URL(init.request?.url ?? "http://web.local/");
+        throw redirectDocument(loginLocation(ACCESS, pageTarget(url.pathname + url.search)?.href ?? "/"), { headers: PRIVATE_HEADERS });
+      }
+      if (error instanceof ApiError && error.status === 403) throw data({ message: "forbidden" }, { status: 403, headers: PRIVATE_HEADERS });
+      if (!(error instanceof ApiError) || error.status >= 500) throw data({ message: "unavailable" }, { status: 503, headers: PRIVATE_HEADERS });
     }
     throw error;
   }
@@ -47,11 +62,11 @@ export async function apiGet<T>(path: string, init?: { signal?: AbortSignal; hea
  * Maps API failures to route responses: real 404s, the permanent redirect of a merged page (`merged`
  * gives the page of the id it was merged into), the search-busy page, otherwise 503.
  */
-export async function loadOr404<T>(path: string, opts: { busyRedirect?: string; merged?: (id: string) => string; responseHeaders?: Headers; signal?: AbortSignal } = {}): Promise<T> {
+export async function loadOr404<T>(path: string, opts: { request?: Request; busyRedirect?: string; merged?: (id: string) => string; responseHeaders?: Headers; signal?: AbortSignal } = {}): Promise<T> {
   try {
-    return await apiGet<T>(path, { responseHeaders: opts.responseHeaders, signal: opts.signal });
+    return await apiGet<T>(path, { request: opts.request, responseHeaders: opts.responseHeaders, signal: opts.signal });
   } catch (error) {
-    if (opts.signal?.aborted) throw error;
+    if (opts.signal?.aborted || error instanceof Response || (error && typeof error === "object" && "type" in error && error.type === "DataWithResponseInit")) throw error;
     if (error instanceof ApiError) {
       if (error.status === 404) throw data({ message: "not_found" }, { status: 404 });
       if (error.mergedInto && opts.merged) throw redirect(opts.merged(error.mergedInto), 308);
@@ -67,7 +82,7 @@ export const BROWSER_MAX_SECONDS = 300;
 
 /** How long shared caches may keep a page that has no data to reuse; the web server writes its final cache headers (server.ts). */
 export function edgeTtl(seconds: number): Record<string, string> {
-  return { "Cache-Control": `public, s-maxage=${seconds}` };
+  return ACCESS ? PRIVATE_HEADERS : { "Cache-Control": `public, s-maxage=${seconds}` };
 }
 
 /**
@@ -77,6 +92,7 @@ export function edgeTtl(seconds: number): Record<string, string> {
  * Time the page already spent in a cache is used up, and a revisit never renews it. Pair it with `pageHeaders`.
  */
 export function cachedPage<T extends object>(seconds: number, value: T, upstream?: Headers) {
+  if (ACCESS) return data({ ...value, expiresAt: 0 }, { headers: PRIVATE_HEADERS });
   const now = Date.now();
   const second = Math.floor(now / 1000);
   let deadline = second + seconds;

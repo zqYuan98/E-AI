@@ -44,7 +44,12 @@ test("an unrelated malformed cookie leaves a real admin session usable without a
   const write = await app.inject({ method: "POST", url: "/api/admin/sources", headers, payload: {} });
   assert.equal(write.statusCode, 403, "the usable session still needs CSRF for writes");
 
-  const logout = await app.inject({ method: "POST", url: "/api/auth/logout", headers });
+  for (const extra of [{}, { origin: config.siteUrl }, { "x-csrf-token": "cookie-test-csrf" }, { origin: "https://other.invalid", "x-csrf-token": "cookie-test-csrf" }]) {
+    const blocked = await app.inject({ method: "POST", url: "/api/auth/logout", headers: { ...headers, ...extra } });
+    assert.equal(blocked.statusCode, 403);
+    assert.equal((await app.inject({ url: "/api/auth/check", headers })).statusCode, 204);
+  }
+  const logout = await app.inject({ method: "POST", url: "/api/auth/logout", headers: { ...headers, origin: config.siteUrl, "x-csrf-token": "cookie-test-csrf" } });
   assert.equal(logout.statusCode, 303);
   const ended = await app.inject({ url: "/api/auth/check", headers });
   assert.equal(ended.statusCode, 401);

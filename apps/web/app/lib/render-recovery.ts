@@ -1,5 +1,6 @@
 // A public render error can outlive its deployment: replace an outdated document once per tab.
 import { isRouteErrorResponse } from "react-router";
+import { ACCESS } from "./access.ts";
 import type { HydrationOptions } from "react-dom/client";
 
 const RECOVERY_RELEASE_KEY = "aihot-render-recovery-release";
@@ -8,6 +9,7 @@ export function createRenderErrorHandler(documentRelease: string | null) {
   let checking = false;
   return async (error: unknown, info: Parameters<NonNullable<HydrationOptions["onCaughtError"]>>[1]) => {
     console.error(error, info);
+    if (ACCESS) return; // Internal documents never persist recovery state or reuse a public release.
     const failedUrl = window.location.href;
     if (isRouteErrorResponse(error) || /^\/admin(?:\/|$)/.test(new URL(failedUrl).pathname)
       || !documentRelease || documentRelease === "dev" || checking) return;

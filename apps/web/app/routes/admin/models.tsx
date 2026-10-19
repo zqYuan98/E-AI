@@ -32,6 +32,10 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
   const { run, pending } = useAdminAction();
   const [target, setTarget] = useState<AdminModels["capabilities"][number] | null>(null);
   const [choice, setChoice] = useState<string>("");
+  // Whole-site provider change: pick a model, test it, then move every step to it.
+  const [all, setAll] = useState<string>(m.choices[0]?.key ?? "default");
+  const [allOpen, setAllOpen] = useState(false);
+  const [checked, setChecked] = useState<{ model: string; ok: boolean; ms: number; error: string | null } | null>(null);
   const labelOf = (key: string) => m.capabilities.find((c) => `capability:${c.key}` === key)?.label ?? key;
 
   return (
@@ -40,6 +44,33 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
       subtitle="每项能力当前用哪个模型、来自哪里（后台切换 > 环境变量 > 代码默认），以及近期的成功率、耗时与费用。切换只影响之后的新任务，已有结果不重算；换精选模型前先看 SelectBench 同批对比。"
       actions={<FilterChips param="days" options={[{ value: "1", label: "24 小时" }, { value: "", label: "7 天" }, { value: "30", label: "30 天" }]} />}
     >
+      <Card title="更换模型服务商（整体切换）" className="mb-5">
+        <p className="mb-3 text-[13px] leading-6 text-ink-3">
+          当前服务商额度用完或要换一家时：先“测试连通”确认地址、密钥和余额可用，再“全部步骤切换”。新增服务商在服务器的 <span className="font-mono">MODEL_PROVIDERS</span> 环境变量里配置（见部署文档），重启后出现在下拉里。
+        </p>
+        {m.providersError && (
+          <p className="mb-3 text-[13px] leading-6 text-hot">
+            <span className="font-mono">MODEL_PROVIDERS</span> 配置有误，其中的模型没有加载：{m.providersError}
+          </p>
+        )}
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-[260px]">
+            <Field label="模型">
+              <Select value={all} onChange={(e) => { setAll(e.target.value); setChecked(null); }}>
+                {m.choices.map((x) => <option key={x.key} value={x.key}>{x.key}（{x.service}）</option>)}
+              </Select>
+            </Field>
+          </div>
+          <Button busy={pending === "check"} onClick={async () => { const r = await run<{ model: string; ok: boolean; ms: number; error: string | null }>("POST", "/api/admin/model-test", { model: all }, { label: "check", revalidate: false }); if (r) setChecked(r); }}>测试连通</Button>
+          <Button tone="primary" disabled={checked?.model !== all || !checked.ok} title={checked?.ok ? undefined : "先测试连通"} onClick={() => setAllOpen(true)}>全部步骤切换到它</Button>
+        </div>
+        {checked && (
+          <p className={`mt-3 text-[13px] ${checked.ok ? "text-ink-2" : "text-hot"}`}>
+            {checked.ok ? `${checked.model} 可用，耗时 ${secs(checked.ms)}。` : `${checked.model} 调用失败：${checked.error}`}
+          </p>
+        )}
+      </Card>
+
       <div className="grid gap-5">
         {m.capabilities.map((c) => {
           const total = c.usage.reduce((a, u) => a + u.calls, 0);
@@ -147,6 +178,19 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
           )}
         </Card>
       </div>
+
+      <ReasonDialog
+        open={allOpen}
+        title={`全部步骤切换到 ${all}`}
+        description="每一步各记一条切换记录，只影响之后的新任务；需要看图的步骤，模型不支持时会跳过。之后可逐步骤再调整。"
+        confirmLabel="全部切换"
+        busy={pending === "all"}
+        onClose={() => setAllOpen(false)}
+        onSubmit={async (reason) => {
+          const r = await run<{ switched: string[]; skipped: string[] }>("POST", "/api/admin/model-switch-all", { model: all, reason }, { label: "all", success: "已切换，下一次调用生效" });
+          return r !== null;
+        }}
+      />
 
       <ReasonDialog
         open={!!target}

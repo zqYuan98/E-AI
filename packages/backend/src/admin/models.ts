@@ -5,7 +5,8 @@
 import type { AdminModels, BeforeJson } from "@aihot/contracts/admin";
 import { sql } from "../db.ts";
 import { capabilities, capabilityAcceptsModel, invalidateModelCache, modelSources } from "../editorial/models.ts";
-import { MODELS } from "../providers/llm.ts";
+import { z } from "zod";
+import { chatJson, MODELS, modelProvidersError } from "../providers/llm.ts";
 import { audit } from "../audit.ts";
 
 interface UsageRow {
@@ -96,7 +97,7 @@ export async function modelsOverview(days = 7): Promise<BeforeJson<AdminModels>>
       })),
   }));
   const choices = Object.values(MODELS).map((m) => ({ key: m.key, service: m.service, vision: !!m.vision }));
-  return { days, capabilities: steps, choices, history, benches };
+  return { days, capabilities: steps, choices, providersError: modelProvidersError, history, benches };
 }
 
 /** Switches a capability to another registered model (or back to the environment/default when null). */
@@ -119,4 +120,39 @@ export async function switchModel(capability: string, model: string | null, reas
   const after = (await modelSources())[capability];
   await audit(actor, "models.switch", `capability:${capability}`, reason, before ?? null, after ?? null);
   return { capability, before, after };
+}
+
+/**
+ * Switches every step to one registered model, for a provider change (the old one has no balance). Each step is
+ * switched and audited like a single switch; steps that need images are skipped when the model cannot read them.
+ */
+export async function switchAllModels(model: string, reason: string, actor: string) {
+  const spec = MODELS[model];
+  if (!spec) throw Object.assign(new Error("unknown model"), { statusCode: 400 });
+  if (!reason.trim()) throw Object.assign(new Error("a reason is required"), { statusCode: 400 });
+  const switched: string[] = [];
+  const skipped: string[] = [];
+  for (const [key, c] of Object.entries(capabilities())) {
+    if (!capabilityAcceptsModel(c, spec)) { skipped.push(key); continue; }
+    await switchModel(key, model, reason, actor);
+    switched.push(key);
+  }
+  return { model, switched, skipped };
+}
+
+/** One tiny paid call to a registered model, to see whether its address, key and balance work before switching to it. */
+export async function testModel(model: string) {
+  if (!MODELS[model]) throw Object.assign(new Error("unknown model"), { statusCode: 400 });
+  const started = Date.now();
+  try {
+    await chatJson({
+      model, purpose: "model_check", subject: `check:${model}`, promptVersion: "check-1", attemptTag: String(started),
+      system: "Reply with the JSON object {\"ok\": true} and nothing else.", user: "ping", maxTokens: 64, timeoutMs: 30_000,
+      schema: z.object({ ok: z.boolean() }),
+    });
+    return { model, ok: true, ms: Date.now() - started, error: null };
+  } catch (error) {
+    // The message names the provider's refusal (HTTP status, balance); the request carries no key.
+    return { model, ok: false, ms: Date.now() - started, error: String((error as Error).message).slice(0, 400) };
+  }
 }

@@ -1,202 +1,615 @@
 {
-  "$comment": "示范信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。之后在后台“信源”里新建、修改和暂停。字段说明见 docs/customize.md。",
+  "$comment": "示范信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。之后在后台“信源”里新建、修改和暂停。公众号由 modules/wechat 自动建信源，不写在这里。字段说明见 docs/customize.md。",
   "sources": [
     {
-      "id": "rss-openai-news",
-      "name": "OpenAI News",
-      "kind": "rss",
+      "id": "web-nea",
+      "name": "国家能源局",
+      "kind": "web_list",
       "config": {
-        "feedUrl": "https://openai.com/news/rss.xml",
+        "url": "https://www.nea.gov.cn/",
+        "parseMode": "html",
+        "itemSelector": "a[href$=\"/c.html\"]",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "allowUrlPrefixes": [
+          "https://www.nea.gov.cn/"
+        ],
+        "detail": {
+          "publishedAtSelector": "meta[name=\"PubDate\"]",
+          "maxFetches": 30
+        },
         "_aihot": {
-          "initialBackfillLimit": 8
+          "initialBackfillLimit": 10
         }
       },
       "tier": "T1",
-      "owner_entity_id": "openai",
-      "participation_mode": "editorial",
-      "interval_minutes": 120,
-      "tags": [
-        "官方"
-      ],
-      "site_fulltext": false,
-      "syndicate_fulltext": false
-    },
-    {
-      "id": "rss-google-deepmind",
-      "name": "Google DeepMind",
-      "kind": "rss",
-      "config": {
-        "feedUrl": "https://deepmind.google/blog/rss.xml",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
-      },
-      "tier": "T1",
-      "owner_entity_id": "google",
-      "participation_mode": "editorial",
-      "interval_minutes": 120,
-      "tags": [
-        "官方"
-      ],
-      "site_fulltext": false,
-      "syndicate_fulltext": false
-    },
-    {
-      "id": "rss-google-research",
-      "name": "Google Research",
-      "kind": "rss",
-      "config": {
-        "feedUrl": "https://research.google/blog/rss/",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
-      },
-      "tier": "T1",
-      "owner_entity_id": "google",
+      "owner_entity_id": "nea",
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "tags": [
         "官方",
+        "政策"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-csg",
+      "name": "南方电网",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.csg.cn/",
+        "parseMode": "html",
+        "itemSelector": "a[href*=\"/t20\"]",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "allowUrlPrefixes": [
+          "https://www.csg.cn/"
+        ],
+        "detail": {
+          "publishedAtSelector": "#articleTitle h4 .left",
+          "maxFetches": 30
+        },
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "csg",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-cpnn",
+      "name": "中国电力新闻网",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.cpnn.com.cn/news/xwtt/",
+        "parseMode": "html",
+        "itemSelector": "a[href*=\"/t20\"]",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "allowUrlPrefixes": [
+          "https://www.cpnn.com.cn/"
+        ],
+        "detail": {
+          "publishedAtSelector": ".cpnnlist_l .times span:last-child",
+          "maxFetches": 30
+        },
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-ieee-spectrum-energy",
+      "name": "IEEE Spectrum · Energy",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://spectrum.ieee.org/feeds/topic/energy.rss",
+        "allowUrlPrefixes": [
+          "https://spectrum.ieee.org/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "媒体",
+        "海外"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-utility-dive",
+      "name": "Utility Dive",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.utilitydive.com/feeds/news/",
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "媒体",
+        "海外"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-arxiv-power-ai",
+      "name": "arXiv · 电力系统 × AI",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://export.arxiv.org/api/query?search_query=%28abs%3A%22power%20system%22%20OR%20abs%3A%22power%20grid%22%20OR%20abs%3A%22distribution%20network%22%29%20AND%20%28abs%3A%22large%20language%20model%22%20OR%20abs%3A%22foundation%20model%22%20OR%20abs%3A%22LLM%22%20OR%20abs%3A%22agent%22%29&sortBy=submittedDate&sortOrder=descending&max_results=30",
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": [
+        "论文"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ndrc-tz",
+      "name": "国家发改委·通知",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.ndrc.gov.cn/xxgk/zcfb/tz/",
+        "parseMode": "html",
+        "itemSelector": "ul.u-list > li",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "https://www.ndrc.gov.cn/xxgk/zcfb/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "ndrc",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "官方",
+        "政策规划"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ndrc-fzggwl",
+      "name": "国家发改委·发展改革委令",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.ndrc.gov.cn/xxgk/zcfb/fzggwl/",
+        "parseMode": "html",
+        "itemSelector": "ul.u-list > li",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "https://www.ndrc.gov.cn/xxgk/zcfb/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "ndrc",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "官方",
+        "政策规划"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ndrc-jd",
+      "name": "国家发改委·政策解读",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.ndrc.gov.cn/xxgk/jd/jd/",
+        "parseMode": "html",
+        "itemSelector": "ul.u-list > li",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "https://www.ndrc.gov.cn/xxgk/jd/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "ndrc",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "官方",
+        "政策规划"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ndrc-xwfb",
+      "name": "国家发改委·新闻发布",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.ndrc.gov.cn/xwdt/xwfb/",
+        "parseMode": "html",
+        "itemSelector": "ul.u-list > li",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "https://www.ndrc.gov.cn/xwdt/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "ndrc",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "官方",
+        "政策规划"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-nea-zxwj",
+      "name": "国家能源局·最新文件",
+      "kind": "json_list",
+      "config": {
+        "url": "https://www.nea.gov.cn/policy/ds_b4ae3efbfd3f4ffcb1bb211fa7bdb92d.json",
+        "mode": "json_api",
+        "itemsPath": "datasource",
+        "titlePaths": [
+          "linkUrls.0.linkTitle",
+          "title"
+        ],
+        "urlTemplate": "{raw:linkUrls.0.linkUrl}",
+        "urlTemplateFallback": "https://www.nea.gov.cn/policy/{raw:publishUrl}",
+        "publishedAtPath": "publishTime",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "contentId",
+        "allowUrlPrefixes": [
+          "https://www.nea.gov.cn/",
+          "http://www.nea.gov.cn/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "nea",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "官方",
+        "政策规划"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-nea-jd",
+      "name": "国家能源局·政策解读",
+      "kind": "json_list",
+      "config": {
+        "url": "https://www.nea.gov.cn/policy/ds_323f40996d5b4b0bbfea850ea9018f09.json",
+        "mode": "json_api",
+        "itemsPath": "datasource",
+        "titlePaths": [
+          "linkUrls.0.linkTitle",
+          "title"
+        ],
+        "urlTemplate": "{raw:linkUrls.0.linkUrl}",
+        "urlTemplateFallback": "https://www.nea.gov.cn/policy/{raw:publishUrl}",
+        "publishedAtPath": "publishTime",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "contentId",
+        "allowUrlPrefixes": [
+          "https://www.nea.gov.cn/",
+          "http://www.nea.gov.cn/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "nea",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "官方",
+        "政策规划"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-nea-nyyw",
+      "name": "国家能源局·能源要闻",
+      "kind": "json_list",
+      "config": {
+        "url": "https://www.nea.gov.cn/xwzx/ds_8f41612499e841a1ad842dbe19f9149f.json",
+        "mode": "json_api",
+        "itemsPath": "datasource",
+        "titlePaths": [
+          "linkUrls.0.linkTitle",
+          "title"
+        ],
+        "urlTemplate": "{raw:linkUrls.0.linkUrl}",
+        "urlTemplateFallback": "https://www.nea.gov.cn/xwzx/{raw:publishUrl}",
+        "publishedAtPath": "publishTime",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "contentId",
+        "allowUrlPrefixes": [
+          "https://www.nea.gov.cn/",
+          "http://www.nea.gov.cn/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "nea",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-gov-zuixin",
+      "name": "中国政府网·最新政策",
+      "kind": "json_list",
+      "config": {
+        "url": "https://www.gov.cn/zhengce/zuixin/ZUIXINZHENGCE.json",
+        "mode": "json_api",
+        "titlePaths": [
+          "TITLE"
+        ],
+        "urlTemplate": "{raw:URL}",
+        "publishedAtPath": "DOCRELPUBTIME",
+        "externalIdPath": "URL",
+        "allowUrlPrefixes": [
+          "https://www.gov.cn/zhengce/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "官方",
+        "政策规划"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-sasac-zcfb",
+      "name": "国务院国资委·政策发布",
+      "kind": "web_list",
+      "config": {
+        "url": "http://www.sasac.gov.cn/n2588035/n2588320/n2588335/index.html",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a[href$=\"content.html\"])",
+        "linkSelector": "a",
+        "titleSelector": "a > i",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "http://www.sasac.gov.cn/n2588035/n2588320/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "官方",
+        "政策规划"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-sasac-xwfb",
+      "name": "国务院国资委·新闻发布",
+      "kind": "web_list",
+      "config": {
+        "url": "http://www.sasac.gov.cn/n2588025/n2588119/index.html",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a[href$=\"content.html\"])",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "http://www.sasac.gov.cn/n2588025/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-sasac-qydt",
+      "name": "国务院国资委·央企动态",
+      "kind": "web_list",
+      "config": {
+        "url": "http://www.sasac.gov.cn/n2588025/n2588124/index.html",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a[href$=\"content.html\"])",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "http://www.sasac.gov.cn/n2588025/n2588124/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-nda-zcfb",
+      "name": "国家数据局·政策发布",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.nda.gov.cn/sjj/zwgk/zcfb/list/index_pc_1.html",
+        "parseMode": "html",
+        "itemSelector": "ul.u-list > li",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "https://www.nda.gov.cn/sjj/zwgk/zcfb/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "官方",
+        "政策规划"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-nda-xwfb",
+      "name": "国家数据局·新闻发布",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.nda.gov.cn/sjj/swdt/xwfb/list/index_pc_1.html",
+        "parseMode": "html",
+        "itemSelector": "ul.u-list > li",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "https://www.nda.gov.cn/sjj/swdt/xwfb/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-cec-hyyw",
+      "name": "中电联·行业要闻",
+      "kind": "json_list",
+      "config": {
+        "url": "https://cec.org.cn/ms-mcms/mcms/content/list?id=169&pageNumber=1&pageSize=20",
+        "mode": "json_api",
+        "itemsPath": "data.list",
+        "titlePaths": [
+          "basicTitle"
+        ],
+        "summaryPaths": [
+          "basicDescription"
+        ],
+        "urlTemplate": "{raw:linkUrl}",
+        "urlTemplateFallback": "https://www.cec.org.cn/detail/index.html?{raw:newType}-{raw:articleID}",
+        "publishedAtPath": "publicTime",
+        "publishedAtUnit": "epoch_ms",
+        "externalIdPath": "articleID",
+        "allowUrlPrefixes": [
+          "https://www.cec.org.cn/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1_5",
+      "owner_entity_id": "cec",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
         "研究"
       ],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-hugging-face",
-      "name": "Hugging Face Blog",
-      "kind": "rss",
+      "id": "json-cec-dt",
+      "name": "中电联·中电联动态",
+      "kind": "json_list",
       "config": {
-        "feedUrl": "https://huggingface.co/blog/feed.xml",
+        "url": "https://cec.org.cn/ms-mcms/mcms/content/list?id=495&pageNumber=1&pageSize=20",
+        "mode": "json_api",
+        "itemsPath": "data.list",
+        "titlePaths": [
+          "basicTitle"
+        ],
+        "summaryPaths": [
+          "basicDescription"
+        ],
+        "urlTemplate": "{raw:linkUrl}",
+        "urlTemplateFallback": "https://www.cec.org.cn/detail/index.html?{raw:newType}-{raw:articleID}",
+        "publishedAtPath": "publicTime",
+        "publishedAtUnit": "epoch_ms",
+        "externalIdPath": "articleID",
+        "allowUrlPrefixes": [
+          "https://www.cec.org.cn/"
+        ],
         "_aihot": {
-          "initialBackfillLimit": 8
+          "initialBackfillLimit": 10
         }
       },
-      "tier": "T1",
-      "owner_entity_id": "hugging-face",
-      "participation_mode": "editorial",
-      "interval_minutes": 120,
-      "tags": [
-        "官方",
-        "开源"
-      ],
-      "site_fulltext": false,
-      "syndicate_fulltext": false
-    },
-    {
-      "id": "rss-microsoft-research",
-      "name": "Microsoft Research",
-      "kind": "rss",
-      "config": {
-        "feedUrl": "https://www.microsoft.com/en-us/research/feed/",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
-      },
-      "tier": "T1",
-      "owner_entity_id": "microsoft",
-      "participation_mode": "editorial",
-      "interval_minutes": 120,
-      "tags": [
-        "官方",
-        "研究"
-      ],
-      "site_fulltext": false,
-      "syndicate_fulltext": false
-    },
-    {
-      "id": "rss-nvidia-blog",
-      "name": "NVIDIA Blog",
-      "kind": "rss",
-      "config": {
-        "feedUrl": "https://blogs.nvidia.com/feed/",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
-      },
-      "tier": "T1",
-      "owner_entity_id": "nvidia",
-      "participation_mode": "editorial",
-      "interval_minutes": 120,
-      "tags": [
-        "官方"
-      ],
-      "site_fulltext": false,
-      "syndicate_fulltext": false
-    },
-    {
-      "id": "rss-aws-ml",
-      "name": "AWS Machine Learning Blog",
-      "kind": "rss",
-      "config": {
-        "feedUrl": "https://aws.amazon.com/blogs/machine-learning/feed/",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
-      },
-      "tier": "T1",
-      "owner_entity_id": null,
-      "participation_mode": "editorial",
-      "interval_minutes": 120,
-      "tags": [
-        "官方",
-        "教程"
-      ],
-      "site_fulltext": false,
-      "syndicate_fulltext": false
-    },
-    {
-      "id": "rss-github-ai",
-      "name": "GitHub Blog · AI & ML",
-      "kind": "rss",
-      "config": {
-        "feedUrl": "https://github.blog/ai-and-ml/feed/",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
-      },
-      "tier": "T1",
-      "owner_entity_id": null,
-      "participation_mode": "editorial",
-      "interval_minutes": 120,
-      "tags": [
-        "官方"
-      ],
-      "site_fulltext": false,
-      "syndicate_fulltext": false
-    },
-    {
-      "id": "rss-mistral",
-      "name": "Mistral AI",
-      "kind": "rss",
-      "config": {
-        "feedUrl": "https://mistral.ai/news/rss",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
-      },
-      "tier": "T1",
-      "owner_entity_id": null,
-      "participation_mode": "editorial",
-      "interval_minutes": 120,
-      "tags": [
-        "官方"
-      ],
-      "site_fulltext": false,
-      "syndicate_fulltext": false
-    },
-    {
-      "id": "rss-bair",
-      "name": "Berkeley AI Research",
-      "kind": "rss",
-      "config": {
-        "feedUrl": "https://bair.berkeley.edu/blog/feed.xml",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
-      },
-      "tier": "T1",
-      "owner_entity_id": null,
+      "tier": "T1_5",
+      "owner_entity_id": "cec",
       "participation_mode": "editorial",
       "interval_minutes": 180,
       "tags": [
@@ -206,77 +619,454 @@
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-the-verge-ai",
-      "name": "The Verge · AI",
-      "kind": "rss",
+      "id": "json-cec-bwxx",
+      "name": "中电联·部委信息",
+      "kind": "json_list",
       "config": {
-        "feedUrl": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
+        "url": "https://cec.org.cn/ms-mcms/mcms/content/list?id=172&pageNumber=1&pageSize=20",
+        "mode": "json_api",
+        "itemsPath": "data.list",
+        "titlePaths": [
+          "basicTitle"
+        ],
+        "summaryPaths": [
+          "basicDescription"
+        ],
+        "urlTemplate": "{raw:linkUrl}",
+        "urlTemplateFallback": "https://www.cec.org.cn/detail/index.html?{raw:newType}-{raw:articleID}",
+        "publishedAtPath": "publicTime",
+        "publishedAtUnit": "epoch_ms",
+        "externalIdPath": "articleID",
+        "allowUrlPrefixes": [
+          "https://www.cec.org.cn/"
+        ],
         "_aihot": {
-          "initialBackfillLimit": 8
+          "initialBackfillLimit": 10
         }
       },
-      "tier": "T2",
-      "owner_entity_id": null,
+      "tier": "T1_5",
+      "owner_entity_id": "cec",
       "participation_mode": "editorial",
-      "interval_minutes": 60,
+      "interval_minutes": 180,
       "tags": [
-        "媒体"
+        "官方",
+        "政策规划"
       ],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-techcrunch-ai",
-      "name": "TechCrunch · AI",
-      "kind": "rss",
+      "id": "json-cec-bzhdt",
+      "name": "中电联·标准化动态",
+      "kind": "json_list",
       "config": {
-        "feedUrl": "https://techcrunch.com/category/artificial-intelligence/feed/",
+        "url": "https://cec.org.cn/ms-mcms/mcms/content/list?id=286&pageNumber=1&pageSize=20",
+        "mode": "json_api",
+        "itemsPath": "data.list",
+        "titlePaths": [
+          "basicTitle"
+        ],
+        "summaryPaths": [
+          "basicDescription"
+        ],
+        "urlTemplate": "{raw:linkUrl}",
+        "urlTemplateFallback": "https://www.cec.org.cn/detail/index.html?{raw:newType}-{raw:articleID}",
+        "publishedAtPath": "publicTime",
+        "publishedAtUnit": "epoch_ms",
+        "externalIdPath": "articleID",
+        "allowUrlPrefixes": [
+          "https://www.cec.org.cn/"
+        ],
         "_aihot": {
-          "initialBackfillLimit": 8
+          "initialBackfillLimit": 10
         }
       },
-      "tier": "T2",
-      "owner_entity_id": null,
+      "tier": "T1_5",
+      "owner_entity_id": "cec",
       "participation_mode": "editorial",
-      "interval_minutes": 60,
+      "interval_minutes": 240,
       "tags": [
-        "媒体"
+        "官方",
+        "政策规划"
       ],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-ars-technica-ai",
-      "name": "Ars Technica · AI",
-      "kind": "rss",
+      "id": "json-cec-yjzq",
+      "name": "中电联·标准征求意见",
+      "kind": "json_list",
       "config": {
-        "feedUrl": "https://arstechnica.com/ai/feed/",
+        "url": "https://cec.org.cn/ms-mcms/mcms/content/list?id=290&pageNumber=1&pageSize=20",
+        "mode": "json_api",
+        "itemsPath": "data.list",
+        "titlePaths": [
+          "basicTitle"
+        ],
+        "summaryPaths": [
+          "basicDescription"
+        ],
+        "urlTemplate": "{raw:linkUrl}",
+        "urlTemplateFallback": "https://www.cec.org.cn/detail/index.html?{raw:newType}-{raw:articleID}",
+        "publishedAtPath": "publicTime",
+        "publishedAtUnit": "epoch_ms",
+        "externalIdPath": "articleID",
+        "allowUrlPrefixes": [
+          "https://www.cec.org.cn/"
+        ],
         "_aihot": {
-          "initialBackfillLimit": 8
+          "initialBackfillLimit": 10
         }
       },
-      "tier": "T2",
-      "owner_entity_id": null,
+      "tier": "T1_5",
+      "owner_entity_id": "cec",
       "participation_mode": "editorial",
-      "interval_minutes": 60,
+      "interval_minutes": 240,
       "tags": [
-        "媒体"
+        "官方",
+        "政策规划"
       ],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-mit-tech-review-ai",
-      "name": "MIT Technology Review · AI",
-      "kind": "rss",
+      "id": "web-ceic-jtyw",
+      "name": "国家能源集团·集团要闻",
+      "kind": "web_list",
       "config": {
-        "feedUrl": "https://www.technologyreview.com/topic/artificial-intelligence/feed",
+        "url": "https://www.ceic.com/gjnyjtww/newCE0301/newlistcom.shtml",
+        "parseMode": "html",
+        "itemSelector": "div.item:has(a[href*=\"/newCE0301/20\"])",
+        "linkSelector": "a",
+        "titleSelector": ".txt",
+        "allowUrlPrefixes": [
+          "https://www.ceic.com/gjnyjtww/newCE0301/"
+        ],
+        "detail": {
+          "publishedAtRegex": "发布时间：\\s*(\\d{4}-\\d{2}-\\d{2})",
+          "maxFetches": 30
+        },
         "_aihot": {
-          "initialBackfillLimit": 8
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "chn-energy",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-datang-jtxw",
+      "name": "中国大唐·集团新闻",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.china-cdt.com/dtwz/xwzx/jtxw/A024004002Gone1.html",
+        "parseMode": "html",
+        "itemSelector": "li.news-li",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": ".news-item-date",
+        "allowUrlPrefixes": [
+          "https://www.china-cdt.com/dtwz/xwzx/jtxw/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "datang",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-spic-jtyw",
+      "name": "国家电投·集团要闻",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.spic.com.cn/2021/xwzx/jtyw/",
+        "parseMode": "html",
+        "itemSelector": "li:has(h6)",
+        "linkSelector": "a",
+        "titleSelector": "h6",
+        "publishedAtSelector": "p",
+        "allowUrlPrefixes": [
+          "https://www.spic.com.cn/jtyw/",
+          "http://www.spic.com.cn/jtyw/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "spic",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ctg-home",
+      "name": "三峡集团·首页要闻",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.ctg.com.cn/",
+        "parseMode": "html",
+        "itemSelector": "li:has(a.normtit)",
+        "linkSelector": "a.normtit",
+        "titleSelector": "a.normtit",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "https://www.ctg.com.cn/sxjt/xwzx55/jtyw44/",
+          "https://www.ctg.com.cn/sxjt/xwzx55/zhxw23/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        },
+        "detail": {
+          "titleSelector": "title",
+          "titleAuthoritative": true,
+          "maxFetches": 30
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "ctg",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-powerchina-gsyw",
+      "name": "中国电建·公司要闻",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.powerchina.cn/zxzx/gsyw/index.html",
+        "parseMode": "html",
+        "itemSelector": ".news-card, .slider-right",
+        "linkSelector": "h4 a, h3 a",
+        "titleSelector": "h4 a, h3 a",
+        "publishedAtSelector": "span._date, span.date",
+        "allowUrlPrefixes": [
+          "https://www.powerchina.cn/zxzx/gsyw/art/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "powerchina",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ceec-gsyw",
+      "name": "中国能建·公司要闻",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.ceec.net.cn/",
+        "parseMode": "html",
+        "itemSelector": "a[href*=\"/art_11016_\"]",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtRegex": "/art/(\\d{4}/\\d{1,2}/\\d{1,2})/",
+        "allowUrlPrefixes": [
+          "https://www.ceec.net.cn/art/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "ceec",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-csg-gsyw",
+      "name": "南方电网·公司要闻",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.csg.cn/xwzx/2026/2026gsyw/",
+        "parseMode": "html",
+        "itemSelector": "li:has(h2 a)",
+        "linkSelector": "h2 a",
+        "titleSelector": "h2 a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "https://www.csg.cn/xwzx/2026/2026gsyw/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "csg",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-csg-yxcz",
+      "name": "南方电网·一线传真",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.csg.cn/xwzx/2026/2026yxcz/",
+        "parseMode": "html",
+        "itemSelector": "li:has(h2 a)",
+        "linkSelector": "h2 a",
+        "titleSelector": "h2 a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "https://www.csg.cn/xwzx/2026/2026yxcz/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "csg",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-csg-nygc",
+      "name": "南方电网·能源观察",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.csg.cn/xwzx/nygc/",
+        "parseMode": "html",
+        "itemSelector": "li:has(h2 a)",
+        "linkSelector": "h2 a",
+        "titleSelector": "h2 a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "https://mp.weixin.qq.com/s/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1_5",
+      "owner_entity_id": "csg",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "研究"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-sgcc-js-gsyw",
+      "name": "国网江苏电力·公司要闻",
+      "kind": "web_list",
+      "config": {
+        "url": "http://www.js.sgcc.com.cn/xwzx/gsyw/index.shtml",
+        "parseMode": "html",
+        "itemSelector": "li:has(a[href*=\"/xwzx/gsyw/20\"])",
+        "linkSelector": "a",
+        "titleSelector": "a text",
+        "publishedAtSelector": "i",
+        "allowUrlPrefixes": [
+          "http://www.js.sgcc.com.cn/xwzx/gsyw/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "sgcc",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-sgcc-yw-via-sx",
+      "name": "国家电网·要闻（国网山西转载）",
+      "kind": "web_list",
+      "config": {
+        "url": "http://www.sx.sgcc.com.cn/",
+        "parseMode": "html",
+        "itemSelector": "tr:has(> td > a[href*=\"/xwzx/yw/\"])",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "http://www.sgcc.com.cn/html/sgcc_main/gb/xwzx/yw/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "sgcc",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "web-cpnn-kj",
+      "name": "中国能源新闻网·科技",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.cpnn.com.cn/news/kj/",
+        "parseMode": "html",
+        "itemSelector": ".cpnnlist_l li",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "b.fr",
+        "allowUrlPrefixes": [
+          "https://www.cpnn.com.cn/news/kj/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
         }
       },
       "tier": "T2",
-      "owner_entity_id": null,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "tags": [
@@ -286,19 +1076,26 @@
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-the-decoder",
-      "name": "The Decoder",
-      "kind": "rss",
+      "id": "web-cpnn-dianli",
+      "name": "中国能源新闻网·电力",
+      "kind": "web_list",
       "config": {
-        "feedUrl": "https://the-decoder.com/feed/",
+        "url": "https://www.cpnn.com.cn/news/dianli2023/",
+        "parseMode": "html",
+        "itemSelector": ".cpnnlist_l li",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "b.fr",
+        "allowUrlPrefixes": [
+          "https://www.cpnn.com.cn/news/dianli2023/"
+        ],
         "_aihot": {
-          "initialBackfillLimit": 8
+          "initialBackfillLimit": 10
         }
       },
       "tier": "T2",
-      "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 60,
+      "interval_minutes": 120,
       "tags": [
         "媒体"
       ],
@@ -306,65 +1103,583 @@
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-simon-willison",
-      "name": "Simon Willison",
-      "kind": "rss",
+      "id": "web-cpnn-nyqy",
+      "name": "中国能源新闻网·企业",
+      "kind": "web_list",
       "config": {
-        "feedUrl": "https://simonwillison.net/atom/everything/",
+        "url": "https://www.cpnn.com.cn/news/nyqy/",
+        "parseMode": "html",
+        "itemSelector": ".cpnnlist_l li",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "b.fr",
+        "allowUrlPrefixes": [
+          "https://www.cpnn.com.cn/news/nyqy/"
+        ],
         "_aihot": {
-          "initialBackfillLimit": 8
+          "initialBackfillLimit": 10
         }
       },
       "tier": "T2",
-      "owner_entity_id": null,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "tags": [
-        "个人"
+        "媒体"
       ],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-import-ai",
-      "name": "Import AI",
-      "kind": "rss",
+      "id": "web-inen-power-news",
+      "name": "国际电力网·资讯",
+      "kind": "web_list",
       "config": {
-        "feedUrl": "https://importai.substack.com/feed",
+        "parseMode": "html",
+        "itemSelector": ".listTxt",
+        "linkSelector": "h5 a",
+        "titleSelector": "h5 a",
+        "allowUrlPrefixes": [
+          "https://power.in-en.com/html/"
+        ],
         "_aihot": {
-          "initialBackfillLimit": 8
+          "initialBackfillLimit": 10
+        },
+        "url": "https://power.in-en.com/news/",
+        "detail": {
+          "publishedAtSelector": "p.source b",
+          "maxFetches": 30
         }
       },
       "tier": "T2",
-      "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 180,
+      "interval_minutes": 120,
       "tags": [
-        "个人",
-        "周刊"
+        "媒体"
       ],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-latent-space",
-      "name": "Latent Space",
-      "kind": "rss",
+      "id": "web-inen-power-tech",
+      "name": "国际电力网·技术",
+      "kind": "web_list",
       "config": {
-        "feedUrl": "https://www.latent.space/feed",
+        "parseMode": "html",
+        "itemSelector": ".listTxt",
+        "linkSelector": "h5 a",
+        "titleSelector": "h5 a",
+        "allowUrlPrefixes": [
+          "https://power.in-en.com/html/"
+        ],
         "_aihot": {
-          "initialBackfillLimit": 8
-        }
+          "initialBackfillLimit": 10
+        },
+        "url": "https://power.in-en.com/tech/",
+        "publishedAtSelector": ".prompt i"
       },
       "tier": "T2",
-      "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 180,
+      "interval_minutes": 120,
       "tags": [
-        "个人"
+        "媒体"
       ],
       "site_fulltext": false,
       "syndicate_fulltext": false
+    },
+    {
+      "id": "web-cpem-szdl",
+      "name": "全国电力设备管理网·数智电力",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.cpem.org.cn/list5.html",
+        "parseMode": "html",
+        "itemSelector": "li:has(a.dbt)",
+        "linkSelector": "a.dbt",
+        "titleSelector": "a.dbt",
+        "publishedAtSelector": "span.sj",
+        "allowUrlPrefixes": [
+          "https://www.cpem.org.cn/list5/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-cpem-dlzx",
+      "name": "全国电力设备管理网·电力资讯",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.cpem.org.cn/list2.html",
+        "parseMode": "html",
+        "itemSelector": "li:has(a.dbt)",
+        "linkSelector": "a.dbt",
+        "titleSelector": "a.dbt",
+        "publishedAtSelector": "span.sj",
+        "allowUrlPrefixes": [
+          "https://www.cpem.org.cn/list2/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-xinhua-energy",
+      "name": "新华网·新华能源",
+      "kind": "json_list",
+      "config": {
+        "url": "https://www.news.cn/energy/ds_42de1fcf98fd47daac4694c46d40957e.json",
+        "mode": "json_api",
+        "itemsPath": "datasource",
+        "titlePaths": [
+          "showTitle",
+          "title"
+        ],
+        "summaryPaths": [
+          "summary"
+        ],
+        "urlTemplate": "https://www.news.cn{raw:publishUrl}",
+        "publishedAtPath": "publishTime",
+        "externalIdPath": "contentId",
+        "allowUrlPrefixes": [
+          "https://www.news.cn/energy/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-bjx-spd-yw",
+      "name": "北极星输配电网·要闻",
+      "kind": "web_list",
+      "config": {
+        "url": "https://shupeidian.bjx.com.cn/yw/",
+        "parseMode": "html",
+        "itemSelector": ".cc-list-content li",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "https://news.bjx.com.cn/html/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-bjx-spd-js",
+      "name": "北极星输配电网·技术",
+      "kind": "web_list",
+      "config": {
+        "url": "https://shupeidian.bjx.com.cn/js/",
+        "parseMode": "html",
+        "itemSelector": ".cc-list-content li",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "https://news.bjx.com.cn/html/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-cnenergynews-dwdl",
+      "name": "中国能源报·电网电力",
+      "kind": "json_list",
+      "config": {
+        "url": "https://www.cnenergynews.cn/api/list?node=%22/fv2uq3s9e%22&offset=0&limit=20",
+        "mode": "json_api",
+        "itemsPath": "list",
+        "titlePaths": [
+          "title"
+        ],
+        "summaryPaths": [
+          "summary"
+        ],
+        "publishedAtPath": "ctime",
+        "publishedAtUnit": "epoch_ms",
+        "urlTemplate": "https://www.cnenergynews.cn/article/{aid}",
+        "externalIdPath": "aid",
+        "allowUrlPrefixes": [
+          "https://www.cnenergynews.cn/article/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-powermag",
+      "name": "POWER Magazine",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.powermag.com/feed/",
+        "allowUrlPrefixes": [
+          "https://www.powermag.com/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "媒体",
+        "海外"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-tdworld",
+      "name": "T&D World",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.tdworld.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D",
+        "allowUrlPrefixes": [
+          "https://www.tdworld.com/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "媒体",
+        "海外"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-canary-media",
+      "name": "Canary Media",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.canarymedia.com/rss.rss",
+        "allowUrlPrefixes": [
+          "https://www.canarymedia.com/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "媒体",
+        "海外"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-energy-storage-news",
+      "name": "Energy-Storage.news",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.energy-storage.news/feed/",
+        "allowUrlPrefixes": [
+          "https://www.energy-storage.news/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "媒体",
+        "海外"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-latitude-media",
+      "name": "Latitude Media",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.latitudemedia.com/feed/",
+        "allowUrlPrefixes": [
+          "https://www.latitudemedia.com/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "媒体",
+        "海外"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "mp-nea",
+      "name": "国家能源局（公众号）",
+      "kind": "mp_account",
+      "config": {
+        "ghid": "gh_204dae95445b",
+        "nickname": "国家能源局",
+        "publisherRole": "organization"
+      },
+      "tier": "T1_5",
+      "owner_entity_id": "nea",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "公众号",
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "mp-ndrc",
+      "name": "国家发展改革委（公众号）",
+      "kind": "mp_account",
+      "config": {
+        "ghid": "gh_bb11686e0930",
+        "nickname": "国家发展改革委",
+        "publisherRole": "organization"
+      },
+      "tier": "T1_5",
+      "owner_entity_id": "ndrc",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "公众号",
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "mp-nda",
+      "name": "国家数据局（公众号）",
+      "kind": "mp_account",
+      "config": {
+        "ghid": "gh_66b0b452f85e",
+        "nickname": "国家数据局",
+        "publisherRole": "organization"
+      },
+      "tier": "T1_5",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "公众号",
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "mp-cec",
+      "name": "中国电力企业联合会（公众号）",
+      "kind": "mp_account",
+      "config": {
+        "ghid": "gh_33d7e5ae885a",
+        "nickname": "中国电力企业联合会",
+        "publisherRole": "organization"
+      },
+      "tier": "T1_5",
+      "owner_entity_id": "cec",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "公众号",
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "mp-cec-xinmei",
+      "name": "电联新媒（公众号）",
+      "kind": "mp_account",
+      "config": {
+        "ghid": "gh_c550b6404510",
+        "nickname": "电联新媒",
+        "publisherRole": "organization"
+      },
+      "tier": "T1_5",
+      "owner_entity_id": "cec",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "公众号",
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "mp-csg-50hz",
+      "name": "南网50Hz（公众号）",
+      "kind": "mp_account",
+      "config": {
+        "ghid": "gh_162f3553374e",
+        "nickname": "南网50Hz",
+        "publisherRole": "organization"
+      },
+      "tier": "T1_5",
+      "owner_entity_id": "csg",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "公众号",
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "mp-cepn",
+      "name": "中国电力报（公众号）",
+      "kind": "mp_account",
+      "config": {
+        "ghid": "gh_fe77e4775c8a",
+        "nickname": "中国电力报",
+        "publisherRole": "organization"
+      },
+      "tier": "T1_5",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "公众号",
+        "媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "mp-cnenergy",
+      "name": "中国能源报（公众号）",
+      "kind": "mp_account",
+      "config": {
+        "ghid": "gh_9565400a2c89",
+        "nickname": "中国能源报",
+        "publisherRole": "organization"
+      },
+      "tier": "T1_5",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "公众号",
+        "媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "mp-sasac",
+      "name": "国资小新（公众号）",
+      "kind": "mp_account",
+      "config": {
+        "ghid": "gh_162762a657a6",
+        "nickname": "国资小新",
+        "publisherRole": "organization"
+      },
+      "tier": "T1_5",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "公众号",
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "mp-eo",
+      "name": "南方能源观察（公众号）",
+      "kind": "mp_account",
+      "config": {
+        "ghid": "gh_99175221837b",
+        "nickname": "南方能源观察"
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "公众号",
+        "媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
     }
   ]
 }

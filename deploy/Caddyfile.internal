@@ -1,0 +1,12 @@
+# HTTPS on a non-standard port, for a server whose 80/443 belong to other services (deploy/internal.compose.yml,
+# docs/deploy.md "内网部署"). No certificate is requested from the internet: SITE_TLS is `internal` (Caddy's own CA,
+# whose root certificate colleagues' devices must trust) or "<certificate file> <key file>" mounted into the container.
+{
+	auto_https disable_redirects
+	skip_install_trust
+}
+{$SITE_DOMAIN} {
+	tls {$SITE_TLS:internal}
+	encode zstd gzip
+	reverse_proxy web:3000
+}

@@ -1,3 +1,4 @@
+import { ACCESS } from "../../lib/access";
 import { useContext, useEffect, useRef, useState } from "react";
 import { Link, UNSAFE_DataRouterContext, UNSAFE_FrameworkContext, useHref, useLocation, type LinkProps } from "react-router";
 import { hasFreshPage } from '../../lib/page-reuse';
@@ -15,7 +16,7 @@ export function IntentLink({ onFocus, onBlur, onMouseEnter, onMouseLeave, onTouc
   const differentPage = target.pathname + target.search !== location.pathname + location.search;
   // Router prefetch also asks shouldRevalidate. A selected/remembered page needs neither its
   // assets nor that revalidation decision, which is reserved for an actual refresh.
-  const shouldPrefetch = ready && differentPage && !hasFreshPage(target);
+  const shouldPrefetch = !ACCESS && ready && differentPage && !hasFreshPage(target);
   const clients = shouldPrefetch && href.startsWith('/') && !href.startsWith('//')
     ? context?.router.match(href)?.filter(m => framework?.manifest.routes[m.route.id]?.hasLoader && framework.manifest.routes[m.route.id]?.hasClientLoader).map(m => m.route.id) ?? []
     : [];
@@ -33,7 +34,7 @@ export function IntentLink({ onFocus, onBlur, onMouseEnter, onMouseLeave, onTouc
   };
   const cancel = () => { clear(); setReady(false); };
   useEffect(() => { cancel(); return clear; }, [props.to]);
-  return <><Link {...props} prefetch={shouldPrefetch ? "render" : "none"}
+  return <><Link {...props} reloadDocument={!!ACCESS || props.reloadDocument} prefetch={shouldPrefetch ? "render" : "none"}
     onFocus={(e) => { onFocus?.(e); if (!e.defaultPrevented) start(); }}
     onBlur={(e) => { onBlur?.(e); cancel(); }}
     onMouseEnter={(e) => { onMouseEnter?.(e); if (!e.defaultPrevented) start(); }}

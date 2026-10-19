@@ -1,0 +1,47 @@
+# 内网部署（和别的业务共用一台服务器时）叠在 docker-compose.yml 上用，见 docs/deploy.md 的“内网部署”：
+#   docker compose -p powerai-ai-internal -f docker-compose.yml -f deploy/internal.compose.yml --profile https up -d
+# 镜像名不和机器上别的项目重名；数据库、文件和证书放在 POWERAI_DATA_ROOT 下（数据盘），不放 Docker 根盘的卷里；
+# 数据库密码必须填；日志有上限。对外只有 Caddy 的 HTTPS 端口（CADDY_HTTPS）；web 的 PORT 只绑 127.0.0.1，
+# 例如 PORT=127.0.0.1:18110：TRUST_PROXY=true 时 web 采信转发头，直接对外会让访客自报地址绕过登录限流。
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+x-backend: &backend
+  image: ${APP_IMAGE:-powerai-ai-internal-app}
+  <<: *logging
+  environment:
+    DATABASE_URL: postgres://aihot:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 必须在 .env 里填}@db:5432/aihot
+  volumes:
+    - ${POWERAI_DATA_ROOT:?POWERAI_DATA_ROOT 必须在 .env 里填，例如 /rdata/powerai-ai-internal}/data:/data
+
+services:
+  db:
+    <<: *logging
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 必须在 .env 里填}
+    volumes:
+      - ${POWERAI_DATA_ROOT:?POWERAI_DATA_ROOT 必须在 .env 里填}/db:/var/lib/postgresql/data
+
+  setup: *backend
+  api: *backend
+  worker: *backend
+
+  web:
+    image: ${APP_IMAGE:-powerai-ai-internal-app}
+    <<: *logging
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # HTTPS on a port of its own (docs/deploy.md). Its data holds the internal CA whose root certificate
+  # colleagues install: kept on the data disk, so recreating the container does not change it.
+  caddy:
+    <<: *logging
+    volumes:
+      - ${POWERAI_DATA_ROOT:?POWERAI_DATA_ROOT 必须在 .env 里填}/caddy:/data

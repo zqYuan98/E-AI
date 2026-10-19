@@ -70,7 +70,8 @@ jobs:
       - name: Browser test engines
         run: npx playwright install --with-deps chromium webkit
       - name: Web tests
-        run: node --test apps/web/tests/*.test.ts
+        # Internal (access module) and public-site suites, each in its own isolated copy of the sources.
+        run: node apps/web/tests/check-isolated.ts "$GITHUB_WORKSPACE" both
 
       # Each test file runs on its own copy of aihot_ci (tests/databases.ts), which the run migrates and
       # leaves empty; the smoke check then reads that empty database.

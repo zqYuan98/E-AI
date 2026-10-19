@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { subjectAfter, withSubject } from "@aihot/site";
 import { webModules } from "../../site-modules";
+import { ACCESS } from "../../lib/access";
 import {
   IconBolt, IconBookmark, IconDoc, IconFlame, IconGrid, IconHeart, IconHistory, IconList, IconMessage, IconPlug, IconUser,
 } from "../icons";
@@ -26,7 +27,8 @@ const SECTIONS: Array<{ title: string; items: NavItem[] }> = [
       { to: "/hot", label: "热点榜", icon: IconFlame },
       { to: "/daily", label: withSubject("日报"), icon: IconDoc },
       { to: "/topics", label: "主题", icon: IconGrid },
-      { to: "/starred", label: "收藏", icon: IconBookmark },
+      // An internal site keeps nothing in the browser, so it has no bookmarks.
+      ...(ACCESS ? [] : [{ to: "/starred", label: "收藏", icon: IconBookmark }]),
     ],
   },
   {

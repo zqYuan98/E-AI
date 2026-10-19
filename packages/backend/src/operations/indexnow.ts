@@ -3,6 +3,7 @@
 // nothing is sent. Needs INDEXNOW_KEY.
 import { config } from "../config.ts";
 import { sql } from "../db.ts";
+import { indexSubmissionDenied } from "../modules.ts";
 import { siteUrl } from "../publication/links.ts";
 import { evidenceCondition, listedCondition } from "../publication/scope.ts";
 import { topicPageCounts } from "../publication/topics.ts";
@@ -11,6 +12,8 @@ const MAX_URLS = 10_000;
 const MAX_STORIES = 3_000;
 
 export async function submitIndexNow(now = new Date()) {
+  // Enforce this here as well as in the scheduler: manual/stale jobs must not read or disclose internal URLs.
+  if (indexSubmissionDenied()) return { status: "denied" as const, httpStatus: null, urls: 0, more: false, sample: [] as string[] };
   const [state] = await sql<{ value: { since: string } }[]>`SELECT value FROM settings WHERE key = 'indexnow.watermark'`;
   const since = state ? new Date(state.value.since) : new Date(now.getTime() - 86400_000);
   const reports = await sql<{ kind: string; key: string }[]>`SELECT kind, key FROM reports WHERE generated_at > ${since} AND generated_at <= ${now}`;

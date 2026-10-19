@@ -10,7 +10,7 @@ export async function navCounts(): Promise<AdminNavCounts> {
   const [c] = await sql<AdminNavCounts[]>`
     SELECT (SELECT count(*)::int FROM feedback WHERE status = 'new') AS feedback,
            (SELECT count(*)::int FROM sources WHERE enabled AND health = 'failing') AS sources,
-           (SELECT count(*)::int FROM receipts WHERE status = 'unknown') + (SELECT count(*)::int FROM deliveries WHERE status = 'unknown') AS runs`;
+           (SELECT count(*)::int FROM receipts WHERE status = 'unknown' AND purpose <> 'model_check') + (SELECT count(*)::int FROM deliveries WHERE status = 'unknown') AS runs`;
   for (const m of serverModules()) for (const [key, count] of Object.entries(m.admin?.counts ?? {})) c![key] = await count();
   return c ?? {};
 }

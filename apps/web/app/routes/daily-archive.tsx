@@ -18,7 +18,7 @@ export { pageHeaders as headers } from "../lib/api.server";
 export const { clientLoader, shouldRevalidate } = pageReuse<typeof loader>();
 
 export async function loader({ request }: { request: Request }) {
-  const { items: index } = await apiGet<ReportIndexResponse>("/api/site/reports/daily", { signal: request.signal });
+  const { items: index } = await apiGet<ReportIndexResponse>("/api/site/reports/daily", { request, signal: request.signal });
   return cachedPage(600, { index, today: beijingDate(Date.now()) });
 }
 

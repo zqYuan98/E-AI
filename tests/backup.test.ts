@@ -14,7 +14,7 @@ import { promisify } from "node:util";
 import sharp from "sharp";
 import { config } from "@aihot/backend/config";
 import { closeDb, sql } from "@aihot/backend/db";
-import { runBackup } from "@aihot/backend/operations/backup";
+import { runBackup, verifyLocalBackup } from "@aihot/backend/operations/backup";
 import { submitFeedback } from "@aihot/backend/operations/feedback";
 
 const run = promisify(execFile);
@@ -158,7 +158,7 @@ test("an unreadable upload directory cannot become a successful empty backup", a
   const shipped = objects.size;
   const [last] = await sql`SELECT value FROM settings WHERE key = 'backup.last'`;
   await symlink("uploads", path.join(config.dataDir, "uploads")); // ELOOP, without depending on root/permission behavior
-  await assert.rejects(runBackup(new Date("2026-11-01T04:01:00Z")), /ELOOP/);
+  await assert.rejects(runBackup(new Date("2026-11-01T04:01:00Z")), /symbolic link/);
   assert.equal(objects.size, shipped, "do not send an empty archive as a replacement for unreadable files");
   const [after] = await sql`SELECT value FROM settings WHERE key = 'backup.last'`;
   assert.deepEqual(after, last, "last successful backup remains accurate");
@@ -216,7 +216,20 @@ test("persistent packing failure still sends the database and reports incomplete
 
 test("local retention keeps three dump/archive pairs without deleting source attachments", async () => {
   await save("feedback-screenshots/retained.png");
+  const backupRoot = path.join(config.dataDir, "backups");
+  await mkdir(backupRoot);
+  const legacy = { [`${stem}-202610010400.dump`]: "legacy dump", [`${stem}-files-202610010400.tar.gz`]: "legacy archive" };
+  for (const [file, bytes] of Object.entries(legacy)) await writeFile(path.join(backupRoot, file), bytes);
   for (const day of [1, 2, 3, 4]) await runBackup(new Date(`2026-11-0${day}T04:00:00Z`));
-  assert.deepEqual((await readdir(path.join(config.dataDir, "backups"))).sort(), [2, 3, 4].flatMap(day => [`${stem}-2026110${day}0400.dump`, `${stem}-files-2026110${day}0400.tar.gz`]).sort());
+  const folders = (await readdir(backupRoot)).filter(file => file.startsWith(`${stem}-snapshot-`));
+  assert.equal(folders.length, 3);
+  const days: number[] = [];
+  for (const folder of folders) {
+    const manifest = await verifyLocalBackup(path.join(backupRoot, folder), stem);
+    assert.deepEqual((await readdir(path.join(backupRoot, folder))).sort(), [manifest.dump.file, manifest.archive.file, "manifest.json"].sort());
+    days.push(new Date(manifest.at).getUTCDate());
+  }
+  assert.deepEqual(days.sort(), [2, 3, 4]);
+  for (const [file, bytes] of Object.entries(legacy)) assert.equal(await readFile(path.join(backupRoot, file), "utf8"), bytes);
   assert.deepEqual(await readFile(path.join(config.dataDir, "feedback-screenshots/retained.png")), PNG);
 });

@@ -3,8 +3,11 @@
 import assert from "node:assert/strict";
 import { afterEach, mock, test } from "node:test";
 import { createRenderErrorHandler } from "../apps/web/app/lib/render-recovery.ts";
+import { ACCESS } from "../apps/web/app/lib/access.ts";
 
 const KEY = "aihot-render-recovery-release";
+// Recovery only applies to public sites; an internal site keeps every render failure on its error page.
+const publicOnly = { skip: ACCESS ? "internal site" : false };
 const ORIGIN = "https://news.example.com";
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
 afterEach(() => {
@@ -30,7 +33,7 @@ function errorInfo() {
   return { componentStack: "at TopicRoute" };
 }
 
-test("an old document render failure checks fresh health and reloads its exact URL once", async () => {
+test("an old document render failure checks fresh health and reloads its exact URL once", publicOnly, async () => {
   const b = browser();
   const error = new TypeError("Cannot read properties of undefined (reading 'length')");
   const info = errorInfo();
@@ -100,7 +103,7 @@ test("blocked storage never risks an automatic reload loop", async () => {
   assert.equal(b.location.reload.mock.calls.length, 0);
 });
 
-test("navigation while the version check is pending never reloads another page", async () => {
+test("navigation while the version check is pending never reloads another page", publicOnly, async () => {
   const b = browser();
   let finish!: (response: Response) => void;
   b.fetch.mock.mockImplementation(() => new Promise<Response>((resolve) => { finish = resolve; }));
@@ -108,6 +111,14 @@ test("navigation while the version check is pending never reloads another page",
   b.location.href = `${ORIGIN}/all`;
   finish(Response.json({ ok: true, release: "release-B" }));
   await pending;
+  assert.equal(b.location.reload.mock.calls.length, 0);
+  assert.equal(b.stored.size, 0);
+});
+
+test("an internal site never probes health, stores recovery state or reloads", { skip: ACCESS ? false : "public site" }, async () => {
+  const b = browser();
+  await createRenderErrorHandler("release-A")(new TypeError("render failed"), errorInfo());
+  assert.equal(b.fetch.mock.calls.length, 0);
   assert.equal(b.location.reload.mock.calls.length, 0);
   assert.equal(b.stored.size, 0);
 });

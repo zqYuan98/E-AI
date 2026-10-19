@@ -20,7 +20,7 @@ export { pageHeaders as headers } from "../lib/api.server";
 export const { clientLoader, shouldRevalidate } = pageReuse<typeof loader>();
 
 export async function loader({ request }: { request: Request }) {
-  return cachedPage(120, { hot: await loadOr404<HotResponse>("/api/site/hot", { signal: request.signal }) });
+  return cachedPage(120, { hot: await loadOr404<HotResponse>("/api/site/hot", { request, signal: request.signal }) });
 }
 
 export function meta() {

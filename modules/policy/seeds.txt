@@ -1,0 +1,22 @@
+# 政策规划库的首批种子：原文或可访问的官方转载页，一行一个（scripts/import.ts --file seeds.txt）。
+# 国家层面
+https://www.gov.cn/zhengce/content/202508/content_7037861.htm
+https://www.nea.gov.cn/20250908/8a90bf7f17b141038fe7be0988a2c603/c.html
+https://www.nea.gov.cn/20250912/c31a8448ceba4fba9081ee2206abc521/c.html
+https://www.nea.gov.cn/20260508/4dae97ca01d348e4871bb8654be34b3a/c.html
+https://www.nea.gov.cn/20260526/261bbb10eea24be3b7ea3a00d89b8891/c.html
+https://www.nea.gov.cn/20260515/d440735d02f442478b986b20c45ae996/c.html
+https://www.gov.cn/zhengce/zhengceku/202408/content_6966863.htm
+https://www.gov.cn/zhengce/zhengceku/202506/content_7026087.htm
+https://www.news.cn/politics/20260520/726055e58f2b483abb566494654d8d5d/c.html
+https://www.miit.gov.cn/zwgk/zcwj/wjfb/tz/art/2026/art_37e463f44fbd44ed9b0fdf4833c3aacd.html
+# 国家电网
+https://power.in-en.com/html/power-2466867.shtml
+https://www.cpem.org.cn/list40/116065.html
+https://paper.people.com.cn/zgnyb/pc/content/202412/23/content_30048825.html
+https://ncdqh.com.cn/technology/202608/237124.html
+# 南方电网
+https://www.cpnn.com.cn/news/nyqy/202607/t20260720_1903339.html
+http://www.gd.chinanews.com.cn/2026/2026-05-27/447954.shtml
+http://paper.people.com.cn/rmrb/pc/content/202607/21/content_30169986.html
+https://www.cpem.org.cn/list2/118234.html

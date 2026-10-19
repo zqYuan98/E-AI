@@ -16,7 +16,7 @@ export interface WebServer {
 }
 
 /** Starts `api` and a web server that reads it. `env` adds to or overrides the web server's environment. */
-export async function startWebServer(api: Server, env: NodeJS.ProcessEnv = {}): Promise<WebServer> {
+export async function startWebServer(api: Server, env: NodeJS.ProcessEnv = {}, mode: "production" | "development" = "production"): Promise<WebServer> {
   api.listen(0, "127.0.0.1");
   await once(api, "listening");
   // The port is chosen first so the pages' canonical addresses (SITE_URL) name the server they come from.
@@ -27,8 +27,12 @@ export async function startWebServer(api: Server, env: NodeJS.ProcessEnv = {}): 
   await new Promise<void>((resolve) => probe.close(() => resolve()));
   const origin = `http://127.0.0.1:${port}`;
   let logs = "";
-  const web = spawn(process.execPath, [fileURLToPath(new URL("../server.ts", import.meta.url))], {
-    env: { ...process.env, WEB_PORT: String(port), SITE_URL: origin, TRUST_PROXY: "false", API_BASE_URL: `http://127.0.0.1:${(api.address() as AddressInfo).port}`, ...env },
+  const args = mode === "production" ? [fileURLToPath(new URL("../server.ts", import.meta.url))]
+    : ["--conditions=development", fileURLToPath(new URL("./bin.cjs", import.meta.resolve("@react-router/dev/package.json"))), "dev", "--port", String(port), "--host", "127.0.0.1"];
+  const safeEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => ["PATH", "SYSTEMROOT", "TEMP", "TMP", "USERPROFILE", "LOCALAPPDATA"].includes(key.toUpperCase())));
+  const web = spawn(process.execPath, args, {
+    cwd: fileURLToPath(new URL("..", import.meta.url)),
+    env: { ...safeEnv, WEB_PORT: String(port), SITE_URL: origin, TRUST_PROXY: "false", API_BASE_URL: `http://127.0.0.1:${(api.address() as AddressInfo).port}`, ...env },
     stdio: ["ignore", "pipe", "pipe"],
   });
   const stop = async () => {
@@ -41,11 +45,11 @@ export async function startWebServer(api: Server, env: NodeJS.ProcessEnv = {}): 
   };
   try {
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error(`web did not start: ${logs}`)), 15_000);
+      const timeout = setTimeout(() => reject(new Error(`web did not start: ${logs}`)), mode === "development" ? 60_000 : 15_000);
       web.once("exit", () => { clearTimeout(timeout); reject(new Error(`web exited: ${logs}`)); });
       web.stderr!.on("data", (chunk) => { logs += String(chunk); });
       web.stdout!.on("data", (chunk) => {
-        if (String(chunk).includes('"msg":"web started"')) { clearTimeout(timeout); resolve(); }
+        if (String(chunk).includes('"msg":"web started"') || (mode === "development" && String(chunk).includes("Local"))) { clearTimeout(timeout); resolve(); }
       });
     });
   } catch (error) {

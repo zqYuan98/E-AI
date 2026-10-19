@@ -1,9 +1,11 @@
-// Admin sign-in and the /api/admin guard. Public routes never read the session.
+// Admin sign-in and the /api/admin guard; auth checks and logout require a real session.
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { ZodError } from "zod";
 import type { AdminMe } from "@aihot/contracts/admin";
 import { DEPLOYMENT, SITE } from "@aihot/site";
 import { config } from "@aihot/backend/config";
+import { serverModules } from "@aihot/backend/modules";
+import { originAllowed } from "@aihot/contracts/access";
 import {
   completeLogin,
   cookie,
@@ -24,6 +26,9 @@ import { sendProblem } from "../http/respond.ts";
 
 /** Cookies are Secure whenever the site is served over HTTPS. */
 const secure = () => config.siteUrl.startsWith("https://");
+const sameOrigin = (req: FastifyRequest) => originAllowed(req.headers.origin, [
+  config.siteUrl, ...serverModules().flatMap((m) => (m.hosts ?? []).map((host) => `https://${host}`)),
+]);
 
 /**
  * Password attempts: at most 10 per client address and 50 in all per 15 minutes. The overall cap holds
@@ -47,7 +52,10 @@ const loginPage = (returnTo: string, error?: string) => `/admin/login?${new URLS
 
 export type AdminHandler = (req: FastifyRequest, reply: FastifyReply, admin: AdminPrincipal) => Promise<unknown>;
 
-/** Guard for /api/admin/*: a live session (or the development stand-in); writes need the CSRF token. */
+/**
+ * Guard for /api/admin/* after module guards: a live session or the development stand-in.
+ * Writes require that admin's own CSRF token.
+ */
 export function adminHandler(fn: AdminHandler) {
   return async (req: FastifyRequest, reply: FastifyReply) => {
     reply.header("Cache-Control", "no-store");
@@ -67,7 +75,7 @@ export function adminHandler(fn: AdminHandler) {
       }
       if ((error as { code?: string }).code === "conflict") return sendProblem(req, reply, { status: 409, code: "conflict", detail: (error as Error).message });
       req.log.error({ err: error, path: req.url.split("?")[0] }, "admin api error");
-      return sendProblem(req, reply, { status: 500, code: "internal_error", detail: String((error as Error).message).slice(0, 300) });
+      return sendProblem(req, reply, { status: 500, code: "internal_error", detail: "The request could not be processed." });
     }
   };
 }
@@ -100,7 +108,8 @@ export function registerAdminAuth(app: FastifyInstance) {
     form.addContentTypeParser("application/x-www-form-urlencoded", { parseAs: "string", bodyLimit: 16 * 1024 }, (_req, body, done) => {
       done(null, Object.fromEntries(new URLSearchParams(String(body))));
     });
-    form.post("/api/auth/password", async (req, reply) => {
+    form.post("/api/auth/password", { bodyLimit: 16 * 1024 }, async (req, reply) => {
+      if (!sameOrigin(req)) return sendProblem(req, reply, { status: 403, code: "forbidden", detail: "A same-origin request is required." });
       const b = (req.body ?? {}) as Record<string, string>;
       const returnTo = String(b.return ?? "/admin");
       reply.header("Cache-Control", "no-store");
@@ -143,10 +152,15 @@ export function registerAdminAuth(app: FastifyInstance) {
   app.get("/api/auth/check", async (req, reply) => {
     reply.header("Cache-Control", "no-store");
     const admin = await sessionPrincipal(req.headers.cookie);
-    return reply.code(admin && !admin.dev ? 204 : 401).send();
+    return reply.code(admin && !admin.dev && admin.userId !== null ? 204 : 401).send();
   });
 
   app.post("/api/auth/logout", async (req, reply) => {
+    const admin = await sessionPrincipal(req.headers.cookie);
+    if (!admin || admin.dev || admin.userId === null) return sendProblem(req, reply, { status: 401, code: "unauthorized", detail: "Sign in to the admin first." });
+    if (!sameOrigin(req) || req.headers["x-csrf-token"] !== admin.csrf) {
+      return sendProblem(req, reply, { status: 403, code: "forbidden", detail: "A same-origin request and current CSRF token are required." });
+    }
     await endSession(req.headers.cookie);
     reply.header("Set-Cookie", cookie(SESSION_COOKIE, "", 0, secure())).header("Cache-Control", "no-store");
     return reply.redirect("/", 303);

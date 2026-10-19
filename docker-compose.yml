@@ -89,12 +89,15 @@ services:
     profiles: ["https"]
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      # Host side configurable for a server whose 80/443 are taken: CADDY_HTTPS=192.168.0.37:18443.
+      - "${CADDY_HTTP:-80}:80"
+      - "${CADDY_HTTPS:-443}:443"
     environment:
       SITE_DOMAIN: ${SITE_DOMAIN:-localhost}
+      SITE_TLS: ${SITE_TLS:-internal}
     volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${CADDYFILE:-./deploy/Caddyfile}:/etc/caddy/Caddyfile:ro
+      - ${CERT_DIR:-./deploy}:/certs:ro
       - caddy:/data
     depends_on:
       - web

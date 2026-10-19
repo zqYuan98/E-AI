@@ -42,3 +42,18 @@ test("manual recovery requires an explicit valid outcome and a note before chang
   }
   assert.equal(sent, 0, "nothing was sent");
 });
+
+test("without access, development-admin recovery needs its own CSRF before changing or sending a delivery", async () => {
+  const [row] = await sql<{ id: number }[]>`INSERT INTO deliveries (target_key, subject_kind, subject_id, dedupe_key, status)
+    VALUES (${TARGET}, 'test', 'test', ${`${T}-csrf`}, 'unknown') RETURNING id`;
+  await sql`UPDATE deliveries SET payload = ${sql.json({ id: row!.id })} WHERE id = ${row!.id}`;
+  const state = async () => (await sql`SELECT status, attempts, updated_at::text AS version FROM deliveries WHERE id = ${row!.id}`)[0];
+  const before = await state();
+  for (const headers of [{}, { "x-csrf-token": "wrong" }]) {
+    const response = await app.inject({ method: "POST", url: `/api/admin/deliveries/${row!.id}/resolve`, headers, payload: { outcome: "resend", note: "checked the group" } });
+    assert.equal(response.statusCode, 403, JSON.stringify(headers));
+    assert.deepEqual(await state(), before);
+    assert.equal((await sql`SELECT 1 FROM audit_log WHERE subject = ${`delivery:${row!.id}`}`).length, 0);
+  }
+  assert.equal(sent, 0, "nothing was sent");
+});

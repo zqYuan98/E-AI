@@ -2,16 +2,21 @@
 // proxied to the api process, so one port serves the whole site; a reverse proxy in front may also send
 // them to the api directly.
 import { createReadStream } from "node:fs";
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { createRequestListener } from "@react-router/node";
 import type { ServerBuild } from "react-router";
+import { pageTarget } from "@aihot/contracts/access";
 import { isApiOwned, resolveRedirect } from "@aihot/contracts/http-policy";
 import { BROWSER_MAX_SECONDS } from "./app/lib/api.server.ts";
 import { proxyToApi } from "./app/lib/api-proxy.server.ts";
+import { ACCESS } from "./app/lib/access.ts";
+import { ASSET_LIST } from "./build-assets.ts";
+import { guardPage, privateResponse, rejectPage } from "./access-edge.server.ts";
 import { logError } from "./app/lib/errors.server.ts";
+import { siteUrl } from "./app/lib/seo.ts";
 
 const PORT = Number(process.env.WEB_PORT || 3000);
 const HOST = process.env.WEB_HOST || "127.0.0.1";
@@ -22,6 +27,9 @@ const HOST = process.env.WEB_HOST || "127.0.0.1";
  */
 const TRUST_PROXY = process.env.TRUST_PROXY === "true";
 const CLIENT_DIR = path.resolve(import.meta.dirname, "build/client");
+// Generated from the actual bundler output, never from site/public or an extension/prefix guess.
+const publicAssets = new Set<string>(JSON.parse(await readFile(path.join(CLIENT_DIR, ASSET_LIST), "utf8")));
+
 
 const TYPES: Record<string, string> = {
   ".js": "text/javascript; charset=utf-8",
@@ -44,15 +52,22 @@ const build: ServerBuild = await import(pathToFileURL(path.resolve(import.meta.d
 // one reaches the component instead. The client manifest declares no loader, so current documents make no
 // such request. A tab updates only when its reader reloads it, so no date says when the last old one is
 // gone: remove this once such requests stop arriving.
+// React Router writes this one runtime file after Vite emits its bundle. Its exact URL is
+// part of the compiled ServerBuild, not inferred from a directory scan or a filename pattern.
+publicAssets.add(build.assets.url);
 const routes = Object.fromEntries(Object.entries(build.routes).map(([id, route]) => [id,
   route?.module.default && !route.module.loader ? { ...route, module: { ...route.module, loader: () => null } } : route,
 ]));
-const ssr = createRequestListener({ build: { ...build, routes }, mode: "production" });
+// Behind a proxy that ends TLS (Caddy, nginx) the SSR request URL is http://<host> while the browser's Origin
+// is SITE_URL's https one; React Router would refuse every form action as cross-site. Only SITE_URL's own
+// host is let through, and the sign-in action still checks Origin against the whole SITE_URL.
+const siteHost = new URL(siteUrl()).host;
+const ssr = createRequestListener({ build: { ...build, routes, allowedActionOrigins: [siteHost] }, mode: "production" });
 
 class BadRequest extends Error {}
 
 /** Hashed build assets are immutable; anything else from the client build gets a short cache. */
-async function serveStatic(pathname: string, res: import("node:http").ServerResponse): Promise<boolean> {
+async function serveStatic(pathname: string, head: boolean, res: import("node:http").ServerResponse): Promise<boolean> {
   if (pathname.includes("..") || pathname.endsWith("/")) return false;
   let decoded: string;
   try {
@@ -60,29 +75,36 @@ async function serveStatic(pathname: string, res: import("node:http").ServerResp
   } catch {
     throw new BadRequest("malformed percent-encoding");
   }
+  if (decoded.includes("\\") || decoded.includes("\0")) return false;
   const file = path.join(CLIENT_DIR, decoded);
-  if (!file.startsWith(CLIENT_DIR)) return false;
+  if (path.relative(CLIENT_DIR, file).startsWith("..")) return false;
   const info = await stat(file).catch(() => null);
   if (!info?.isFile()) return false;
-  const immutable = pathname.startsWith("/assets/");
+  const immutable = publicAssets.has(pathname);
   res.writeHead(200, {
     "Content-Type": TYPES[path.extname(file)] ?? "application/octet-stream",
     "Content-Length": info.size,
     "Cache-Control": immutable ? "public, max-age=31536000, immutable" : "public, max-age=3600",
     "X-Content-Type-Options": "nosniff",
   });
-  createReadStream(file).pipe(res);
+  if (head) res.end();
+  else createReadStream(file).pipe(res);
   return true;
 }
 
 // One bad request must never take the process down: answer it and keep serving.
 const server = createServer((req, res) => {
+  if (ACCESS) {
+    privateResponse(res);
+    delete req.headers["if-none-match"];
+    delete req.headers["if-modified-since"];
+  }
   handle(req, res).catch((error: unknown) => {
     const bad = error instanceof BadRequest || error instanceof URIError;
     if (!bad) logError(error, { msg: "web request failed", method: req.method, path: (req.url ?? "").split("?")[0]!.slice(0, 200) });
     if (res.headersSent) return res.destroy();
     res.writeHead(bad ? 400 : 500, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" });
-    res.end(bad ? "Bad request" : "Internal error");
+    res.end(req.method === "HEAD" ? undefined : bad ? "Bad request" : "Internal error");
   });
 });
 
@@ -95,7 +117,7 @@ function pageResponse(req: import("node:http").IncomingMessage, res: import("nod
   // An origin-form target is a path even when it starts with //, not a new URL authority.
   const url = new URL(target.startsWith("/") ? `http://web.local${target}` : target, "http://web.local");
   const pathname = decodeURIComponent(url.pathname).replace(/\.data$/, "");
-  const publicRead = (req.method === "GET" || req.method === "HEAD") && !/^\/admin(?:\/|$)/i.test(pathname);
+  const publicRead = !ACCESS && (req.method === "GET" || req.method === "HEAD") && !/^\/admin(?:\/|$)/i.test(pathname);
   if (publicRead && url.pathname.endsWith(".data")) {
     url.searchParams.delete("_routes");
     req.url = url.pathname + url.search;
@@ -138,28 +160,33 @@ function pageResponse(req: import("node:http").IncomingMessage, res: import("nod
 }
 
 async function handle(req: import("node:http").IncomingMessage, res: import("node:http").ServerResponse) {
-  const raw = req.url ?? "/";
-  const qi = raw.indexOf("?");
-  const pathname = qi >= 0 ? raw.slice(0, qi) : raw;
-  const search = qi >= 0 ? raw.slice(qi) : "";
+  const target = pageTarget(req.url ?? "/", req.headers.host);
+  const resource = !!target && !target.data && publicAssets.has(target.path) && (req.method === "GET" || req.method === "HEAD");
+  if (!target) return rejectPage(req, res, 400);
+  const pathname = target.path;
+  const url = new URL(`http://web.local${target.href}`);
+  const search = url.search;
+
+  // The visitor's address replaces whatever the request claimed, for the api's per-visitor limits:
+  // proxied api routes and SSR actions that call the api (member sign-in) forward only this value.
+  const forwarded = String(req.headers["x-forwarded-for"] ?? "").split(",").map((v) => v.trim()).filter(Boolean);
+  const client = TRUST_PROXY && forwarded.length ? forwarded[forwarded.length - 1]! : (req.socket.remoteAddress ?? "");
+  req.headers["x-forwarded-for"] = client;
+  req.headers["x-real-ip"] = client;
+
+  // API routes enforce their own session and CSRF policy, even if requested with SSR/proxy headers.
+  if (!target.data && isApiOwned(pathname)) return proxyToApi(req, res, { "x-forwarded-for": client, "x-real-ip": client });
+  if (!resource && await guardPage(req, res, target)) return;
 
   const decision = resolveRedirect(pathname, search);
   if (decision) {
     for (const [k, v] of Object.entries(decision.headers)) res.setHeader(k, v);
     if (decision.location) res.setHeader("Location", decision.location);
     res.statusCode = decision.status;
-    return res.end(decision.location ? undefined : decision.status === 410 ? "Gone" : "Not found");
+    return res.end(req.method === "HEAD" || decision.location ? undefined : decision.status === 410 ? "Gone" : "Not found");
   }
 
-  if (isApiOwned(pathname)) {
-    // The visitor's address, decided here: the one the trusted proxy saw (the last X-Forwarded-For
-    // entry), or this connection's own. Both headers carry only that.
-    const forwarded = String(req.headers["x-forwarded-for"] ?? "").split(",").map((v) => v.trim()).filter(Boolean);
-    const client = TRUST_PROXY && forwarded.length ? forwarded[forwarded.length - 1]! : (req.socket.remoteAddress ?? "");
-    return proxyToApi(req, res, { "x-forwarded-for": client, "x-real-ip": client });
-  }
-
-  if ((req.method === "GET" || req.method === "HEAD") && pathname.includes(".") && (await serveStatic(pathname, res))) return;
+  if (!target.data && (req.method === "GET" || req.method === "HEAD") && pathname.includes(".") && (await serveStatic(url.pathname, req.method === "HEAD", res))) return;
   pageResponse(req, res);
   return ssr(req, res);
 }

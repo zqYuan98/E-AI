@@ -57,8 +57,9 @@ test("the MCP check uses module samples and keeps its failure assertions", async
   const address = await app.listen({ host: "127.0.0.1", port: 0 });
   const samples = abilities.map(({ mcp }) => ({ tool: mcp.tool, checkArgs: mcp.checkArgs, input: z.toJSONSchema(mcp.input, { io: "input" }) }));
 
-  // Only replace the child process's site manifest. The CLI, SDK, HTTP route and public reads are
-  // unchanged, and use this file's empty test database; no real site module is needed for the fixture.
+  // Only replace the child process's site manifests: the fixture's modules, and no access module, so the
+  // CLI checks the public MCP contract (the internal-site MCP denial is covered in smoke-outlets.standalone.test.ts).
+  // The CLI, SDK, HTTP route and public reads are unchanged, and use this file's empty test database.
   function check(tools = samples) {
     const manifest = [{ name: "check-fixture", agent: { abilities: tools.map((mcp) => ({ mcp })) } }];
     const source = `
@@ -74,7 +75,9 @@ test("the MCP check uses module samples and keeps its failure assertions", async
     const preload = `
       import { registerHooks } from "node:module";
       const manifestUrl = ${JSON.stringify(import.meta.resolve("@aihot/site/modules/server"))};
+      const modulesUrl = ${JSON.stringify(import.meta.resolve("@aihot/site/modules"))};
       registerHooks({ load(url, context, next) {
+        if (url === modulesUrl) return { format: "module", source: "export const MODULES = [];", shortCircuit: true };
         return url === manifestUrl ? { format: "module", source: ${JSON.stringify(source)}, shortCircuit: true } : next(url, context);
       } });
     `;
@@ -83,46 +86,52 @@ test("the MCP check uses module samples and keeps its failure assertions", async
     });
   }
 
-  async function fails(tools: typeof samples, message: RegExp) {
+  // The CLI prints each tool's outcome, never arguments or response text; a failure prints no details.
+  const line = (tool: string, outcome: "成功响应" | "业务错误响应" | "仅校验发现契约") => `MCP 工具 ${mcpToolName(tool)}：${outcome}`;
+  const PASSED = "公开 MCP 完整契约检查通过";
+  async function fails(tools: typeof samples, check_: (stdout: string) => void) {
     await assert.rejects(check(tools), (error: unknown) => {
       const result = error as Error & { code: number; stdout: string };
       assert.notEqual(result.code, 0);
-      assert.match(result.stdout + result.message, message);
+      assert.ok(!result.stdout.includes(PASSED));
+      assert.match(result.message, /MCP 契约检查失败/);
+      check_(result.stdout);
       return true;
     });
   }
 
   try {
     await t.test("a required sample and the default empty arguments both succeed", async () => {
-      assert.match((await check()).stdout, /MCP contract check passed/);
+      assert.ok((await check()).stdout.includes(PASSED));
       assert.deepEqual(calls, [{ label: "sample" }, {}]);
     });
     await t.test("a required tool without a sample is discovered without a false failure", async () => {
       const before = requestedTools.length;
       const result = await check(samples.map((sample) => ({ ...sample, checkArgs: undefined })));
-      assert.match(result.stdout, /echo_check → discovery only/);
-      assert.match(result.stdout, /MCP contract check passed/);
+      assert.ok(result.stdout.includes(line("echo_check", "仅校验发现契约")));
+      assert.ok(result.stdout.includes(PASSED));
       const moduleCalls = requestedTools.slice(before).filter((name) => samples.some((sample) => name === mcpToolName(sample.tool)));
       assert.deepEqual(moduleCalls, [mcpToolName("status_check")]);
     });
     await t.test("async input validation decides empty calls and preserves explicit samples", async () => {
       const before = requestedTools.length;
       const result = await check();
-      assert.match(result.stdout, /status_check \{\} → ok/);
-      assert.match(result.stdout, /async_check → discovery only/);
+      assert.ok(result.stdout.includes(line("status_check", "成功响应")));
+      assert.ok(result.stdout.includes(line("async_check", "仅校验发现契约")));
       const moduleCalls = requestedTools.slice(before).filter((name) => samples.some((sample) => name === mcpToolName(sample.tool)));
       assert.deepEqual(moduleCalls, [mcpToolName("echo_check"), mcpToolName("status_check")]);
-      assert.match((await check([samples[0], samples[1], { ...samples[2], checkArgs: { id: "sample" } }])).stdout, /async_check \{"id":"sample"\} → ok/);
+      assert.ok((await check([samples[0], samples[1], { ...samples[2], checkArgs: { id: "sample" } }])).stdout.includes(line("async_check", "成功响应")));
       assert.deepEqual(calls.at(-1), { id: "sample" });
     });
     await t.test("an explicit invalid sample still fails SDK validation", async () => {
-      await fails([{ ...samples[0], checkArgs: {} }, samples[1], samples[2]], /expected success, got an error/);
+      await fails([{ ...samples[0], checkArgs: {} }, samples[1], samples[2]], (stdout) => assert.ok(stdout.includes(line("echo_check", "业务错误响应"))));
     });
     await t.test("schema-valid arguments do not excuse a failed read", async () => {
-      await fails([{ ...samples[0], checkArgs: { label: "fail" } }, samples[1], samples[2]], /expected success, got an error/);
+      await fails([{ ...samples[0], checkArgs: { label: "fail" } }, samples[1], samples[2]], (stdout) => assert.ok(stdout.includes(line("echo_check", "业务错误响应"))));
     });
     await t.test("every declared module tool must be listed", async () => {
-      await fails([...samples, { ...samples[0], tool: "missing_check", checkArgs: undefined }], /tool list mismatch/);
+      // The tool list is compared before any call: no tool ran.
+      await fails([...samples, { ...samples[0], tool: "missing_check", checkArgs: undefined }], (stdout) => assert.ok(!stdout.includes("MCP 工具 ")));
     });
   } finally {
     app.server.closeAllConnections();
