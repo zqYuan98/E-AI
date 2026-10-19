@@ -89,7 +89,7 @@ services:
     profiles: ["https"]
     restart: unless-stopped
     ports:
-      # Host side configurable for a server whose 80/443 are taken: CADDY_HTTPS=192.168.0.37:18443.
+      # Host side configurable for a server whose 80/443 are taken: CADDY_HTTPS=192.168.0.37:18460.
       - "${CADDY_HTTP:-80}:80"
       - "${CADDY_HTTPS:-443}:443"
     environment:

@@ -9,9 +9,14 @@ x-logging: &logging
     driver: json-file
     options: { max-size: "10m", max-file: "5" }
 
+# The containers run as the deploying user (APP_UID/APP_GID, `id -u` / `id -g`), so the data directories need
+# no chown by root: a user without sudo can own them, and the files in them stay removable by that user.
+x-user: &user
+  user: "${APP_UID:-1000}:${APP_GID:-1000}"
+
 x-backend: &backend
   image: ${APP_IMAGE:-powerai-ai-internal-app}
-  <<: *logging
+  <<: [*logging, *user]
   environment:
     DATABASE_URL: postgres://aihot:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 必须在 .env 里填}@db:5432/aihot
   volumes:
@@ -19,7 +24,7 @@ x-backend: &backend
 
 services:
   db:
-    <<: *logging
+    <<: [*logging, *user]
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 必须在 .env 里填}
     volumes:
@@ -42,6 +47,6 @@ services:
   # HTTPS on a port of its own (docs/deploy.md). Its data holds the internal CA whose root certificate
   # colleagues install: kept on the data disk, so recreating the container does not change it.
   caddy:
-    <<: *logging
+    <<: [*logging, *user]
     volumes:
       - ${POWERAI_DATA_ROOT:?POWERAI_DATA_ROOT 必须在 .env 里填}/caddy:/data

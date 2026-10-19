@@ -64,27 +64,29 @@ MCP 默认接受 `SITE_URL` 的主机以及 `localhost`、`127.0.0.1`、`[::1]`�
 
 站点装了 `modules/access` 时，所有页面和接口都要登录。和别的业务共用一台服务器时，用独立的项目名，并叠上 `deploy/internal.compose.yml`：镜像名不和别的项目重名，数据库、文件和证书放在数据盘的目录里，数据库密码必须填，容器日志有上限，web 带健康检查。
 
-对外只开一个 HTTPS 端口，不占 80/443：Caddy 在容器里终结 TLS，用自己的证书颁发机构签发证书（非标准端口没法用 Let’s Encrypt 验证）。下面以子域名 `power.notvitamin.com`（解析到这台服务器）和端口 18443 为例；换子域名只改 `SITE_URL` 和 `SITE_DOMAIN`。
+对外只开一个 HTTPS 端口，不占 80/443：Caddy 在容器里终结 TLS，用自己的证书颁发机构签发证书（非标准端口没法用 Let’s Encrypt 验证）。下面以子域名 `power.notvitamin.com`（解析到这台服务器）和端口 18460 为例；换子域名只改 `SITE_URL` 和 `SITE_DOMAIN`。
 
 1. `.env` 里除了必填项，再写：
 
    ```bash
-   SITE_URL=https://power.notvitamin.com:18443   # 必须和同事浏览器里输入的地址一字不差（含端口），否则登录被拒（403）
+   SITE_URL=https://power.notvitamin.com:18460   # 必须和同事浏览器里输入的地址一字不差（含端口），否则登录被拒（403）
    SITE_DOMAIN=power.notvitamin.com
    CADDYFILE=./deploy/Caddyfile.internal
-   CADDY_HTTPS=192.168.0.37:18443                # 对外的唯一端口，绑内网网卡；先确认空闲
-   CADDY_HTTP=127.0.0.1:18081                    # 用不到，只是不占 80
+   CADDY_HTTPS=192.168.0.37:18460                # 对外的唯一端口，绑内网网卡；先确认空闲
+   CADDY_HTTP=127.0.0.1:18461                    # 用不到，只是不占 80
    SITE_TLS=internal                             # Caddy 自带证书；有公司证书时写 "/certs/fullchain.pem /certs/key.pem" 并设 CERT_DIR
    PORT=127.0.0.1:18110                          # web 只给本机的 Caddy 和检查用，不能对外（见下）
    TRUST_PROXY=true                              # 访客地址从 Caddy 的 X-Forwarded-For 读，登录限流按它计数
    POWERAI_DATA_ROOT=/rdata/powerai-ai-internal
+   APP_UID=1001                                  # 部署用户的 `id -u` 和 `id -g`：容器以这个身份运行，数据目录归部署用户所有，不需要 root
+   APP_GID=1001
    COLLECT_ENABLED=false                         # 首次启动先关着，确认登录、成员和页面正常，再打开
    MODEL_CALLS_ENABLED=false
    ```
 
    `TRUST_PROXY=true` 时 web 采信转发头，所以 `PORT` 只能绑 `127.0.0.1`：直接对外的话，访客可以自报地址绕过登录限流。
 
-2. 启动（先确认 `id -u`：data 目录要让容器里的 node 用户 uid 1000 可写，不是 1000 时请服务器管理员 `chown 1000:1000` 这个目录）：
+2. 启动（`POWERAI_DATA_ROOT` 要在部署用户可写的磁盘上；`/rdata` 这类 root 属主的目录，先请管理员建好 `powerai-ai-internal` 并把属主改成部署用户）：
 
    ```bash
    mkdir -p /rdata/powerai-ai-internal/{db,data,caddy}
@@ -100,7 +102,7 @@ MCP 默认接受 `SITE_URL` 的主机以及 `localhost`、`127.0.0.1`、`[::1]`�
    $C exec -T caddy cat /data/caddy/pki/authorities/local/root.crt > powerai-root.crt
    ```
 
-4. 首个管理员用 `.env` 里的 `ADMIN_PASSWORD` 从 `https://power.notvitamin.com:18443/admin/login` 登录，在后台“访问控制 → 成员管理”里给同事建账号（口令至少 12 位）。同事登录后只能阅读和提交反馈；RSS、MCP 和公开 API 在内部站点都需要登录，暂不对外。用 IP 或别的地址打开会被拒绝。
+4. 首个管理员用 `.env` 里的 `ADMIN_PASSWORD` 从 `https://power.notvitamin.com:18460/admin/login` 登录，在后台“访问控制 → 成员管理”里给同事建账号（口令至少 12 位）。同事登录后只能阅读和提交反馈；RSS、MCP 和公开 API 在内部站点都需要登录，暂不对外。用 IP 或别的地址打开会被拒绝。
 
 5. 确认模型服务商可用（见下一节）后，把 `COLLECT_ENABLED`、`MODEL_CALLS_ENABLED` 改成 `true`，`$C up -d` 生效；上线当天按“备份”一节手动做一份并演练恢复。
 
