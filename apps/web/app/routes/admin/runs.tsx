@@ -6,7 +6,7 @@ import type { Route } from "./+types/runs";
 import type { AdminDeliveryIssue, AdminReceiptIssue, AdminRuns } from "@aihot/contracts/admin";
 import { adminGet } from "../../lib/admin.server";
 import { useAdminAction } from "../../features/admin/action";
-import { ago, bj, duration, num } from "../../features/admin/format";
+import { bj, duration, num } from "../../features/admin/format";
 import { AdminPage, Badge, Button, Card, DataTable, Dot, Empty, Field, Json, ReasonDialog, Select, Stat, Time } from "../../features/admin/ui";
 import { loadParts } from "../../site-modules";
 
@@ -50,7 +50,7 @@ export default function RunsAdmin({ loaderData }: Route.ComponentProps) {
         <Stat
           label="worker"
           value={<span className="inline-flex items-center gap-2 text-[18px]"><Dot tone={worker?.alive ? "ok" : "bad"} />{worker ? (worker.alive ? "运行中" : "心跳中断") : "无心跳"}</span>}
-          hint={worker ? `${worker.host} · 心跳 ${ago(worker.at)}` : "worker 未上报心跳"}
+          hint={worker ? <>{worker.host} · 心跳 <Time at={worker.at} /></> : "worker 未上报心跳"}
         />
         <Stat label="队列积压" value={num(queued)} tone={queued > 500 ? "warn" : undefined} hint="排队与等待重试" />
         <Stat label="失败的定时任务" value={num(failing.length)} tone={failing.length ? "bad" : "ok"} hint="最近一次运行失败" />
@@ -175,7 +175,7 @@ export default function RunsAdmin({ loaderData }: Route.ComponentProps) {
           title="处理失败（30 天，按错误归类）"
           right={
             <span className="flex items-center gap-3">
-              {r.retrying.count > 0 && <span>等待重试 {num(r.retrying.count)} 条 · 下一次 <Time at={r.retrying.next} /></span>}
+              {r.retrying.count > 0 && <span>等待重试 {num(r.retrying.count)} 条 · 最早到期 <Time at={r.retrying.next} /></span>}
               {r.errors.length > 0 && <Button size="sm" onClick={() => setRequeue("")}>全部重新处理</Button>}
             </span>
           }

@@ -230,7 +230,7 @@ function ItemGone() {
       <PhoneBar back={{ to: "/", label: "精选" }} />
       <div className="py-24 text-center">
         <div className="text-[20px] font-bold text-ink">{gone ? "这里没有内容" : "暂时无法加载"}</div>
-        <p className="mt-2 text-[13.5px] leading-relaxed text-ink-3">{gone ? "这篇内容不存在，或已不再公开。" : "服务暂时繁忙，请稍后再试。"}</p>
+        <p className="mt-2 text-[13.5px] leading-relaxed text-ink-3">{gone ? "这篇内容不存在，或已经下架。" : "服务暂时繁忙，请稍后再试。"}</p>
         {!gone && (
           <button type="button" onClick={() => void revalidator.revalidate()} className="mt-6 h-11 rounded-full border border-line-strong bg-surface px-5 text-[14px] font-medium text-ink-2 active:bg-bg-sunk">
             重试

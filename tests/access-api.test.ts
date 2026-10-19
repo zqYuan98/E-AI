@@ -332,6 +332,17 @@ test("a disabled member can be restored; a member changes their own password and
   assert.equal((await signIn(member.username, fresh)).statusCode, 200);
 });
 
+test("successful admin sign-ins never use up the attempt limit; failed ones do", async () => {
+  const signInAdmin = (password: string) => app.inject({
+    method: "POST", url: "/api/auth/password", remoteAddress: "127.0.0.250",
+    headers: { origin: config.siteUrl, "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": "10.20.30.40" },
+    payload: new URLSearchParams({ password, return: "/admin" }).toString(),
+  });
+  for (let i = 0; i < 15; i++) assert.equal((await signInAdmin(config.adminPassword!)).headers.location, "/admin", `success ${i + 1}`);
+  for (let i = 0; i < 10; i++) assert.match(String((await signInAdmin(`wrong admin password ${i}`)).headers.location), /error=wrong/);
+  assert.match(String((await signInAdmin(config.adminPassword!)).headers.location), /error=too-many/, "ten failures lock this address");
+});
+
 test("admin logout uses real admin CSRF even with a member cookie and revokes only the admin session", async () => {
   const member = await newMember();
   const signed = await memberSession(member.username);

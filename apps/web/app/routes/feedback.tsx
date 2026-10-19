@@ -67,8 +67,8 @@ function FeedbackAside() {
           ))}
         </ol>
       </AsideCard>
-      <AsideCard title="来源方">
-        <p className="text-[13px] leading-[1.75] text-ink-3">如果你是来源方，希望更正、下架或调整展示方式，写明对应的文章链接和你的诉求即可。</p>
+      <AsideCard title="内容有误">
+        <p className="text-[13px] leading-[1.75] text-ink-3">摘要、分类或政策要素有误，或者某个来源不该收录，写明对应的页面链接和问题即可，管理员会更正或下架。</p>
       </AsideCard>
     </>
   );

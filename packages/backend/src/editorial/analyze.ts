@@ -181,9 +181,17 @@ export function normalizeStructure(data: z.infer<typeof StructureSchema>, a: Ana
       return quote ? [{ text: c.text ?? quote, quote }] : [];
     }).slice(0, 4),
   };
+  // A company the material never names is the model's guess; it would put the item into that company's topic.
+  const lower = visible.toLowerCase();
+  const named = (id: string) => {
+    const e = ENTITIES[id]!;
+    return [e.name, ...e.aliases, ...(e.otherNames ?? [])].some((n) => n.length >= 2 && lower.includes(n.toLowerCase()));
+  };
+  const entityOfTag = new Map(Object.entries(ENTITIES).flatMap(([id, e]) => (e.displayTag ? [[e.displayTag, id] as const] : [])));
   return {
-    category: data.category, tags: normalizeTags(data.tags),
-    subjects: [...new Set(data.subjects.map((s) => s.trim().toLowerCase()).filter((s) => s in ENTITIES))],
+    category: data.category,
+    tags: normalizeTags(data.tags).filter((t) => !entityOfTag.has(t) || named(entityOfTag.get(t)!)),
+    subjects: [...new Set(data.subjects.map((s) => s.trim().toLowerCase()).filter((s) => s in ENTITIES && named(s)))],
     scope, fact,
   };
 }

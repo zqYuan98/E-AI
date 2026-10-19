@@ -16,6 +16,7 @@ import {
   bodyModeOf, channelOf, displayTags, isIndexable, isPoolEligible, isSelectable, mayRedistribute, publicSourceName, type SourceFacts,
 } from "./rules.ts";
 import { latestCompositeCondition, ownFactEvidenceCondition } from "./scope.ts";
+import { OFF_TOPIC_TAGS } from "@aihot/industry/taxonomy";
 
 interface ArticleRow {
   id: string;
@@ -283,7 +284,9 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
   // An undated archive has a readable detail page, but its discovery is not a news timestamp.
   // Explicit imports can retain an editorial decision already published elsewhere.
   const eligible = isPoolEligible({ participationMode: source.participation_mode, relevance, title, summary, originalPost: !!original })
-    && (!article.backfill || article.published_at !== null || !!options.releasedAt);
+    && (!article.backfill || article.published_at !== null || !!options.releasedAt)
+    // The industry pack's off-topic tags: the model's own reading says the item is not the site's subject.
+    && !tags.some((t) => OFF_TOPIC_TAGS.includes(t));
   const selectionCandidate = isSelectable(eligible, judgedSelected, source.tier);
   // Scoring nominates a report; a completed identity/value decision admits it to selection.
   // A historical import already has its public decision. Preserve that confirmed state on rebuild.

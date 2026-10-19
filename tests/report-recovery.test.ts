@@ -86,3 +86,12 @@ test("empty older gaps cannot starve a later daily, weekly or monthly, and failu
     assert.ok(await report(kind!, key!), `${kind} ${key} was recovered past the empty gaps`);
   }
 });
+
+test("a new site's first issues wait for a window it ran in instead of failing every half hour", async () => {
+  // The site's first article arrives in the window of the daily dated 2024-03-12 (half a day before its edition time).
+  await item("2024-03-12");
+  assert.deepEqual(await composeDueReports(editionAt("daily", "2024-03-11", 3600)), { generated: [], failed: [] }, "every due window ended before the site ran");
+  const { generated } = await composeDueReports(editionAt("daily", "2024-03-12", 3600));
+  assert.ok(generated.includes("daily:2024-03-12"), "the first daily it ran for");
+  assert.ok(!generated.some((g) => g.startsWith("weekly:") || g.startsWith("monthly:")), "earlier weeks and months are not tried");
+});

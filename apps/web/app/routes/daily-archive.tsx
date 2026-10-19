@@ -1,7 +1,9 @@
 import { useLoaderData } from "react-router";
 import { IntentLink } from "../components/ui/IntentLink";
 import type { ReportIndexEntry, ReportIndexResponse } from "@aihot/contracts/site";
-import { SITE, withSubject } from "@aihot/site";
+import { EDITION_TIMES, SITE, withSubject } from "@aihot/site";
+
+const EDITION_TIME = EDITION_TIMES.daily;
 import { apiGet, cachedPage } from "../lib/api.server";
 import { pageReuse } from "../lib/page-reuse";
 import { archiveLd, pageMeta } from "../lib/seo";
@@ -10,6 +12,7 @@ import { weekdayShort } from "../lib/format";
 import { ReportLayout } from "../features/report/ReportLayout";
 import { archiveGroups, ENTRIES_UNIT } from "../features/report/format";
 import { Rows, SectionPage } from "../features/report/ReportPaper";
+import { EmptyState } from "../components/ui/Page";
 import { Nameplate } from "../features/report/Nameplate";
 import type { Screen } from "../components/shell/screens";
 
@@ -48,6 +51,11 @@ export default function DailyArchive() {
           </div>
           <div aria-hidden="true" className="border-t border-line-strong" />
         </header>
+        {months.length === 0 && (
+          <div className="mt-6">
+            <EmptyState title="还没有日报">{`第一期在站点开始收录后的下一个 ${EDITION_TIME} 出刊，之后每天一期。`}</EmptyState>
+          </div>
+        )}
         {months.map((m) => (
           <SectionPage key={m.id} id={`m-${m.id}`} label={m.label}>
             <Rows items={m.entries}>

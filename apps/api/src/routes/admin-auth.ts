@@ -31,21 +31,24 @@ const sameOrigin = (req: FastifyRequest) => originAllowed(req.headers.origin, [
 ]);
 
 /**
- * Password attempts: at most 10 per client address and 50 in all per 15 minutes. The overall cap holds
- * even when a client forges its address; with a 12+ character password that is far too slow to guess.
+ * Failed password attempts: at most 10 per client address and 50 in all per 15 minutes; a successful sign-in
+ * uses none. The overall cap holds even when a client forges its address; with a 12+ character password that
+ * is far too slow to guess.
  */
 const attempts = new Map<string, number[]>();
-function over(key: string, limit: number, now: number): boolean {
-  const recent = (attempts.get(key) ?? []).filter((t) => now - t < 15 * 60_000);
-  recent.push(now);
-  attempts.set(key, recent);
-  return recent.length > limit;
+function recent(key: string, now: number): number[] {
+  const list = (attempts.get(key) ?? []).filter((t) => now - t < 15 * 60_000);
+  attempts.set(key, list);
+  return list;
 }
 function tooManyAttempts(ip: string): boolean {
   const now = Date.now();
   if (attempts.size > 5000) attempts.clear();
-  const perClient = over(`ip:${ip}`, 10, now);
-  return over("all", 50, now) || perClient;
+  return recent(`ip:${ip}`, now).length >= 10 || recent("all", now).length >= 50;
+}
+function recordFailure(ip: string) {
+  const now = Date.now();
+  for (const key of [`ip:${ip}`, "all"]) attempts.set(key, [...recent(key, now), now]);
 }
 
 const loginPage = (returnTo: string, error?: string) => `/admin/login?${new URLSearchParams({ return: safeReturn(returnTo), ...(error ? { error } : {}) })}`;
@@ -119,6 +122,7 @@ export function registerAdminAuth(app: FastifyInstance) {
         reply.header("Set-Cookie", cookie(SESSION_COOKIE, token, SESSION_DAYS * 86400, secure()));
         return reply.redirect(target, 303);
       } catch (error) {
+        recordFailure(String(req.ip));
         if (!(error instanceof LoginRejected)) req.log.error({ err: error }, "admin login failed");
         return reply.redirect(loginPage(returnTo, error instanceof LoginRejected && /ADMIN_PASSWORD/.test(error.message) ? "unset" : "wrong"), 303);
       }

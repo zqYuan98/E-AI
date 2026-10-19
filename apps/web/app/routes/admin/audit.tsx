@@ -39,7 +39,7 @@ export default function Audit({ loaderData }: Route.ComponentProps) {
             { key: "a", label: "操作", render: (r) => <span className="font-mono text-[12.5px] text-ink">{r.action}</span> },
             { key: "s", label: "对象", render: (r) => subjectLink(r.subject) },
             { key: "who", label: "操作人", render: (r) => r.actor },
-            { key: "r", label: "原因", render: (r) => <span className="text-ink-2">{r.reason}</span> },
+            { key: "r", label: "原因", render: (r) => (r.reason ? <span className="text-ink-2">{r.reason}</span> : <span className="text-ink-4">—</span>) },
             { key: "d", label: "变化", render: (r) => (r.before || r.after ? <Json value={{ before: r.before, after: r.after }} label="前后" /> : null) },
           ]}
         />

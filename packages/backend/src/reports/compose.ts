@@ -280,6 +280,12 @@ export function dueMonthly(now = new Date()): string {
   return `${Math.floor(month / 12)}-${String((month % 12) + 1).padStart(2, "0")}`;
 }
 
+/** When an issue's window ends: the edition time of its (last) day. */
+function windowEnd(kind: ReportKind, key: string): Date {
+  const lastDay = kind === "daily" ? key : kind === "weekly" ? isoWeekRange(key)!.end : monthRange(key)!.end;
+  return beijingAt(lastDay, EDITION_TIMES.daily);
+}
+
 const nextWeek = (label: string) => isoWeekLabel(addDays(isoWeekRange(label)!.start, 7));
 const nextMonth = (label: string) => {
   const [y, m] = label.split("-").map(Number) as [number, number];
@@ -300,8 +306,12 @@ export async function composeDueReports(now = new Date(), limit = 8): Promise<{ 
     { kind: "weekly", due: dueWeekly(now), next: nextWeek, compose: composeWeekly },
     { kind: "monthly", due: dueMonthly(now), next: nextMonth, compose: composeMonthly },
   ];
+  // A new site's first issue of a kind waits for a window the site ran in: an issue whose whole window ended before
+  // the first article arrived has nothing to report, and is not a failure to retry every half hour.
+  const [{ first_at: siteStart } = { first_at: null }] = await sql<{ first_at: Date | null }[]>`SELECT min(discovered_at) AS first_at FROM articles`;
   kinds: for (const k of kinds) {
     const have = new Set((await sql<{ key: string }[]>`SELECT key FROM reports WHERE kind = ${k.kind}`).map((r) => r.key));
+    if (!have.size && (!siteStart || windowEnd(k.kind, k.due) <= siteStart)) continue;
     const first = [...have].sort()[0] ?? k.due;
     for (let key = first; key <= k.due; key = k.next(key)) {
       if (have.has(key)) continue;

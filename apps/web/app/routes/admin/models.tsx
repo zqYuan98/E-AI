@@ -221,7 +221,7 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
                 { key: "at", label: "时间", render: (h) => <span className="num whitespace-nowrap">{bj(h.at)}</span> },
                 { key: "c", label: "能力", render: (h) => labelOf(h.subject) },
                 { key: "m", label: "变化", render: (h) => <span className="font-mono text-[12px]">{h.before?.model ?? "—"} → {h.after?.model ?? "—"}</span> },
-                { key: "r", label: "原因", render: (h) => <span className="text-ink-3">{h.reason}</span> },
+                { key: "r", label: "原因", render: (h) => (h.reason ? <span className="text-ink-3">{h.reason}</span> : <span className="text-ink-4">—</span>) },
                 { key: "a", label: "操作人", render: (h) => h.actor },
               ]}
             />

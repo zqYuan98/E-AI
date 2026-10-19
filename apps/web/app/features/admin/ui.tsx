@@ -22,7 +22,8 @@ export function AdminPage({ title, subtitle, actions, children }: { title: React
 
 export function Card({ title, right, children, className = "", pad = true }: { title?: ReactNode; right?: ReactNode; children: ReactNode; className?: string; pad?: boolean }) {
   return (
-    <section className={`rounded-panel bg-surface ring-1 ring-line ${className}`}>
+    // min-w-0: inside a grid or flex row a card shrinks to the column, and its tables scroll instead of widening the page.
+    <section className={`min-w-0 rounded-panel bg-surface ring-1 ring-line ${className}`}>
       {(title || right) && (
         <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
           <h2 className="text-[14px] font-semibold text-ink">{title}</h2>

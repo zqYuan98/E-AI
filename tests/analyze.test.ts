@@ -75,7 +75,8 @@ const row = async (id: string) =>
 
 test("a selected item: prefilter, two scores, the content understanding and the structure", async () => {
   assert.ok(FLOOR >= 4 && FLOOR < T1 && T1 <= 97, "the cases need the understand floor below the T1 threshold, and a few points either side");
-  const id = await article("CLEAR");
+  // The material names the State Grid, so the structure's subject is kept (an unnamed one is dropped, below).
+  const id = await article("CLEAR", { bodyText: `CLEAR: 国家电网 ${LONG} (${T})` });
   const res = await analyzeArticle(id);
   assert.deepEqual([res!.output!.selected, res!.output!.score], [true, T1 + 1], `${T1 + 3} + ${T1 - 1} >= 2 × ${T1}; the mean is shown`);
   assert.deepEqual(calls("CLEAR").sort(), ["prefilter", "score", "score", "structure", "understand"]);
@@ -123,6 +124,10 @@ test("structure retains grounded conditions, rejects invented or unseen quotes, 
   const titleOnly = normalizeStructure(StructureSchema.parse({ ...base, scope: "single" }), { ...input, bodyText: null, excerpt: null });
   assert.equal(titleOnly.scope, "unknown", "a confident model cannot supply the missing original material");
   assert.equal(titleOnly.fact, null);
+  const guessed = normalizeStructure(StructureSchema.parse({ ...base, subjects: ["sgcc", "huawei"], tags: ["场景应用", "国家电网", "华为"] }), input);
+  assert.deepEqual([guessed.subjects, guessed.tags], [[], ["场景应用"]], "companies the material never names are the model's guess");
+  const named = normalizeStructure(StructureSchema.parse({ ...base, subjects: ["huawei"], tags: ["场景应用", "华为"] }), { ...input, bodyText: `华为盘古电力大模型 ${input.bodyText}` });
+  assert.deepEqual([named.subjects, named.tags], [["huawei"], ["场景应用", "华为"]]);
 });
 
 test("a near-selected item is written like a selected one; below the floor it is translated", async () => {
@@ -132,7 +137,7 @@ test("a near-selected item is written like a selected one; below the floor it is
   const low = await analyzeArticle(lowId);
   assert.deepEqual([low!.output!.selected, low!.output!.titleZh, low!.output!.reasonZh], [false, "翻译标题 LOW", null]);
   assert.deepEqual(calls("LOW").sort(), ["prefilter", "score", "score", "structure", "summarize"]);
-  assert.deepEqual((await row(lowId)).tags, ["大模型发布", "调度", "国家电网"], "structure tags");
+  assert.deepEqual((await row(lowId)).tags, ["大模型发布", "调度"], "structure tags; the State Grid is not named in this material, so its tag is not added");
 });
 
 test("the prefilter's BLOCK stops everything; UNKNOWN with material goes on like PASS", async () => {
