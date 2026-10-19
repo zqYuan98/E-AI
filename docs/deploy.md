@@ -80,6 +80,7 @@ MCP 默认接受 `SITE_URL` 的主机以及 `localhost`、`127.0.0.1`、`[::1]`�
    POWERAI_DATA_ROOT=/rdata/powerai-ai-internal
    APP_UID=1001                                  # 部署用户的 `id -u` 和 `id -g`：容器以这个身份运行，数据目录归部署用户所有，不需要 root
    APP_GID=1001
+   APP_SUBNET=10.213.77.0/24                     # 项目网络的网段；Docker 报 “all predefined address pools have been fully subnetted” 时必须指定，选主机上没人用的（docker network ls、ip route 看）
    COLLECT_ENABLED=false                         # 首次启动先关着，确认登录、成员和页面正常，再打开
    MODEL_CALLS_ENABLED=false
    ```

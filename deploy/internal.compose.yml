@@ -22,6 +22,15 @@ x-backend: &backend
   volumes:
     - ${POWERAI_DATA_ROOT:?POWERAI_DATA_ROOT 必须在 .env 里填，例如 /rdata/powerai-ai-internal}/data:/data
 
+# A server shared with many Docker projects can have its default address pools used up ("all predefined
+# address pools have been fully subnetted"). This project's network names its own subnet instead; pick one
+# that no network or route on the host uses (`docker network ls`, `ip route`).
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${APP_SUBNET:-10.213.77.0/24}
+
 services:
   db:
     <<: [*logging, *user]
