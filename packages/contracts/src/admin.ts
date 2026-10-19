@@ -309,6 +309,14 @@ export interface AdminSettings {
   contact: { wechatQr: string | null; feishuQr: string | null };
   targets: AdminNotifyTarget[];
   budgets: AdminBudget[];
+  /** Collection and model calls: what the environment allows, what the admin set, what runs now. */
+  switches: Array<{ name: "collect" | "models"; allowed: boolean; on: boolean; running: boolean }>;
+  embedding: {
+    /** The service in use and where it comes from (`env` wins when the environment has a key). */
+    inUse: { source: "env" | "admin"; model: string; dims: number; baseUrl: string } | null;
+    /** What the page holds; the key is never sent, only its last four characters. */
+    stored: { baseUrl: string; model: string; dims: number; keyHint: string; enabled: boolean; updatedBy: string; updatedAt: Timestamp } | null;
+  };
 }
 
 // Models and evaluation
@@ -345,6 +353,8 @@ export interface AdminModelProvider {
   vision: boolean;
   jsonMode: boolean;
   reasoningTokens: number | null;
+  /** Calls in flight at a time (null: no limit). */
+  maxConcurrency: number | null;
   extra: Record<string, unknown> | null;
   updatedBy: string;
   updatedAt: Timestamp | null;

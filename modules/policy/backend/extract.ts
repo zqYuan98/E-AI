@@ -2,13 +2,14 @@
 // 让模型判断是不是政策规划类文件并抽取要素，再逐项回原文核对：原话、文号、日期、发文单位在正文里找不到的一律不存。
 // 同一份文件的原文、解读和报道归到一行；先到的报道、后到的原文，要素换成从原文抽的。
 import { z } from "zod";
-import { sql } from "@aihot/backend/db";
+import { sql, type Db } from "@aihot/backend/db";
 import { config } from "@aihot/backend/config";
 import { chatJson } from "@aihot/backend/providers/llm";
 import { BudgetExceededError, ProviderRejectedError, ReceiptBusyError } from "@aihot/backend/providers/receipts";
 import { modelFor } from "@aihot/backend/editorial/models";
 import { promptText, promptVersion } from "@aihot/backend/editorial/prompts";
 import { logError } from "@aihot/backend/lib/log-error";
+import { modelCallsOn } from "@aihot/backend/operations/switches";
 import { POLICY_LEVELS, POLICY_TYPES } from "../types.ts";
 
 /** 信源打了这个标签，它的资料都送去判断；其他信源只送标题像正式文件的。 */
@@ -54,6 +55,10 @@ export function docKey(name: string): string {
 /** 把模型的抽取结果对回原文：找不到原话的条目丢掉，文号、日期、发文单位不在原文里就置空。 */
 export function ground(out: Extracted, material: { title: string; body: string; source: string }): Extracted {
   const text = squash(`${material.title}\n${material.body}`);
+  // 文件名是合并依据：它的核心（docKey 取的那一段）要在原文里、且不短于 6 个字（“工作会议”这类泛称分不开文件），
+  // 否则编出来或太泛的名字会把不同文件合成一份；不满足就按单篇资料建档。
+  const bare = (s: string) => squash(s).replace(/[《》<>"'()\[\]【】、，,。.:：;；·\-—_]/g, "");
+  const nameFound = !!out.documentName?.trim() && docKey(out.documentName).length >= 6 && bare(text).includes(docKey(out.documentName));
   const has = (s: string | null | undefined) => !!s && squash(s).length >= 2 && text.includes(squash(s));
   const quoted = (q: string) => squash(q).length >= 6 && !/\.\.\.|…/.test(q) && text.includes(squash(q));
   const date = (() => {
@@ -65,6 +70,7 @@ export function ground(out: Extracted, material: { title: string; body: string; 
   })();
   return {
     ...out,
+    documentName: nameFound ? out.documentName!.trim() : null,
     level: levelOf(out, material.title),
     docNo: has(out.docNo) ? out.docNo!.trim() : null,
     issuedOn: date,
@@ -131,8 +137,10 @@ export async function readDocument(c: Pick<Candidate, "id" | "title" | "body_tex
 export async function storeDocument(articleId: string, title: string, out: Extracted | null, receiptId: number | null): Promise<number | null> {
   return sql.begin(async (tx) => {
     if (!out) {
+      const [previous] = await tx<{ doc_id: number | null }[]>`SELECT doc_id FROM policy_links WHERE article_id = ${articleId} FOR UPDATE`;
       await tx`INSERT INTO policy_links (article_id, outcome, receipt_id) VALUES (${articleId}, 'not_document', ${receiptId})
         ON CONFLICT (article_id) DO UPDATE SET outcome = 'not_document', doc_id = NULL, role = NULL, receipt_id = EXCLUDED.receipt_id, checked_at = now()`;
+      if (previous?.doc_id) await releaseDocument(tx, previous.doc_id, articleId);
       return null;
     }
     const role = out.role ?? "report";
@@ -159,15 +167,29 @@ export async function storeDocument(articleId: string, title: string, out: Extra
         await tx`UPDATE policy_docs SET doc_no = coalesce(doc_no, ${out.docNo}), issued_on = coalesce(issued_on, ${out.issuedOn}), updated_at = now() WHERE id = ${docId}`;
       }
     }
+    const [previous] = await tx<{ doc_id: number | null }[]>`SELECT doc_id FROM policy_links WHERE article_id = ${articleId} FOR UPDATE`;
     await tx`INSERT INTO policy_links (article_id, doc_id, role, outcome, receipt_id) VALUES (${articleId}, ${docId}, ${role}, 'document', ${receiptId})
       ON CONFLICT (article_id) DO UPDATE SET doc_id = EXCLUDED.doc_id, role = EXCLUDED.role, outcome = 'document', receipt_id = EXCLUDED.receipt_id, checked_at = now()`;
+    if (previous?.doc_id && previous.doc_id !== docId) await releaseDocument(tx, previous.doc_id, articleId);
     return docId;
   });
 }
 
+/**
+ * 一篇资料不再属于某份文件（重新抽取后换了文件、或判为不是文件）：那份文件没有别的资料就删掉，
+ * 还有的话，以这篇为主资料时换成剩下里最好的一篇（原文 > 解读 > 报道）。
+ */
+async function releaseDocument(tx: Db, docId: number, articleId: string) {
+  const [next] = await tx<{ article_id: string; role: string }[]>`
+    SELECT article_id, role FROM policy_links WHERE doc_id = ${docId} AND article_id <> ${articleId}
+    ORDER BY CASE role WHEN 'original' THEN 0 WHEN 'interpretation' THEN 1 ELSE 2 END, checked_at DESC LIMIT 1`;
+  if (!next) await tx`DELETE FROM policy_docs WHERE id = ${docId}`;
+  else await tx`UPDATE policy_docs SET primary_article_id = ${next.article_id}, primary_role = ${next.role}, updated_at = now() WHERE id = ${docId} AND primary_article_id = ${articleId}`;
+}
+
 /** 定时任务：每次处理一小批候选。模型调用关着时不做。 */
 export async function extractPending(): Promise<{ checked: number; documents: number; failed: number }> {
-  if (!config.modelCallsEnabled) return { checked: 0, documents: 0, failed: 0 };
+  if (!(await modelCallsOn())) return { checked: 0, documents: 0, failed: 0 };
   let documents = 0;
   let failed = 0;
   const list = await candidates();

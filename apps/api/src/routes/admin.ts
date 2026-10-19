@@ -15,6 +15,8 @@ import { requeueFailedArticles, runsOverview } from "@aihot/backend/admin/runs";
 import { resolveDelivery } from "@aihot/backend/notify/deliver";
 import { releaseReceipt } from "@aihot/backend/operations/recover";
 import { replaceContactQr, setTargetEnabled, settingsOverview, updateBudget } from "@aihot/backend/admin/settings";
+import { setRunSwitch } from "@aihot/backend/operations/switches";
+import { checkEmbedding, saveEmbedding } from "@aihot/backend/admin/embedding";
 import { createSource, fetchNow, listSources, previewSource, previewStoredSource, sourceDetail, updateSource } from "@aihot/backend/admin/sources";
 import { sendProblem } from "../http/respond.ts";
 import { adminHandler } from "./admin-auth.ts";
@@ -96,6 +98,15 @@ export function registerAdmin(app: FastifyInstance) {
 
   // Settings
   app.get("/api/admin/settings", adminHandler(async () => settingsOverview()));
+  app.post("/api/admin/run-switches/:name", adminHandler(async (req, _reply, admin) => {
+    const b = body<{ on: boolean; reason: string }>(req);
+    return setRunSwitch(param(req, "name") as never, b.on === true, String(b.reason ?? ""), actorOf(admin));
+  }));
+  app.put("/api/admin/embedding", adminHandler(async (req, _reply, admin) => {
+    const { reason, ...rest } = body<{ reason: string } & Record<string, unknown>>(req);
+    return saveEmbedding(rest, String(reason ?? ""), actorOf(admin));
+  }));
+  app.post("/api/admin/embedding/test", adminHandler(async () => checkEmbedding()));
   app.post("/api/admin/settings/contact-qr", adminHandler(async (req, _reply, admin) => {
     const b = body<{ slot: "wechatQr" | "feishuQr"; image: string }>(req);
     return replaceContactQr({ slot: b.slot, data: decodeImage(b.image) }, actorOf(admin));

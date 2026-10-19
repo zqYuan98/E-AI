@@ -530,7 +530,7 @@ const signalText = (a: { title: string; body_text: string | null }) => reportTex
  * grouped again; each is judged the usual way, against all candidates.
  */
 async function rematchSignals(articleId: string, queryText: string): Promise<number> {
-  if (!embeddingsAvailable()) return 0;
+  if (!(await embeddingsAvailable())) return 0;
   const mine = (await vectorsFor([{ id: articleId, text: queryText }])).get(articleId);
   if (!mine) return 0;
   const posts = await sql<{ id: string; title: string; body_text: string | null }[]>`
@@ -572,7 +572,7 @@ async function groupSignal(a: ArticleRow, source: { id: string; signal_group_id:
     const target = referenced[0]!;
     return write({ factId: target.fact_id, storyId: target.story_id }, "signal-native", [{ id: target.fact_id, score: 1, relation: "SAME_STORY", confidence: 1 }]);
   }
-  if (!embeddingsAvailable()) return { verdict: "signal-unmatched" };
+  if (!(await embeddingsAvailable())) return { verdict: "signal-unmatched" };
   const recalled = await recallFacts(a.id, signalText(a), SIGNAL_MIN_COSINE, SIGNAL_TOP_FACTS);
   if (recalled.length === 0) {
     // Recorded, so a post that found nothing is told apart from one never decided.

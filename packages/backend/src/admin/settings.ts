@@ -10,6 +10,8 @@ import { sql } from "../db.ts";
 import { sha256 } from "../lib/ids.ts";
 import { loadContact, type ContactSettings } from "../site/contact.ts";
 import { audit } from "../audit.ts";
+import { runSwitchStatus } from "../operations/switches.ts";
+import { embeddingSettings } from "./embedding.ts";
 
 const MAX_QR_BYTES = 2 * 1024 * 1024;
 
@@ -32,10 +34,10 @@ export async function replaceContactQr(input: { slot: keyof ContactSettings; dat
   return next;
 }
 
-/** The settings page: contact QR codes, content push targets and paid-service budgets. */
+/** The settings page: run switches, the embedding service, contact QR codes, content push targets and paid-service budgets. */
 export async function settingsOverview(): Promise<BeforeJson<AdminSettings>> {
-  const [contact, targets, budgets] = await Promise.all([loadContact(), listTargets(), listBudgets()]);
-  return { contact, targets, budgets };
+  const [contact, targets, budgets, switches, embedding] = await Promise.all([loadContact(), listTargets(), listBudgets(), runSwitchStatus(), embeddingSettings()]);
+  return { contact, targets, budgets, switches, embedding };
 }
 
 export async function listTargets(): Promise<BeforeJson<AdminNotifyTarget>[]> {

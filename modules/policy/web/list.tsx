@@ -96,6 +96,15 @@ export default function PolicyList() {
       </header>
 
       <div className="mt-4 space-y-2.5">
+        {/* A plain GET form: the other filters ride along as hidden fields. */}
+        <form method="get" action="/policy" className="flex gap-2">
+          {KEYS.filter((k) => k !== "q" && params.get(k)).map((k) => <input key={k} type="hidden" name={k} value={params.get(k)!} />)}
+          <input
+            type="search" name="q" defaultValue={params.get("q") ?? ""} maxLength={40} placeholder="搜文件名、文号或摘要，例如 人工智能、新型电力系统"
+            className="h-9 min-w-0 flex-1 rounded-full border border-line bg-surface px-4 text-[13.5px] text-ink outline-none focus:border-accent"
+          />
+          <button type="submit" className="h-9 shrink-0 rounded-full border border-line bg-surface px-4 text-[13px] text-ink-2 hover:text-accent">搜索</button>
+        </form>
         <Chips name="level" options={[[null, "全部单位"], ...Object.entries(POLICY_LEVELS)]} />
         <Chips name="ai" options={[[null, "全部"], ["any", "涉及 AI"], ["core", "AI 专项"]]} />
         <Chips name="type" options={[[null, "全部类型"], ...POLICY_TYPES.map((t): [string, string] => [t, t])]} />

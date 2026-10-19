@@ -128,7 +128,7 @@ const LEXICAL_MIN = 0.25;
 /** Both identity candidates and reading context use the same stored vectors (or the lexical fallback). */
 async function similarReports(queryId: string, queryText: string, pool: Array<{ article_id: string; revision?: number }>, minScore: number): Promise<Map<string, number>> {
   const scores = new Map<string, number>();
-  if (pool.length && !embeddingsAvailable()) {
+  if (pool.length && !(await embeddingsAvailable())) {
     for (const [id, text] of await reportTexts([...new Set(pool.map((r) => r.article_id))])) {
       const s = lexicalSimilarity(queryText, text);
       if (s >= LEXICAL_MIN) scores.set(id, s);

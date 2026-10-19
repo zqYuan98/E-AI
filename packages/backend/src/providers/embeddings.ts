@@ -1,33 +1,75 @@
 // Text embeddings through receipts, used only for recall. Any OpenAI-compatible /embeddings endpoint
 // (EMBEDDING_BASE_URL, EMBEDDING_API_KEY, EMBEDDING_MODEL); with a DashScope key and nothing else set,
-// Aliyun text-embedding-v4 at 1024 dimensions. Without either, recall compares the texts themselves.
+// Aliyun text-embedding-v4 at 1024 dimensions. Without either, the service entered on the admin settings page
+// (its key sealed in the database). Without any, recall compares the texts themselves.
 import { config, credential } from "../config.ts";
 import { sql } from "../db.ts";
 import { sha256 } from "../lib/ids.ts";
 import { z } from "zod";
 import { ModelOutputError } from "./llm.ts";
 import { completeReceipt, paidRequest, ProviderRejectedError, rejectReceivedResponse } from "./receipts.ts";
+import { ModelCallsPaused, modelCallsOn } from "../operations/switches.ts";
+import { open } from "../lib/secret-box.ts";
 
 const own = !!credential("models", "EMBEDDING_API_KEY");
+/** The environment's model and size (EMBEDDING_* or DashScope); the admin page's service has its own. */
 export const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || (own ? "text-embedding-3-small" : "text-embedding-v4");
 /** Requested dimensions, when the provider takes the parameter (0 leaves it to the model). */
 export const EMBEDDING_DIMS = Number(process.env.EMBEDDING_DIMS ?? (own ? 0 : 1024));
-const SERVICE = own ? "embedding" : "dashscope";
-/** A vector of the configured size; a stored one of another size (EMBEDDING_DIMS changed) is computed again. */
-const VECTOR = EMBEDDING_DIMS > 0 ? z.array(z.number()).length(EMBEDDING_DIMS) : z.array(z.number()).min(1);
 
-/** Embeddings are paid model calls: MODEL_CALLS_ENABLED=false switches them off like every other call. */
-export function embeddingsAvailable(): boolean {
-  return config.modelCallsEnabled && !!(credential("models", "EMBEDDING_API_KEY") ?? credential("models", "DASHSCOPE_API_KEY"));
+export interface EmbeddingService {
+  source: "env" | "admin";
+  service: string;
+  model: string;
+  /** Requested dimensions (0 leaves the size to the model). */
+  dims: number;
+  baseUrl: string;
+  apiKey: string;
 }
 
-async function embedBatch(texts: string[], subject: string): Promise<{ vectors: number[][]; receiptId: number }> {
+/** The admin page's service as stored (settings `embedding.service`); the key sealed for the purpose `embedding`. */
+export interface StoredEmbedding { baseUrl: string; model: string; dims: number; keyEnc: string; keyHint: string; enabled: boolean; updatedBy: string }
+export const EMBEDDING_SETTING = "embedding.service";
+export const EMBEDDING_PURPOSE = "embedding-service";
+let stored: { at: number; value: StoredEmbedding | null } | null = null;
+export const invalidateEmbeddingService = () => { stored = null; };
+
+async function storedService(): Promise<StoredEmbedding | null> {
+  if (stored && Date.now() - stored.at < 30_000) return stored.value;
+  const [row] = await sql<{ value: StoredEmbedding }[]>`SELECT value FROM settings WHERE key = ${EMBEDDING_SETTING}`;
+  stored = { at: Date.now(), value: row?.value ?? null };
+  return stored.value;
+}
+
+/** The service in use: the environment's when it has a key (the deployment decides), else the admin page's, else none. */
+export async function embeddingService(): Promise<EmbeddingService | null> {
+  const ownKey = credential("models", "EMBEDDING_API_KEY");
+  if (ownKey) return { source: "env", service: "embedding", model: EMBEDDING_MODEL, dims: EMBEDDING_DIMS, baseUrl: credential("models", "EMBEDDING_BASE_URL") ?? "https://api.openai.com/v1", apiKey: ownKey };
+  const dashscope = credential("models", "DASHSCOPE_API_KEY");
+  if (dashscope) return { source: "env", service: "dashscope", model: EMBEDDING_MODEL, dims: EMBEDDING_DIMS, baseUrl: credential("models", "DASHSCOPE_BASE_URL") ?? "https://dashscope.aliyuncs.com/compatible-mode/v1", apiKey: dashscope };
+  const s = await storedService();
+  const secret = credential("auth", "SESSION_SECRET");
+  const apiKey = s?.enabled && secret ? open(s.keyEnc, secret, EMBEDDING_PURPOSE) : null;
+  return s && apiKey ? { source: "admin", service: "embedding", model: s.model, dims: s.dims, baseUrl: s.baseUrl, apiKey } : null;
+}
+
+/** A vector of the configured size; a stored one of another size (the size changed) is computed again. */
+const vectorOf = (dims: number) => (dims > 0 ? z.array(z.number()).length(dims) : z.array(z.number()).min(1));
+
+/** Embeddings are paid model calls: off with MODEL_CALLS_ENABLED=false or paused on the admin page, like every other call. */
+export async function embeddingsAvailable(): Promise<boolean> {
+  return (await modelCallsOn()) && !!(await embeddingService());
+}
+
+async function embedBatch(texts: string[], subject: string, purpose = "embedding"): Promise<{ vectors: number[][]; receiptId: number }> {
   if (!config.modelCallsEnabled) throw new Error("Model calls are disabled (MODEL_CALLS_ENABLED=false)");
-  const base = own ? credential("models", "EMBEDDING_BASE_URL") ?? "https://api.openai.com/v1" : credential("models", "DASHSCOPE_BASE_URL") ?? "https://dashscope.aliyuncs.com/compatible-mode/v1";
-  const key = own ? credential("models", "EMBEDDING_API_KEY") : credential("models", "DASHSCOPE_API_KEY");
-  if (!key) throw new Error("EMBEDDING_API_KEY (or DASHSCOPE_API_KEY) missing");
+  if (!(await modelCallsOn())) throw new ModelCallsPaused();
+  const svc = await embeddingService();
+  if (!svc) throw new Error("No embedding service: EMBEDDING_API_KEY, DASHSCOPE_API_KEY or the admin settings page");
+  const { service: SERVICE, model: EMBEDDING_MODEL, dims: EMBEDDING_DIMS, baseUrl: base, apiKey: key } = svc;
+  const VECTOR = vectorOf(EMBEDDING_DIMS);
   const receipt = await paidRequest(
-    { service: SERVICE, model: EMBEDDING_MODEL, purpose: "embedding", subject, identity: { model: EMBEDDING_MODEL, dims: EMBEDDING_DIMS, texts: texts.map((t) => sha256(t)) }, requestSummary: { count: texts.length } },
+    { service: SERVICE, model: EMBEDDING_MODEL, purpose, subject, identity: { model: EMBEDDING_MODEL, dims: EMBEDDING_DIMS, texts: texts.map((t) => sha256(t)) }, requestSummary: { count: texts.length } },
     async () => {
       const res = await fetch(`${base.replace(/\/$/, "")}/embeddings`, {
         method: "POST",
@@ -75,6 +117,10 @@ function storedVector(data: Buffer): number[] | null {
 export async function ensureEmbeddings(items: Array<{ id: string; text: string }>): Promise<Map<string, number[]>> {
   const out = new Map<string, number[]>();
   if (items.length === 0) return out;
+  const svc = await embeddingService();
+  if (!svc) throw new Error("No embedding service: EMBEDDING_API_KEY, DASHSCOPE_API_KEY or the admin settings page");
+  const { model: EMBEDDING_MODEL } = svc;
+  const VECTOR = vectorOf(svc.dims);
   const hashes = new Map(items.map((item) => [item.id, sha256(item.text)]));
   const rows = await sql<{ ref_id: string; text_hash: string; vector: Buffer }[]>`
     SELECT ref_id, text_hash, array_send(vector) AS vector FROM embeddings WHERE kind = 'article' AND model = ${EMBEDDING_MODEL} AND ref_id IN ${sql(items.map((i) => i.id))}`;
@@ -103,4 +149,15 @@ export async function ensureEmbeddings(items: Array<{ id: string; text: string }
     for (let j = 0; j < batch.length; j++) out.set(batch[j]!.id, vectors[j]!);
   }
   return out;
+}
+
+/** The admin's connectivity check: one short text through the service in use, recorded as a check (not an outage). */
+export async function testEmbedding(): Promise<{ ok: boolean; ms: number; dims: number | null; error: string | null }> {
+  const started = Date.now();
+  try {
+    const { vectors } = await embedBatch([`connectivity check ${started}`], `check:embedding:${started}`, "model_check");
+    return { ok: true, ms: Date.now() - started, dims: vectors[0]?.length ?? null, error: null };
+  } catch (error) {
+    return { ok: false, ms: Date.now() - started, dims: null, error: String((error as Error).message).slice(0, 400) };
+  }
 }

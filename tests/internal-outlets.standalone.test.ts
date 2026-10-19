@@ -43,6 +43,7 @@ const stubs: Record<string, string> = {
   "@aihot/backend/operations/feedback": "export const forwardPendingFeedback = async () => {};",
   "@aihot/backend/operations/backup": "export const backupConfigured = () => false; export const runBackup = async () => {};",
   "@aihot/backend/operations/reports": "export const sourceHealthWeekly = async () => {};",
+  "@aihot/backend/operations/switches": "export const collectionOn = async () => false;",
 };
 const hook = registerHooks({
   resolve(specifier, context, next) {

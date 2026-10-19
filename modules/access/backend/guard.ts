@@ -11,7 +11,7 @@ const OPEN_READS = new Set([
   "/logo.svg", "/favicon.ico", "/icon.png", "/icon-192.png", "/apple-icon.png",
 ]);
 const LOGIN_POSTS = new Set(["/api/access/login", "/api/auth/password"]);
-const MEMBER_WRITES = new Set(["/api/access/logout", "/api/site/feedback"]);
+const MEMBER_WRITES = new Set(["/api/access/logout", "/api/access/password", "/api/site/feedback"]);
 const attempts = new LoginLimits();
 
 export function allowedOrigins(): string[] {
@@ -63,7 +63,7 @@ export function registerAccessGuard(app: FastifyInstance): void {
     if (adminRoute && !admin) return sendProblem(req, reply, { status: 403, code: "forbidden", detail: "A real admin session is required." });
     if (read) return;
     // MCP POST is deliberately not opened in this batch; authentication still comes first.
-    // Members may only sign out and send feedback, both with their CSRF token below.
+    // Members may only sign out, change their own password and send feedback, all with their CSRF token below.
     if (route === "/api/mcp" || (principal.kind === "member" && !MEMBER_WRITES.has(route ?? ""))) {
       return sendProblem(req, reply, { status: 403, code: "forbidden", detail: "This session is read-only." });
     }

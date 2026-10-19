@@ -8,6 +8,7 @@ import { config, credential } from "../config.ts";
 import { sha256 } from "../lib/ids.ts";
 import { parseModelProviders } from "./model-providers.ts";
 import { loadStoredProviders } from "./model-store.ts";
+import { ModelCallsPaused, modelCallsOn } from "../operations/switches.ts";
 import { assertAccepted, paidRequest, ProviderRejectedError, rejectReceivedResponse } from "./receipts.ts";
 
 export interface ModelSpec {
@@ -24,6 +25,8 @@ export interface ModelSpec {
   extra?: Record<string, unknown>;
   /** Output tokens added to every call's own limit for a reasoning model, which reasons before it answers. */
   reasoningTokens?: number;
+  /** Calls in flight at a time in this process; more wait their turn (a provider's concurrency limit). */
+  maxConcurrency?: number;
   jsonMode: boolean;
   vision?: boolean;
 }
@@ -97,7 +100,8 @@ export async function refreshStoredModels(force = false): Promise<void> {
         if (!r.enabled || !r.apiKey || MODELS[r.key]) continue;
         MODELS[r.key] = {
           key: r.key, service: "llm", model: r.model, baseUrl: r.baseUrl, baseUrlEnv: "model_providers", apiKeyEnv: "model_providers", apiKey: r.apiKey,
-          ...(r.extra ? { extra: r.extra } : {}), ...(r.reasoningTokens ? { reasoningTokens: r.reasoningTokens } : {}), jsonMode: r.jsonMode, vision: r.vision,
+          ...(r.extra ? { extra: r.extra } : {}), ...(r.reasoningTokens ? { reasoningTokens: r.reasoningTokens } : {}),
+          ...(r.maxConcurrency ? { maxConcurrency: r.maxConcurrency } : {}), jsonMode: r.jsonMode, vision: r.vision,
         };
         stored.add(r.key);
       }
@@ -117,6 +121,22 @@ export const invalidateStoredModels = () => { storedAt = 0; };
 
 /** Keys of the providers that come from MODEL_PROVIDERS (environment), as opposed to the admin page. */
 export const envProviderKeys = () => Object.keys(providers);
+
+/** Per-model slots: a provider with a concurrency limit gets at most that many calls at once from this process. */
+const slots = new Map<string, { active: number; waiting: Array<() => void> }>();
+async function withSlot<T>(key: string, max: number | undefined, fn: () => Promise<T>): Promise<T> {
+  if (!max) return fn();
+  const s = slots.get(key) ?? { active: 0, waiting: [] };
+  slots.set(key, s);
+  while (s.active >= max) await new Promise<void>((resolve) => s.waiting.push(resolve));
+  s.active++;
+  try {
+    return await fn();
+  } finally {
+    s.active--;
+    s.waiting.shift()?.();
+  }
+}
 
 export type ContentPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
 
@@ -198,6 +218,7 @@ export async function chatJson<S extends z.ZodType>(opts: ChatJsonOptions<S>): P
   const spec = MODELS[opts.model];
   if (!spec) throw new Error(`Unknown model ${opts.model}`);
   if (!config.modelCallsEnabled) throw new Error("Model calls are disabled (MODEL_CALLS_ENABLED=false)");
+  if (!(await modelCallsOn())) throw new ModelCallsPaused();
   const baseUrl = spec.baseUrl ?? credential("models", spec.baseUrlEnv);
   const apiKey = spec.apiKey ?? credential("models", spec.apiKeyEnv);
   if (!baseUrl || !apiKey || !spec.model) throw new Error(`Model ${opts.model} is not configured (${spec.baseUrlEnv}, ${spec.apiKeyEnv}${spec.key === "default" ? ", LLM_MODEL" : ""})`);
@@ -219,7 +240,7 @@ export async function chatJson<S extends z.ZodType>(opts: ChatJsonOptions<S>): P
     ...(spec.extra ?? {}),
   };
 
-  const receipt = await paidRequest(
+  const receipt = await withSlot(spec.key, spec.maxConcurrency, () => paidRequest(
     {
       service: spec.service,
       model: spec.model,
@@ -260,7 +281,7 @@ export async function chatJson<S extends z.ZodType>(opts: ChatJsonOptions<S>): P
         cost: null,
       };
     },
-  );
+  ));
 
   const response = receipt.response as { choices?: Array<{ message?: { content?: string }; finish_reason?: string }>; usage?: Record<string, unknown> };
   const content = response.choices?.[0]?.message?.content ?? "";

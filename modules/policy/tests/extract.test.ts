@@ -53,6 +53,10 @@ test("only what the original text says is kept", () => {
   assert.deepEqual(got.issuers, ["国家电网有限公司"], "a blank issuer is not in every source name");
   assert.deepEqual(got.targets.map((t) => [t.value, t.year]), [["超80%", "2027"], ["超80%", null]], "a year the quote does not carry");
   assert.deepEqual(got.tasks, []);
+  assert.equal(got.documentName, null, "a name the text does not carry is not a merge key");
+  const named = ground(base({ documentName: "《关于深化推进“人工智能+”专项行动的意见》" }), { title: "标题", body: BODY, source: "国家电网" });
+  assert.equal(named.documentName, "《关于深化推进“人工智能+”专项行动的意见》");
+  assert.equal(ground(base({ documentName: "工作会议" }), { title: "标题", body: `${BODY}工作会议`, source: "" }).documentName, null, "too short to tell documents apart");
   const kept = ground(base(), { title: "标题", body: BODY.replace(/\s/g, " "), source: "国家电网" });
   assert.equal(kept.docNo, "国家电网科〔2025〕88号");
   assert.equal(kept.issuedOn, "2025-12-10", "a date written 2025年12月10日 in the text");
@@ -60,7 +64,8 @@ test("only what the original text says is kept", () => {
 
 test("a report then the original: one document, the original's fields, the number kept", async () => {
   const report = await article(`国网深化推进人工智能+专项行动 ${T}`);
-  const docId = await storeDocument(report, "报道标题", ground(base({ summary: "报道摘要", docNo: "国家电网科〔2025〕88号" }), { title: "", body: BODY, source: "" }), null);
+  const named = BODY.replace("专项行动的意见》", `专项行动的意见 ${T}》`);
+  const docId = await storeDocument(report, "报道标题", ground(base({ summary: "报道摘要", docNo: "国家电网科〔2025〕88号" }), { title: "", body: named, source: "" }), null);
   const original = await article(`关于深化推进人工智能+专项行动的意见 ${T}`);
   const again = await storeDocument(original, "原文标题", { ...base({ role: "original", summary: "原文摘要", documentName: `《关于深化推进“人工智能+”专项行动的意见 ${T}》` }), docNo: null }, null);
   assert.equal(again, docId, "the same document under its name with or without 书名号");

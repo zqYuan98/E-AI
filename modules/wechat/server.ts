@@ -2,10 +2,11 @@
 // 文章连同正文送进和普通采集一样的判重、精选和归组。服务地址只来自部署配置（WECHAT_FEED_URL），
 // 它在内网里，所以不走信源抓取的公网地址检查。
 import type { ServerModule } from "@aihot/backend/modules";
+import { collectionOn } from "@aihot/backend/operations/switches";
 import { feedUrl, syncWechatFeed } from "./backend/sync.ts";
 
 export const wechat: ServerModule = {
   name: "wechat",
   // Reading the feed is collection: it stays off with COLLECT_ENABLED like every other source.
-  schedules: [{ name: "wechat-feed", cron: "11,41 * * * *", run: syncWechatFeed, missed: "skip", when: () => process.env.COLLECT_ENABLED === "true" && !!feedUrl() }],
+  schedules: [{ name: "wechat-feed", cron: "11,41 * * * *", run: async () => { if (await collectionOn()) await syncWechatFeed(); }, missed: "skip", when: () => process.env.COLLECT_ENABLED === "true" && !!feedUrl() }],
 };

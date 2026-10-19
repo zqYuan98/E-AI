@@ -11,6 +11,7 @@ const Provider = z.object({
   apiKeyEnv: z.string().regex(/^[A-Z][A-Z0-9_]{1,63}$/, "apiKeyEnv: the variable's name, e.g. SILICONFLOW_API_KEY"),
   extra: z.record(z.string(), z.unknown()).optional(),
   reasoningTokens: z.number().int().min(0).max(100_000).optional(),
+  maxConcurrency: z.number().int().min(1).max(64).optional(),
   jsonMode: z.boolean().default(true),
   vision: z.boolean().optional(),
 }).strict();
@@ -23,6 +24,7 @@ export interface CustomProvider {
   apiKeyEnv: string;
   extra?: Record<string, unknown>;
   reasoningTokens?: number;
+  maxConcurrency?: number;
   jsonMode: boolean;
   vision?: boolean;
 }
@@ -57,6 +59,7 @@ const StoredInput = z.object({
   apiKey: z.string().min(8).max(512).regex(/^[\x21-\x7e]+$/, "the key has spaces or unusual characters").optional(),
   extra: z.record(z.string(), z.unknown()).nullable().optional(),
   reasoningTokens: z.number().int().min(0).max(100_000).nullable().optional(),
+  maxConcurrency: z.number().int().min(1).max(64).nullable().optional(),
   jsonMode: z.boolean().default(true),
   vision: z.boolean().default(false),
   enabled: z.boolean().default(true),

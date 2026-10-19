@@ -7,5 +7,7 @@ export const policy = defineModule({
     { path: "policy", file: "web/list.tsx" },
     { path: "policy/:id", file: "web/detail.tsx" },
   ],
-  apiPaths: [/^\/api\/site\/policy(?:\/|$)/],
+  // The admin layout in apps/web/app/routes.ts has no path prefix.
+  adminPages: [{ path: "admin/policy", file: "web/admin.tsx" }],
+  apiPaths: [/^\/api\/site\/policy(?:\/|$)/, /^\/api\/admin\/policy(?:\/|$)/],
 });

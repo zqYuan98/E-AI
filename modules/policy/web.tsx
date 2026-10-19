@@ -6,4 +6,5 @@ export const policyWeb = defineWebModule({
   name: "policy",
   sidebar: { section: "资料", items: [{ to: "/policy", label: "政策规划", icon: IconDoc }] },
   tools: [{ to: "/policy", label: "政策规划库", icon: <IconDoc size={18} /> }],
+  admin: { groups: [{ group: "资料", items: [{ to: "/admin/policy", label: "政策库管理" }] }] },
 });

@@ -6,7 +6,8 @@
 ## 怎么进库
 
 - **自动**：定时任务 `policy.extract`（每 15 分钟）从已经抓到正文的资料里挑候选：打了 `政策规划` 标签的信源的全部资料，以及标题像正式文件的资料（含“规划”“行动方案”“实施意见”等）。模型读一遍，判断是不是政策规划类，并抽取文号、日期、发文单位、目标指标、重点任务和 AI 条款。
-- **手动**：首批种子和抓不到的原文用脚本收录，网址写进 `seeds.txt` 或直接给出：
+- **后台**：“资料 → 政策库管理”粘贴原文网址（每行一个）或点“导入首批种子”（`seeds.txt`），worker 每分钟处理几条，结果在页面上；抽取有误的文件可以隐藏、删除或重新抽取。要“模型调用”在运行中。
+- **手动**：在服务器上批量收录也可以用脚本，网址写进 `seeds.txt` 或直接给出：
   ```bash
   docker compose exec worker node modules/policy/scripts/import.ts --file modules/policy/seeds.txt
   docker compose exec worker node modules/policy/scripts/import.ts https://www.nea.gov.cn/...

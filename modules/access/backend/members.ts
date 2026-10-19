@@ -106,7 +106,7 @@ export async function loginMember(username: unknown, password: unknown, requestI
   }) as Promise<string>;
 }
 
-export async function changeMember(id: number, change: { disable: true } | { password: string }, actor: string, requestId?: string): Promise<Member> {
+export async function changeMember(id: number, change: { disable: true } | { enable: true } | { password: string }, actor: string, requestId?: string): Promise<Member> {
   if (!Number.isSafeInteger(id) || id < 1) throw new AccessError(400, "invalid_request", "成员编号无效。");
   if ("password" in change && !validPassword(change.password)) throw invalid();
   const encoded = "password" in change ? await hashPassword(change.password) : null;
@@ -114,14 +114,31 @@ export async function changeMember(id: number, change: { disable: true } | { pas
     const [before] = await tx<MemberRow[]>`SELECT id, username, display_name, disabled, created_at, updated_at FROM access_members WHERE id = ${id} FOR UPDATE`;
     if (!before) throw new AccessError(404, "not_found", "成员不存在。");
     const [row] = await tx<MemberRow[]>`
-      UPDATE access_members SET password_hash = coalesce(${encoded}, password_hash), disabled = ${"disable" in change ? true : before.disabled},
+      UPDATE access_members SET password_hash = coalesce(${encoded}, password_hash), disabled = ${"disable" in change ? true : "enable" in change ? false : before.disabled},
         credential_version = credential_version + 1, updated_at = now() WHERE id = ${id}
       RETURNING id, username, display_name, disabled, created_at, updated_at`;
     await tx`DELETE FROM access_sessions WHERE member_id = ${id}`;
     const member = publicMember(row!);
-    await audit(actor, encoded ? "access.member.reset" : "access.member.disable", `member:${id}`, null, publicMember(before), member, { db: tx, requestId });
+    await audit(actor, encoded ? "access.member.reset" : "enable" in change ? "access.member.enable" : "access.member.disable", `member:${id}`, null, publicMember(before), member, { db: tx, requestId });
     return member;
   }) as Promise<Member>;
+}
+
+/**
+ * A member changes their own password: the current one must match. Every session of the member ends, this one
+ * too, so the next page asks to sign in with the new password.
+ */
+export async function changeOwnPassword(header: string | undefined, current: unknown, next: unknown, requestId?: string): Promise<void> {
+  const principal = await memberPrincipal(header);
+  if (!principal) throw new AccessError(401, "unauthorized", "Sign in first.");
+  if (!validPassword(next)) throw new AccessError(400, "invalid_request", "新密码至少 12 个字符。");
+  if (current === next) throw new AccessError(400, "invalid_request", "新密码不能和当前密码相同。");
+  const id = Number(principal.id.slice("member:".length));
+  const [row] = await sql<CredentialRow[]>`SELECT * FROM access_members WHERE id = ${id}`;
+  if (!row || row.disabled || !validPassword(current) || !(await verifyPassword(current, row.password_hash))) {
+    throw new AccessError(403, "forbidden", "当前密码不正确。");
+  }
+  await changeMember(id, { password: next as string }, `member:${id}`, requestId);
 }
 
 export async function logoutMember(header: string | undefined, requestId?: string): Promise<void> {

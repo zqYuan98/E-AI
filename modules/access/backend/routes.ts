@@ -4,7 +4,7 @@ import { cookie } from "@aihot/backend/admin/auth";
 import { config } from "@aihot/backend/config";
 import { adminHandler } from "../../../apps/api/src/routes/admin-auth.ts";
 import { sendProblem } from "../../../apps/api/src/http/respond.ts";
-import { AccessError, SESSION_SECONDS, accessPrincipal, changeMember, createMember, listMembers, loginMember, logoutMember, memberPrincipal } from "./members.ts";
+import { AccessError, SESSION_SECONDS, accessPrincipal, changeMember, changeOwnPassword, createMember, listMembers, loginMember, logoutMember, memberPrincipal } from "./members.ts";
 import { PasswordBusy } from "./password.ts";
 
 const secure = () => config.siteUrl.startsWith("https://");
@@ -53,6 +53,15 @@ export function registerAccess(app: FastifyInstance): void {
     }
     return { member: await createMember({ username: b.username, password: b.password, name: b.name }, `admin:${admin.userId}`, req.id) };
   })));
+  app.post("/api/access/password", { bodyLimit: 8 * 1024 }, (req, reply) => respond(req, reply, async () => {
+    const b = body(req);
+    await changeOwnPassword(req.headers.cookie, b.current, b.next, req.id);
+    reply.header("Set-Cookie", cookie(MEMBER_COOKIE, "", 0, secure()));
+    return { redirect: "/login" };
+  }));
+  app.post(`${path}/:id/enable`, adminHandler((req, reply, admin) => respond(req, reply, async () => ({
+    member: await changeMember(Number((req.params as { id: string }).id), { enable: true }, `admin:${admin.userId}`, req.id),
+  }))));
   app.post(`${path}/:id/disable`, adminHandler((req, reply, admin) => respond(req, reply, async () => ({
     member: await changeMember(Number((req.params as { id: string }).id), { disable: true }, `admin:${admin.userId}`, req.id),
   }))));

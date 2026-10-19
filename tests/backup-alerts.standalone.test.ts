@@ -22,6 +22,8 @@ async function findings(options: { summary?: object; lastOk?: string | null; las
     "../notify/feishu.ts": { beijingStamp: (value: string | number | Date) => new Date(value).toISOString(), duration: (ms: number) => `${ms / 3600000}h`, beijingDay: unexpected, sendAlert: unexpected, formatAlert: unexpected, formatRecovery: unexpected },
     "../editorial/models.ts": { stepsOnService: unexpected },
     "./backup.ts": { backupConfigured: unexpected },
+    // Collection and model calls read as off, as in the environment of these tests.
+    "./switches.ts": { collectionOn: async () => false, modelCallsOn: async () => false },
     "./grouping.ts": { GROUPING_WARN_AFTER_MS: 600000, waitingSelectedNews: unexpected },
     "../media/upstream.ts": { upstreamFindings: async () => [] },
     "../modules.ts": { remoteBackupDenied: () => true, responder: () => null, serverModules: () => [] },

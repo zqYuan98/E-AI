@@ -29,13 +29,15 @@ export default function Members() {
       : await run("POST", "/api/admin/access/members", { username: String(values.get("username")), name: String(values.get("name") || values.get("username")), password }, { success: "成员已创建" });
     if (result) { notifyAccessChange(); form.reset(); setReset(null); }
   }
-  return <AdminPage title="成员管理" subtitle="成员可阅读内部资料，不能进入后台。停用或重置密码会立即撤销已有会话。">
+  return <AdminPage title="成员管理" subtitle="成员可阅读内部资料，不能进入后台；登录后可在页面顶部“修改密码”。停用或重置密码会立即撤销已有会话，停用的成员可以恢复。">
     <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
       <Card title="已授权成员">
         {!rows.length && <p className="py-8 text-center text-[13px] text-ink-4">尚无成员，请创建第一个账号。</p>}
         <ul className="divide-y divide-line">{rows.map(member => <li key={member.id} className="flex flex-wrap items-center justify-between gap-4 py-4">
           <div className="min-w-0"><div className="flex items-center gap-2"><span className="break-words text-[14px] font-medium text-ink">{member.name}</span><Badge tone={member.disabled ? "muted" : "ok"}>{member.disabled ? "已停用" : "可用"}</Badge></div><p className="mt-1 break-all text-[12px] text-ink-4">{member.username}</p></div>
-          <div className="flex gap-2"><button disabled={busy || member.disabled} onClick={() => { setReset(member); setError(""); }} className={buttonClass("secondary")}>重置密码</button><button disabled={busy || member.disabled} className={buttonClass("secondary")} onClick={() => { if (window.confirm(`停用 ${member.name}？其所有会话会立即失效。`)) void run("POST", `/api/admin/access/members/${member.id}/disable`, undefined, { success: "成员已停用" }).then(result => { if (result) notifyAccessChange(); }); }}>停用</button></div>
+          <div className="flex gap-2"><button disabled={busy} onClick={() => { setReset(member); setError(""); }} className={buttonClass("secondary")}>重置密码</button>{member.disabled
+            ? <button disabled={busy} className={buttonClass("secondary")} onClick={() => { if (window.confirm(`恢复 ${member.name}？恢复后可以用原密码登录；需要的话先重置密码。`)) void run("POST", `/api/admin/access/members/${member.id}/enable`, undefined, { success: "成员已恢复" }); }}>恢复</button>
+            : <button disabled={busy} className={buttonClass("secondary")} onClick={() => { if (window.confirm(`停用 ${member.name}？其所有会话会立即失效。`)) void run("POST", `/api/admin/access/members/${member.id}/disable`, undefined, { success: "成员已停用" }).then(result => { if (result) notifyAccessChange(); }); }}>停用</button>}</div>
         </li>)}</ul>
       </Card>
       <Card title={reset ? `重置密码 · ${reset.name}` : "创建成员"}>

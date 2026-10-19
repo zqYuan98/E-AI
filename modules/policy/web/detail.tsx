@@ -119,6 +119,11 @@ export default function PolicyDetail() {
           )}
           <Clauses title="人工智能相关条款" items={d.aiClauses} />
           <Clauses title="重点任务" items={d.tasks} />
+          {d.targets.length + d.aiClauses.length + d.tasks.length === 0 && (
+            <p className="mt-8 rounded-card border border-line bg-surface px-4 py-3 text-[13px] leading-6 text-ink-3">
+              这份文件没有抽取到能在原文里逐字核对上的目标、任务或 AI 条款（核对不上的不展示）。请看下方原文和报道。
+            </p>
+          )}
         </article>
       </ReadingLayout>
     </>

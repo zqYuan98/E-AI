@@ -57,7 +57,7 @@ export const TOPIC_TAGS = [
 
 /** 可选的实体标签（公司、机构、平台）。 */
 export const ENTITY_TAGS = [
-  "国家电网", "南方电网", "国家能源局", "国家发改委", "中电联", "国家能源集团", "华能", "国家电投", "华为", "百度", "阿里云", "DeepSeek",
+  "国家电网", "南方电网", "国家能源局", "国家发改委", "中电联", "国家能源集团", "华能", "大唐", "华电", "国家电投", "三峡集团", "华为", "百度", "阿里云", "DeepSeek",
 ] as const;
 
 /** 模型常写的近义词，统一成词表里的写法。 */
@@ -90,10 +90,10 @@ export const ENTITIES: Record<string, { name: string; displayTag: string | null;
   cec: { name: "中电联", displayTag: "中电联", aliases: ["中国电力企业联合会", "中电联", "CEC"] },
   "chn-energy": { name: "国家能源集团", displayTag: "国家能源集团", aliases: ["国家能源集团", "国家能源投资集团", "CHN Energy"] },
   huaneng: { name: "华能", displayTag: "华能", aliases: ["中国华能", "华能集团", "华能"] },
-  datang: { name: "大唐", displayTag: null, aliases: ["中国大唐", "大唐集团"] },
-  huadian: { name: "华电", displayTag: null, aliases: ["中国华电", "华电集团"] },
+  datang: { name: "大唐", displayTag: "大唐", aliases: ["中国大唐", "大唐集团"] },
+  huadian: { name: "华电", displayTag: "华电", aliases: ["中国华电", "华电集团"] },
   spic: { name: "国家电投", displayTag: "国家电投", aliases: ["国家电投", "国家电力投资集团", "SPIC"] },
-  ctg: { name: "三峡集团", displayTag: null, aliases: ["中国三峡集团", "三峡集团", "长江电力"] },
+  ctg: { name: "三峡集团", displayTag: "三峡集团", aliases: ["中国三峡集团", "三峡集团", "长江电力"] },
   powerchina: { name: "中国电建", displayTag: null, aliases: ["中国电建", "中国电力建设集团", "POWERCHINA"] },
   ceec: { name: "中国能建", displayTag: null, aliases: ["中国能建", "中国能源建设集团", "CEEC"] },
   nari: { name: "国电南瑞", displayTag: null, aliases: ["国电南瑞", "南瑞集团", "南瑞", "NARI"] },
@@ -149,8 +149,10 @@ export const PUBLISHER_DOMAINS: ReadonlyArray<{ entityId: string; domains: reado
   { entityId: "ndrc", domains: ["ndrc.gov.cn"] },
   { entityId: "miit", domains: ["miit.gov.cn"] },
   { entityId: "cec", domains: ["cec.org.cn"] },
-  { entityId: "chn-energy", domains: ["chnenergy.com.cn"] },
+  { entityId: "chn-energy", domains: ["chnenergy.com.cn", "ceic.com"] },
   { entityId: "huaneng", domains: ["chng.com.cn"] },
+  { entityId: "datang", domains: ["china-cdt.com"] },
+  { entityId: "huadian", domains: ["chd.com.cn"] },
   { entityId: "spic", domains: ["spic.com.cn"] },
   { entityId: "ctg", domains: ["ctg.com.cn"] },
   { entityId: "powerchina", domains: ["powerchina.cn"] },

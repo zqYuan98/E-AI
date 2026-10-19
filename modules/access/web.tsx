@@ -23,7 +23,10 @@ function MemberBar() {
   }
   return <section aria-label="当前成员" className="mb-5 flex flex-wrap items-center justify-between gap-2 border-b border-line py-3 text-[12px] text-ink-3">
     <span><span className="mr-2 font-medium text-accent">内部工作空间</span>{principal.name}</span>
-    <button type="button" disabled={busy} onClick={logout} className="text-ink-3 hover:text-ink disabled:opacity-50">{busy ? "正在退出…" : "退出登录"}</button>
+    <span className="inline-flex items-center gap-4">
+      {principal.kind === "member" && <a href="/account" className="text-ink-3 hover:text-ink">修改密码</a>}
+      <button type="button" disabled={busy} onClick={logout} className="text-ink-3 hover:text-ink disabled:opacity-50">{busy ? "正在退出…" : "退出登录"}</button>
+    </span>
     {error && <p role="alert" className="w-full text-hot">{error}</p>}
   </section>;
 }

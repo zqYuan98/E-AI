@@ -14,7 +14,8 @@ const columns = sql`d.id, d.name, d.doc_type, d.level, d.issuers, d.doc_no, to_c
   d.ai_clauses, d.ai_relevance, d.primary_article_id, a.url, a.published_at`;
 
 // 主资料在公开层被撤回（withdrawn）的文件不显示；只收进政策库、没有发布记录的主资料照常显示。
-const visible = sql`NOT EXISTS (SELECT 1 FROM publications pv WHERE pv.article_id = d.primary_article_id AND pv.visibility = 'withdrawn')`;
+// 管理员隐藏的文件也不显示。
+const visible = sql`NOT d.hidden AND NOT EXISTS (SELECT 1 FROM publications pv WHERE pv.article_id = d.primary_article_id AND pv.visibility = 'withdrawn')`;
 
 function card(r: DocRow): PolicyDocCard {
   return {

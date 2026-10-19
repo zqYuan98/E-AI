@@ -19,8 +19,11 @@ import { recoverStaleWork } from "@aihot/backend/operations/recover";
 import { forwardPendingFeedback } from "@aihot/backend/operations/feedback";
 import { backupConfigured, runBackup } from "@aihot/backend/operations/backup";
 import { sourceHealthWeekly } from "@aihot/backend/operations/reports";
+import { collectionOn } from "@aihot/backend/operations/switches";
 
 const collecting = process.env.COLLECT_ENABLED === "true";
+/** Collection the admin can pause on the settings page without a restart (the environment still has to allow it). */
+const whileCollecting = (run: () => Promise<unknown>) => async () => { if (await collectionOn()) await run(); };
 
 const ENGINE_SCHEDULES: Scheduled[] = [
   { name: "content.sweep", cron: "*/5 * * * *", run: sweepUnprocessed },
@@ -49,14 +52,14 @@ const ENGINE_SCHEDULES: Scheduled[] = [
   { name: "reports.source-health", cron: "0 9 * * 1", missed: "once", run: () => sourceHealthWeekly(), when: () => !responder() },
   ...(collecting
     ? [
-        { name: "sources.schedule", cron: "* * * * *", run: () => scheduleDueSources() },
+        { name: "sources.schedule", cron: "* * * * *", run: whileCollecting(() => scheduleDueSources()) },
         { name: "sources.adapt-intervals", cron: "20 4 * * *", run: adaptIntervals },
         // Icons are read from the sources' own sites, so they stop with collection.
-        { name: "sources.icons", cron: "40 4 * * *", missed: "once" as const, run: () => refreshSourceIcons() },
+        { name: "sources.icons", cron: "40 4 * * *", missed: "once" as const, run: whileCollecting(() => refreshSourceIcons()) },
       ]
     : []),
   // WeChat official accounts through Dajiala (paid), each once per its interval; only with its key.
-  ...(collecting && dajialaConfigured() ? [{ name: "sources.mp-reconcile", cron: "*/15 * * * *", run: () => scheduleMpReconcile() }] : []),
+  ...(collecting && dajialaConfigured() ? [{ name: "sources.mp-reconcile", cron: "*/15 * * * *", run: whileCollecting(() => scheduleMpReconcile()) }] : []),
 ];
 
 export async function registerSchedules(boss: PgBoss) {

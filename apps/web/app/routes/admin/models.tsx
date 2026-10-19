@@ -27,8 +27,8 @@ function Unpriced() {
   return <span className="whitespace-nowrap text-ink-4" title="服务商没有返回费用，按 token 数和你的模型单价自己估算">未定价</span>;
 }
 type Provider = AdminModels["providers"][number];
-interface ProviderForm { key: string; label: string; model: string; baseUrl: string; apiKey: string; extra: string; reasoningTokens: string; jsonMode: boolean; vision: boolean; enabled: boolean }
-const BLANK: ProviderForm = { key: "", label: "", model: "", baseUrl: "", apiKey: "", extra: "", reasoningTokens: "", jsonMode: true, vision: false, enabled: true };
+interface ProviderForm { key: string; label: string; model: string; baseUrl: string; apiKey: string; extra: string; reasoningTokens: string; maxConcurrency: string; jsonMode: boolean; vision: boolean; enabled: boolean }
+const BLANK: ProviderForm = { key: "", label: "", model: "", baseUrl: "", apiKey: "", extra: "", reasoningTokens: "", maxConcurrency: "", jsonMode: true, vision: false, enabled: true };
 // Addresses of common OpenAI-compatible services; the page only fills the address in, the model name and key are the admin's.
 const VENDORS: Array<{ name: string; baseUrl: string }> = [
   { name: "硅基流动", baseUrl: "https://api.siliconflow.cn/v1" },
@@ -41,7 +41,7 @@ const VENDORS: Array<{ name: string; baseUrl: string }> = [
 ];
 const toForm = (p: Provider): ProviderForm => ({
   key: p.key, label: p.label, model: p.model, baseUrl: p.baseUrl, apiKey: "", extra: p.extra ? JSON.stringify(p.extra) : "",
-  reasoningTokens: p.reasoningTokens ? String(p.reasoningTokens) : "", jsonMode: p.jsonMode, vision: p.vision, enabled: p.enabled,
+  reasoningTokens: p.reasoningTokens ? String(p.reasoningTokens) : "", maxConcurrency: p.maxConcurrency ? String(p.maxConcurrency) : "", jsonMode: p.jsonMode, vision: p.vision, enabled: p.enabled,
 });
 const secs = (ms: number | null) => (ms == null ? "—" : ms >= 10_000 ? `${Math.round(ms / 1000)} s` : `${(ms / 1000).toFixed(1)} s`);
 
@@ -88,7 +88,7 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
             rowKey={(p) => p.key}
             columns={[
               { key: "n", label: "名称", render: (p) => <span className="whitespace-nowrap">{p.label}<span className="ml-1.5 font-mono text-[11.5px] text-ink-4">{p.key}</span></span> },
-              { key: "m", label: "模型", render: (p) => <span className="font-mono text-[12px]">{p.model}</span> },
+              { key: "m", label: "模型", render: (p) => <span className="font-mono text-[12px]">{p.model}{p.maxConcurrency ? <span className="ml-1.5 text-ink-4">并发 ≤{p.maxConcurrency}</span> : null}</span> },
               { key: "u", label: "地址", render: (p) => <span className="font-mono text-[11.5px] text-ink-3">{p.baseUrl || "—"}</span> },
               { key: "k", label: "密钥", render: (p) => (p.keyReadable ? <span className="font-mono text-[11.5px] text-ink-3">{p.keyHint}</span> : <Badge tone="bad" title="服务器的 SESSION_SECRET 变过，原来保存的密钥打不开，请重新填写">需重新填密钥</Badge>) },
               { key: "s", label: "状态", render: (p) => (p.source === "env" ? <Badge tone="info" title="在服务器的 MODEL_PROVIDERS 里配置，页面只能看和测试">环境变量</Badge> : p.enabled ? <Badge tone="ok">启用</Badge> : <Badge tone="muted">已停用</Badge>) },
@@ -268,10 +268,12 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
           }
           const tokens = v.reasoningTokens.trim();
           if (tokens && !/^\d+$/.test(tokens)) { setFormError("推理额度要写成非负整数，例如 4000"); return false; }
+          const concurrency = v.maxConcurrency.trim();
+          if (concurrency && !/^([1-9]|[1-5]\d|6[0-4])$/.test(concurrency)) { setFormError("最大并发要写成 1–64 的整数，不限制就留空"); return false; }
           setFormError(null);
           const body = {
             label: v.label, model: v.model, baseUrl: v.baseUrl, ...(v.apiKey ? { apiKey: v.apiKey } : {}), extra,
-            reasoningTokens: tokens ? Number(tokens) : null, jsonMode: v.jsonMode, vision: v.vision, enabled: v.enabled, reason,
+            reasoningTokens: tokens ? Number(tokens) : null, maxConcurrency: concurrency ? Number(concurrency) : null, jsonMode: v.jsonMode, vision: v.vision, enabled: v.enabled, reason,
           };
           const r = await run("PUT", `/api/admin/model-providers/${encodeURIComponent(v.key)}`, body, { label: "provider", success: form.isNew ? "已添加" : "已保存" });
           return r !== null;
@@ -308,6 +310,9 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
             <Field label="额外请求字段（可选，JSON）" hint="比如关掉推理：{&quot;enable_thinking&quot;: false}">
               <Textarea rows={2} value={form.values.extra} onChange={(e) => setField("extra", e.target.value)} />
             </Field>
+            <Field label="最大并发（可选）" hint="同时最多发几个请求；服务商报 429、Concurrency limit exceeded 时填，例如 4。留空不限制">
+              <Input inputMode="numeric" value={form.values.maxConcurrency} onChange={(e) => setField("maxConcurrency", e.target.value)} />
+            </Field>
             <Field label="推理额度（可选）" hint="推理模型先想再答，额外给推理留的输出 token；调用报 finish_reason=length 时填，例如 4000">
               <Input inputMode="numeric" value={form.values.reasoningTokens} onChange={(e) => setField("reasoningTokens", e.target.value)} />
             </Field>
@@ -327,7 +332,7 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
           if (!toggling) return false;
           const p = toggling;
           const r = await run("PUT", `/api/admin/model-providers/${encodeURIComponent(p.key)}`, {
-            label: p.label, model: p.model, baseUrl: p.baseUrl, extra: p.extra, reasoningTokens: p.reasoningTokens, jsonMode: p.jsonMode, vision: p.vision, enabled: !p.enabled, reason,
+            label: p.label, model: p.model, baseUrl: p.baseUrl, extra: p.extra, reasoningTokens: p.reasoningTokens, maxConcurrency: p.maxConcurrency, jsonMode: p.jsonMode, vision: p.vision, enabled: !p.enabled, reason,
           }, { label: "provider", success: p.enabled ? "已停用" : "已启用" });
           return r !== null;
         }}

@@ -301,6 +301,37 @@ for (const operation of ["reset", "disable"] as const) test(`${operation} racing
   }
 });
 
+test("a disabled member can be restored; a member changes their own password and every session of theirs ends", async () => {
+  const member = await newMember();
+  assert.equal((await app.inject({ method: "POST", url: `${path}/${member.id}/disable`, headers: adminHeaders() })).statusCode, 200);
+  assert.equal((await signIn(member.username)).statusCode, 401);
+  const enabled = await app.inject({ method: "POST", url: `${path}/${member.id}/enable`, headers: adminHeaders() });
+  assert.equal(enabled.statusCode, 200, enabled.body);
+  assert.equal(enabled.json().member.disabled, false);
+  const audited = await sql`SELECT 1 FROM audit_log WHERE action = 'access.member.enable' AND subject = ${`member:${member.id}`}`;
+  assert.equal(audited.length, 1);
+
+  const here = await memberSession(member.username);
+  const elsewhere = await memberSession(member.username);
+  const change = (payload: Record<string, unknown>, headers: Record<string, string> = { cookie: here.cookie, origin: config.siteUrl, "x-csrf-token": here.principal.csrf }) =>
+    app.inject({ method: "POST", url: "/api/access/password", headers, payload });
+  const fresh = "brand new password 789";
+  assert.equal((await change({ current: password, next: fresh }, { cookie: here.cookie, origin: config.siteUrl })).statusCode, 403, "the CSRF token is required");
+  assert.equal((await change({ current: "not the password 000", next: fresh })).statusCode, 403, "the current password must match");
+  assert.equal((await change({ current: password, next: "short" })).statusCode, 400);
+  assert.equal((await change({ current: password, next: password })).statusCode, 400);
+  assert.equal((await change({ current: password, next: fresh }, { cookie: adminCookie, origin: config.siteUrl, "x-csrf-token": adminCsrf })).statusCode, 401, "only a member changes a member password");
+
+  const done = await change({ current: password, next: fresh });
+  assert.equal(done.statusCode, 200, done.body);
+  privateResponse(done);
+  assert.match(String(done.headers["set-cookie"]), /aihot_member=;/);
+  assert.equal(await sessionStatus(here.cookie), 401, "this session ends");
+  assert.equal(await sessionStatus(elsewhere.cookie), 401, "and every other session of the member");
+  assert.equal((await signIn(member.username)).statusCode, 401);
+  assert.equal((await signIn(member.username, fresh)).statusCode, 200);
+});
+
 test("admin logout uses real admin CSRF even with a member cookie and revokes only the admin session", async () => {
   const member = await newMember();
   const signed = await memberSession(member.username);
