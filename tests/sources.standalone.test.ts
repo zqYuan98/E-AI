@@ -186,6 +186,16 @@ test("noise words match whatever their case", () => {
   assert.equal(noiseFiltered(c("iPhone 18 开售", ""), source), true);
 });
 
+test("a keyword search or mixed list keeps only items naming one of its required words", () => {
+  // A procurement search returns hospital and farmland projects too; only the power ones stay. Drop markers still apply.
+  const source = { config: { ingestNoiseFilter: { requireMatches: ["供电", "变电"], dropMarkersTitleOnly: ["终止公告"] } } } as never;
+  const c = (title: string, excerpt = "") => ({ url: "https://example.org/a", title, excerpt }) as never;
+  assert.equal(noiseFiltered(c("某110千伏变电站新建工程施工招标公告"), source), false);
+  assert.equal(noiseFiltered(c("某县医院病房改造项目", "含 10kV 供电线路迁改"), source), false);
+  assert.equal(noiseFiltered(c("某县高标准农田建设项目"), source), true);
+  assert.equal(noiseFiltered(c("某供电线路工程终止公告"), source), true);
+});
+
 test("a time without a zone is read in the source's offset, in JSON lists and in detail page metadata", async () => {
   const list = async (extra: Record<string, unknown> = {}) => (await fetchJsonList({ id: "test-json", config: { url: `${site}/zoneless.json`, itemsPath: "result", titlePaths: ["title"], urlTemplate: "https://example.org/p/{id}", publishedAtPath: "publishDate", ...extra } } as never))
     .map((c) => c.publishedAt?.toISOString());

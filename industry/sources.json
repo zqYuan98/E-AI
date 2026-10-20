@@ -1478,6 +1478,3096 @@
       "syndicate_fulltext": false
     },
     {
+      "id": "json-sgcc-ecp-zbgg",
+      "name": "国家电网电子商务平台·招标公告",
+      "kind": "json_list",
+      "config": {
+        "url": "https://ecp.sgcc.com.cn/ecp2.0/ecpwcmcore/index/noteList",
+        "mode": "json_api",
+        "method": "POST",
+        "headers": {
+          "user-agent": "Mozilla/5.0 (compatible; PowerAIHot/1.0)",
+          "accept": "application/json, text/plain, */*",
+          "origin": "https://ecp.sgcc.com.cn",
+          "referer": "https://ecp.sgcc.com.cn/ecp2.0/portal/"
+        },
+        "bodyJson": {
+          "index": 1,
+          "size": 100,
+          "firstPageMenuId": "2018032700291334",
+          "purOrgStatus": "",
+          "purOrgCode": "",
+          "purType": "",
+          "orgId": "",
+          "key": ""
+        },
+        "itemsPath": "resultValue.noteList",
+        "titlePaths": [
+          "title"
+        ],
+        "summaryPaths": [
+          "publishOrgName"
+        ],
+        "urlTemplate": "https://ecp.sgcc.com.cn/ecp2.0/portal/?id={raw:id}#/doc/{raw:doctype}/{raw:id}_2018032700291334",
+        "publishedAtPath": "noticePublishTime",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "id",
+        "sortByPublishedAt": true,
+        "allowUrlPrefixes": [
+          "https://ecp.sgcc.com.cn/ecp2.0/portal/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "sgcc",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "招标",
+        "国网"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "json-sgcc-ecp-cggg",
+      "name": "国家电网电子商务平台·采购公告",
+      "kind": "json_list",
+      "config": {
+        "url": "https://ecp.sgcc.com.cn/ecp2.0/ecpwcmcore/index/noteList",
+        "mode": "json_api",
+        "method": "POST",
+        "headers": {
+          "user-agent": "Mozilla/5.0 (compatible; PowerAIHot/1.0)",
+          "accept": "application/json, text/plain, */*",
+          "origin": "https://ecp.sgcc.com.cn",
+          "referer": "https://ecp.sgcc.com.cn/ecp2.0/portal/"
+        },
+        "bodyJson": {
+          "index": 1,
+          "size": 100,
+          "firstPageMenuId": "2018032900295987",
+          "purOrgStatus": "",
+          "purOrgCode": "",
+          "purType": "",
+          "orgId": "",
+          "key": ""
+        },
+        "itemsPath": "resultValue.noteList",
+        "titlePaths": [
+          "title"
+        ],
+        "summaryPaths": [
+          "publishOrgName"
+        ],
+        "urlTemplate": "https://ecp.sgcc.com.cn/ecp2.0/portal/?id={raw:id}#/doc/{raw:doctype}/{raw:id}_2018032900295987",
+        "publishedAtPath": "noticePublishTime",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "id",
+        "sortByPublishedAt": true,
+        "allowUrlPrefixes": [
+          "https://ecp.sgcc.com.cn/ecp2.0/portal/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "sgcc",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "招标",
+        "国网"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "json-sgcc-ecp-hxr",
+      "name": "国家电网电子商务平台·中标候选人公示",
+      "kind": "json_list",
+      "config": {
+        "url": "https://ecp.sgcc.com.cn/ecp2.0/ecpwcmcore/index/noteList",
+        "mode": "json_api",
+        "method": "POST",
+        "headers": {
+          "user-agent": "Mozilla/5.0 (compatible; PowerAIHot/1.0)",
+          "accept": "application/json, text/plain, */*",
+          "origin": "https://ecp.sgcc.com.cn",
+          "referer": "https://ecp.sgcc.com.cn/ecp2.0/portal/"
+        },
+        "bodyJson": {
+          "index": 1,
+          "size": 100,
+          "firstPageMenuId": "2018060501171107",
+          "purOrgStatus": "",
+          "purOrgCode": "",
+          "purType": "",
+          "orgId": "",
+          "key": ""
+        },
+        "itemsPath": "resultValue.noteList",
+        "titlePaths": [
+          "title"
+        ],
+        "summaryPaths": [
+          "publishOrgName"
+        ],
+        "urlTemplate": "https://ecp.sgcc.com.cn/ecp2.0/portal/?id={raw:id}#/doc/{raw:doctype}/{raw:id}_2018060501171107",
+        "publishedAtPath": "noticePublishTime",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "id",
+        "sortByPublishedAt": true,
+        "allowUrlPrefixes": [
+          "https://ecp.sgcc.com.cn/ecp2.0/portal/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "sgcc",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "中标",
+        "国网"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "json-sgcc-ecp-zbjg",
+      "name": "国家电网电子商务平台·中标结果公告",
+      "kind": "json_list",
+      "config": {
+        "url": "https://ecp.sgcc.com.cn/ecp2.0/ecpwcmcore/index/noteList",
+        "mode": "json_api",
+        "method": "POST",
+        "headers": {
+          "user-agent": "Mozilla/5.0 (compatible; PowerAIHot/1.0)",
+          "accept": "application/json, text/plain, */*",
+          "origin": "https://ecp.sgcc.com.cn",
+          "referer": "https://ecp.sgcc.com.cn/ecp2.0/portal/"
+        },
+        "bodyJson": {
+          "index": 1,
+          "size": 100,
+          "firstPageMenuId": "2018060501171111",
+          "purOrgStatus": "",
+          "purOrgCode": "",
+          "purType": "",
+          "orgId": "",
+          "key": ""
+        },
+        "itemsPath": "resultValue.noteList",
+        "titlePaths": [
+          "title"
+        ],
+        "summaryPaths": [
+          "publishOrgName"
+        ],
+        "urlTemplate": "https://ecp.sgcc.com.cn/ecp2.0/portal/?id={raw:id}#/doc/{raw:doctype}/{raw:id}_2018060501171111",
+        "publishedAtPath": "noticePublishTime",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "id",
+        "sortByPublishedAt": true,
+        "allowUrlPrefixes": [
+          "https://ecp.sgcc.com.cn/ecp2.0/portal/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "sgcc",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "中标",
+        "国网"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "json-powerchina-bid-zcgg",
+      "name": "中国电建阳光采购网·招采公告",
+      "kind": "json_list",
+      "config": {
+        "url": "https://bid.powerchina.cn/newcbs/recpro-newmember/BidAnnouncementSummary/list",
+        "mode": "json_api",
+        "method": "POST",
+        "headers": {
+          "accept": "application/json, text/plain, */*",
+          "referer": "https://bid.powerchina.cn/consult/notice"
+        },
+        "bodyJson": {
+          "pageNum": 1,
+          "pageSize": 50,
+          "announcementType": "招采公告",
+          "companyType": "",
+          "announcementSource": "0"
+        },
+        "itemsPath": "rows",
+        "titlePaths": [
+          "title"
+        ],
+        "summaryPaths": [
+          "procuringEntity",
+          "source"
+        ],
+        "urlTemplate": "https://bid.powerchina.cn/notice/detail?id={raw:id}&type=%E6%8B%9B%E9%87%87%E5%85%AC%E5%91%8A",
+        "publishedAtPath": "publishTime",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "id",
+        "allowUrlPrefixes": [
+          "https://bid.powerchina.cn/notice/detail"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "powerchina",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "招标",
+        "中国电建"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-powerchina-bid-hxr",
+      "name": "中国电建阳光采购网·中标候选人公示",
+      "kind": "json_list",
+      "config": {
+        "url": "https://bid.powerchina.cn/newcbs/recpro-newmember/BidAnnouncementSummary/list",
+        "mode": "json_api",
+        "method": "POST",
+        "headers": {
+          "accept": "application/json, text/plain, */*",
+          "referer": "https://bid.powerchina.cn/consult/notice"
+        },
+        "bodyJson": {
+          "pageNum": 1,
+          "pageSize": 50,
+          "announcementType": "中标候选人公示",
+          "companyType": "",
+          "announcementSource": "0"
+        },
+        "itemsPath": "rows",
+        "titlePaths": [
+          "title"
+        ],
+        "summaryPaths": [
+          "procuringEntity",
+          "source"
+        ],
+        "urlTemplate": "https://bid.powerchina.cn/notice/detail?id={raw:id}&type=%E4%B8%AD%E6%A0%87%E5%80%99%E9%80%89%E4%BA%BA%E5%85%AC%E7%A4%BA",
+        "publishedAtPath": "publishTime",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "id",
+        "allowUrlPrefixes": [
+          "https://bid.powerchina.cn/notice/detail"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "powerchina",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "中标",
+        "中国电建"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-powerchina-bid-zbjg",
+      "name": "中国电建阳光采购网·中标/成交公示",
+      "kind": "json_list",
+      "config": {
+        "url": "https://bid.powerchina.cn/newcbs/recpro-newmember/BidAnnouncementSummary/list",
+        "mode": "json_api",
+        "method": "POST",
+        "headers": {
+          "accept": "application/json, text/plain, */*",
+          "referer": "https://bid.powerchina.cn/consult/notice"
+        },
+        "bodyJson": {
+          "pageNum": 1,
+          "pageSize": 50,
+          "announcementType": "中标/成交公示",
+          "companyType": "",
+          "announcementSource": "0"
+        },
+        "itemsPath": "rows",
+        "titlePaths": [
+          "title"
+        ],
+        "summaryPaths": [
+          "procuringEntity",
+          "source"
+        ],
+        "urlTemplate": "https://bid.powerchina.cn/notice/detail?id={raw:id}&type=%E4%B8%AD%E6%A0%87%2F%E6%88%90%E4%BA%A4%E5%85%AC%E7%A4%BA",
+        "publishedAtPath": "publishTime",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "id",
+        "allowUrlPrefixes": [
+          "https://bid.powerchina.cn/notice/detail"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "powerchina",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "中标",
+        "中国电建"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-yn-ggzy-zbjh",
+      "name": "云南公共资源交易·电力招标计划",
+      "kind": "json_list",
+      "config": {
+        "url": "https://ggzy.yn.gov.cn/ynggfwpt-home-api/jyzyCenter/jyInfo/gcjs/getTenserPlanList",
+        "mode": "json_api",
+        "method": "POST",
+        "headers": {
+          "accept": "application/json, text/plain, */*",
+          "referer": "https://ggzy.yn.gov.cn/tradeHall/tradeList"
+        },
+        "bodyJson": {
+          "pageNum": 1,
+          "pageSize": 20,
+          "cityId": "",
+          "industryCode": "A08",
+          "childType": "",
+          "tradeType": "gcjs",
+          "title": ""
+        },
+        "itemsPath": "value.list",
+        "titlePaths": [
+          "tenderProjectName"
+        ],
+        "summaryPaths": [
+          "areaName"
+        ],
+        "urlTemplate": "https://ggzy.yn.gov.cn/tradeHall/tradeDetail?guid={raw:guid}&colCode=1&rowCode=%E6%8B%9B%E6%A0%87%E8%AE%A1%E5%88%92&from=jiaoYi",
+        "publishedAtPath": "publishTime",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "guid",
+        "allowUrlPrefixes": [
+          "https://ggzy.yn.gov.cn/tradeHall/tradeDetail"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "前期信号",
+        "招标计划",
+        "云南"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-yn-ggzy-zbgg",
+      "name": "云南公共资源交易·电力招标公告",
+      "kind": "json_list",
+      "config": {
+        "url": "https://ggzy.yn.gov.cn/ynggfwpt-home-api/jyzyCenter/jyInfo/gcjs/getZbggList",
+        "mode": "json_api",
+        "method": "POST",
+        "headers": {
+          "accept": "application/json, text/plain, */*",
+          "referer": "https://ggzy.yn.gov.cn/tradeHall/tradeList"
+        },
+        "bodyJson": {
+          "pageNum": 1,
+          "pageSize": 20,
+          "cityId": "",
+          "industryCode": "A08",
+          "childType": "",
+          "tradeType": "gcjs",
+          "title": ""
+        },
+        "itemsPath": "value.list",
+        "titlePaths": [
+          "bulletinname"
+        ],
+        "summaryPaths": [
+          "areaName"
+        ],
+        "urlTemplate": "https://ggzy.yn.gov.cn/tradeHall/tradeDetail?guid={raw:guid}&colCode=1&rowCode=%E6%8B%9B%E6%A0%87%E5%85%AC%E5%91%8A&from=jiaoYi",
+        "publishedAtPath": "bulletinissuetime",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "guid",
+        "allowUrlPrefixes": [
+          "https://ggzy.yn.gov.cn/tradeHall/tradeDetail"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "招标",
+        "云南"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-yn-ggzy-hxr",
+      "name": "云南公共资源交易·电力中标候选人公示",
+      "kind": "json_list",
+      "config": {
+        "url": "https://ggzy.yn.gov.cn/ynggfwpt-home-api/jyzyCenter/jyInfo/gcjs/getPbbgList",
+        "mode": "json_api",
+        "method": "POST",
+        "headers": {
+          "accept": "application/json, text/plain, */*",
+          "referer": "https://ggzy.yn.gov.cn/tradeHall/tradeList"
+        },
+        "bodyJson": {
+          "pageNum": 1,
+          "pageSize": 20,
+          "cityId": "",
+          "industryCode": "A08",
+          "childType": "",
+          "tradeType": "gcjs",
+          "title": ""
+        },
+        "itemsPath": "value.list",
+        "titlePaths": [
+          "publicityname"
+        ],
+        "summaryPaths": [
+          "areaName"
+        ],
+        "urlTemplate": "https://ggzy.yn.gov.cn/tradeHall/tradeDetail?guid={raw:guid}&colCode=1&rowCode=%E4%B8%AD%E6%A0%87%E5%80%99%E9%80%89%E4%BA%BA%E5%85%AC%E7%A4%BA&from=jiaoYi",
+        "publishedAtPath": "publicitystarttime",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "guid",
+        "allowUrlPrefixes": [
+          "https://ggzy.yn.gov.cn/tradeHall/tradeDetail"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "中标",
+        "云南"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-yn-ggzy-zbjg",
+      "name": "云南公共资源交易·电力中标结果",
+      "kind": "json_list",
+      "config": {
+        "url": "https://ggzy.yn.gov.cn/ynggfwpt-home-api/jyzyCenter/jyInfo/gcjs/getZbJgGgList",
+        "mode": "json_api",
+        "method": "POST",
+        "headers": {
+          "accept": "application/json, text/plain, */*",
+          "referer": "https://ggzy.yn.gov.cn/tradeHall/tradeList"
+        },
+        "bodyJson": {
+          "pageNum": 1,
+          "pageSize": 20,
+          "cityId": "",
+          "industryCode": "A08",
+          "childType": "",
+          "tradeType": "gcjs",
+          "title": ""
+        },
+        "itemsPath": "value.list",
+        "titlePaths": [
+          "bulletinname"
+        ],
+        "summaryPaths": [
+          "areaName"
+        ],
+        "urlTemplate": "https://ggzy.yn.gov.cn/tradeHall/tradeDetail?guid={raw:guid}&colCode=1&rowCode=%E4%B8%AD%E6%A0%87%E7%BB%93%E6%9E%9C%E5%85%AC%E7%A4%BA&from=jiaoYi",
+        "publishedAtPath": "bulletinissuetime",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "guid",
+        "allowUrlPrefixes": [
+          "https://ggzy.yn.gov.cn/tradeHall/tradeDetail"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "中标",
+        "云南"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-nx-ggzy-dlgc",
+      "name": "宁夏公共资源交易·电力工程",
+      "kind": "json_list",
+      "config": {
+        "url": "https://ggzyjy.fzggw.nx.gov.cn/interface_wz/rest/esinteligentsearch/getFullTextDataNew",
+        "mode": "json_api",
+        "method": "POST",
+        "headers": {
+          "accept": "application/json, text/plain, */*",
+          "x-requested-with": "XMLHttpRequest"
+        },
+        "bodyJson": {
+          "token": "",
+          "pn": 0,
+          "rn": 20,
+          "sdt": "",
+          "edt": "",
+          "wd": "",
+          "inc_wd": "",
+          "exc_wd": "",
+          "fields": "title",
+          "cnum": "",
+          "sort": "{\"webdate\":\"0\",\"id\":\"0\"}",
+          "ssort": "",
+          "cl": 200,
+          "terminal": "",
+          "condition": [
+            {
+              "fieldName": "categorynum",
+              "equal": "001001001",
+              "notEqual": null,
+              "equalList": null,
+              "notEqualList": null,
+              "isLike": true,
+              "likeType": 2
+            },
+            {
+              "fieldName": "hangye",
+              "equal": "L",
+              "notEqual": null,
+              "equalList": null,
+              "notEqualList": null,
+              "isLike": false,
+              "likeType": 0
+            }
+          ],
+          "time": null,
+          "highlights": "",
+          "statistics": null,
+          "unionCondition": [],
+          "accuracy": "",
+          "noParticiple": "0",
+          "searchRange": null,
+          "noWd": true,
+          "isBusiness": "1"
+        },
+        "itemsPath": "result.records",
+        "titlePaths": [
+          "title"
+        ],
+        "urlTemplate": "https://ggzyjy.fzggw.nx.gov.cn{raw:linkurl}",
+        "publishedAtPath": "webdate",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "id",
+        "allowUrlPrefixes": [
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001001/001001001005/",
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001001/001001001001/",
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001001/001001001004/",
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001001/001001001003/",
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001002/001001002001/",
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001002/001001002003/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "招标",
+        "宁夏"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-nx-ggzy-kw-bd",
+      "name": "宁夏公共资源交易·检索「变电」",
+      "kind": "json_list",
+      "config": {
+        "url": "https://ggzyjy.fzggw.nx.gov.cn/interface_wz/rest/esinteligentsearch/getFullTextDataNew",
+        "mode": "json_api",
+        "method": "POST",
+        "headers": {
+          "accept": "application/json, text/plain, */*",
+          "x-requested-with": "XMLHttpRequest"
+        },
+        "bodyJson": {
+          "token": "",
+          "pn": 0,
+          "rn": 20,
+          "sdt": "",
+          "edt": "",
+          "wd": "变电",
+          "inc_wd": "",
+          "exc_wd": "",
+          "fields": "title",
+          "cnum": "",
+          "sort": "{\"webdate\":\"0\",\"id\":\"0\"}",
+          "ssort": "",
+          "cl": 200,
+          "terminal": "",
+          "condition": [
+            {
+              "fieldName": "categorynum",
+              "equal": "001001",
+              "notEqual": null,
+              "equalList": null,
+              "notEqualList": null,
+              "isLike": true,
+              "likeType": 2
+            }
+          ],
+          "time": null,
+          "highlights": "",
+          "statistics": null,
+          "unionCondition": [],
+          "accuracy": "",
+          "noParticiple": "0",
+          "searchRange": null,
+          "noWd": true,
+          "isBusiness": "1"
+        },
+        "itemsPath": "result.records",
+        "titlePaths": [
+          "title"
+        ],
+        "urlTemplate": "https://ggzyjy.fzggw.nx.gov.cn{raw:linkurl}",
+        "publishedAtPath": "webdate",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "id",
+        "allowUrlPrefixes": [
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001001/001001001005/",
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001001/001001001001/",
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001001/001001001004/",
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001001/001001001003/",
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001002/001001002001/",
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001002/001001002003/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "招标",
+        "宁夏"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-nx-ggzy-kw-gd",
+      "name": "宁夏公共资源交易·检索「供电」",
+      "kind": "json_list",
+      "config": {
+        "url": "https://ggzyjy.fzggw.nx.gov.cn/interface_wz/rest/esinteligentsearch/getFullTextDataNew",
+        "mode": "json_api",
+        "method": "POST",
+        "headers": {
+          "accept": "application/json, text/plain, */*",
+          "x-requested-with": "XMLHttpRequest"
+        },
+        "bodyJson": {
+          "token": "",
+          "pn": 0,
+          "rn": 20,
+          "sdt": "",
+          "edt": "",
+          "wd": "供电",
+          "inc_wd": "",
+          "exc_wd": "",
+          "fields": "title",
+          "cnum": "",
+          "sort": "{\"webdate\":\"0\",\"id\":\"0\"}",
+          "ssort": "",
+          "cl": 200,
+          "terminal": "",
+          "condition": [
+            {
+              "fieldName": "categorynum",
+              "equal": "001001",
+              "notEqual": null,
+              "equalList": null,
+              "notEqualList": null,
+              "isLike": true,
+              "likeType": 2
+            }
+          ],
+          "time": null,
+          "highlights": "",
+          "statistics": null,
+          "unionCondition": [],
+          "accuracy": "",
+          "noParticiple": "0",
+          "searchRange": null,
+          "noWd": true,
+          "isBusiness": "1"
+        },
+        "itemsPath": "result.records",
+        "titlePaths": [
+          "title"
+        ],
+        "urlTemplate": "https://ggzyjy.fzggw.nx.gov.cn{raw:linkurl}",
+        "publishedAtPath": "webdate",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "id",
+        "allowUrlPrefixes": [
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001001/001001001005/",
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001001/001001001001/",
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001001/001001001004/",
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001001/001001001003/",
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001002/001001002001/",
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001002/001001002003/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "招标",
+        "宁夏"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-nx-ggzy-kw-dl",
+      "name": "宁夏公共资源交易·检索「电力」",
+      "kind": "json_list",
+      "config": {
+        "url": "https://ggzyjy.fzggw.nx.gov.cn/interface_wz/rest/esinteligentsearch/getFullTextDataNew",
+        "mode": "json_api",
+        "method": "POST",
+        "headers": {
+          "accept": "application/json, text/plain, */*",
+          "x-requested-with": "XMLHttpRequest"
+        },
+        "bodyJson": {
+          "token": "",
+          "pn": 0,
+          "rn": 20,
+          "sdt": "",
+          "edt": "",
+          "wd": "电力",
+          "inc_wd": "",
+          "exc_wd": "",
+          "fields": "title",
+          "cnum": "",
+          "sort": "{\"webdate\":\"0\",\"id\":\"0\"}",
+          "ssort": "",
+          "cl": 200,
+          "terminal": "",
+          "condition": [
+            {
+              "fieldName": "categorynum",
+              "equal": "001001",
+              "notEqual": null,
+              "equalList": null,
+              "notEqualList": null,
+              "isLike": true,
+              "likeType": 2
+            }
+          ],
+          "time": null,
+          "highlights": "",
+          "statistics": null,
+          "unionCondition": [],
+          "accuracy": "",
+          "noParticiple": "0",
+          "searchRange": null,
+          "noWd": true,
+          "isBusiness": "1"
+        },
+        "itemsPath": "result.records",
+        "titlePaths": [
+          "title"
+        ],
+        "urlTemplate": "https://ggzyjy.fzggw.nx.gov.cn{raw:linkurl}",
+        "publishedAtPath": "webdate",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "id",
+        "allowUrlPrefixes": [
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001001/001001001005/",
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001001/001001001001/",
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001001/001001001004/",
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001001/001001001003/",
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001002/001001002001/",
+          "https://ggzyjy.fzggw.nx.gov.cn/dzjy/001001/001001002/001001002003/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "招标",
+        "宁夏"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-csg-bidding-zbgg",
+      "name": "南方电网供应链·招标公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.bidding.csg.cn/zbgg/index.jhtml",
+        "parseMode": "html",
+        "itemSelector": "li:has(a[href^=\"/zbgg/\"][target=\"_blank\"])",
+        "linkSelector": "a[href^=\"/zbgg/\"][target=\"_blank\"]",
+        "titleSelector": "a[href^=\"/zbgg/\"][target=\"_blank\"]",
+        "publishedAtSelector": "span.Gray",
+        "allowUrlPrefixes": [
+          "https://www.bidding.csg.cn/zbgg/"
+        ],
+        "detail": {
+          "titleSelector": "h1.s-title",
+          "titleAuthoritative": true,
+          "maxFetches": 10
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "csg",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "招标",
+        "南网"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-csg-bidding-fzbgg",
+      "name": "南方电网供应链·非招标采购公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.bidding.csg.cn/fzbgg/index.jhtml",
+        "parseMode": "html",
+        "itemSelector": "li:has(a[href^=\"/fzbgg/\"][target=\"_blank\"])",
+        "linkSelector": "a[href^=\"/fzbgg/\"][target=\"_blank\"]",
+        "titleSelector": "a[href^=\"/fzbgg/\"][target=\"_blank\"]",
+        "publishedAtSelector": "span.Gray",
+        "allowUrlPrefixes": [
+          "https://www.bidding.csg.cn/fzbgg/"
+        ],
+        "detail": {
+          "titleSelector": "h1.s-title",
+          "titleAuthoritative": true,
+          "maxFetches": 10
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "csg",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "招标",
+        "南网"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-csg-bidding-lxcggg",
+      "name": "南方电网供应链·零星采购公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.bidding.csg.cn/lxcggg/index.jhtml",
+        "parseMode": "html",
+        "itemSelector": "li:has(a[href^=\"/lxcggg/\"][target=\"_blank\"])",
+        "linkSelector": "a[href^=\"/lxcggg/\"][target=\"_blank\"]",
+        "titleSelector": "a[href^=\"/lxcggg/\"][target=\"_blank\"]",
+        "publishedAtSelector": "span.Gray",
+        "allowUrlPrefixes": [
+          "https://www.bidding.csg.cn/lxcggg/"
+        ],
+        "detail": {
+          "titleSelector": "h1.s-title",
+          "titleAuthoritative": true,
+          "maxFetches": 10
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "csg",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "招标",
+        "南网"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-csg-bidding-zbhxrgs",
+      "name": "南方电网供应链·中标候选人公示",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.bidding.csg.cn/zbhxrgs/index.jhtml",
+        "parseMode": "html",
+        "itemSelector": "li:has(a[href^=\"/zbhxrgs/\"][target=\"_blank\"])",
+        "linkSelector": "a[href^=\"/zbhxrgs/\"][target=\"_blank\"]",
+        "titleSelector": "a[href^=\"/zbhxrgs/\"][target=\"_blank\"]",
+        "publishedAtSelector": "span.Gray",
+        "allowUrlPrefixes": [
+          "https://www.bidding.csg.cn/zbhxrgs/"
+        ],
+        "detail": {
+          "titleSelector": "h1.s-title",
+          "titleAuthoritative": true,
+          "maxFetches": 10
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "csg",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "中标",
+        "南网"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ctg-eps-zbgg",
+      "name": "三峡集团电子采购平台·招标公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://eps.ctg.com.cn/cms/channel/1ywgg1/index.htm",
+        "parseMode": "html",
+        "itemSelector": "li[name=\"li_name\"]",
+        "linkSelector": "a",
+        "titleSelector": "a > b.use-title-attr",
+        "publishedAtSelector": "a > em",
+        "allowUrlPrefixes": [
+          "https://eps.ctg.com.cn/cms/channel/1ywgg1/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "ctg",
+      "participation_mode": "editorial",
+      "interval_minutes": 90,
+      "tags": [
+        "招标",
+        "三峡集团"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ctg-eps-cggg",
+      "name": "三峡集团电子采购平台·采购公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://eps.ctg.com.cn/cms/channel/2ywgg1/index.htm",
+        "parseMode": "html",
+        "itemSelector": "li[name=\"li_name\"]",
+        "linkSelector": "a",
+        "titleSelector": "a > b.use-title-attr",
+        "publishedAtSelector": "a > em",
+        "allowUrlPrefixes": [
+          "https://eps.ctg.com.cn/cms/channel/2ywgg1/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "ctg",
+      "participation_mode": "editorial",
+      "interval_minutes": 90,
+      "tags": [
+        "招标",
+        "三峡集团"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ctg-eps-hxr",
+      "name": "三峡集团电子采购平台·中标候选人公示",
+      "kind": "web_list",
+      "config": {
+        "url": "https://eps.ctg.com.cn/cms/channel/1ywgg3/index.htm",
+        "parseMode": "html",
+        "itemSelector": "li[name=\"li_name\"]",
+        "linkSelector": "a",
+        "titleSelector": "a > b.use-title-attr",
+        "publishedAtSelector": "a > em",
+        "allowUrlPrefixes": [
+          "https://eps.ctg.com.cn/cms/channel/1ywgg3/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "ctg",
+      "participation_mode": "editorial",
+      "interval_minutes": 90,
+      "tags": [
+        "中标",
+        "三峡集团"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ctg-eps-zbjg",
+      "name": "三峡集团电子采购平台·中标结果公示",
+      "kind": "web_list",
+      "config": {
+        "url": "https://eps.ctg.com.cn/cms/channel/1ywgg4/index.htm",
+        "parseMode": "html",
+        "itemSelector": "li[name=\"li_name\"]",
+        "linkSelector": "a",
+        "titleSelector": "a > b.use-title-attr",
+        "publishedAtSelector": "a > em",
+        "allowUrlPrefixes": [
+          "https://eps.ctg.com.cn/cms/channel/1ywgg4/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "ctg",
+      "participation_mode": "editorial",
+      "interval_minutes": 90,
+      "tags": [
+        "中标",
+        "三峡集团"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ctg-eps-cgjg",
+      "name": "三峡集团电子采购平台·采购结果公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://eps.ctg.com.cn/cms/channel/2ywgg3/index.htm",
+        "parseMode": "html",
+        "itemSelector": "li[name=\"li_name\"]",
+        "linkSelector": "a",
+        "titleSelector": "a > b.use-title-attr",
+        "publishedAtSelector": "a > em",
+        "allowUrlPrefixes": [
+          "https://eps.ctg.com.cn/cms/channel/2ywgg3/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "ctg",
+      "participation_mode": "editorial",
+      "interval_minutes": 90,
+      "tags": [
+        "中标",
+        "三峡集团"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-chnenergy-bidding-zbgg",
+      "name": "国能e招·招标公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.chnenergybidding.com.cn/bidweb/001/001002/moreinfo.html",
+        "parseMode": "html",
+        "itemSelector": "li.right-item",
+        "linkSelector": "a.infolink",
+        "titleSelector": "a.infolink",
+        "publishedAtSelector": "span.r",
+        "allowUrlPrefixes": [
+          "https://www.chnenergybidding.com.cn/bidweb/001/001002/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "chn-energy",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "招标",
+        "国家能源集团"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-chnenergy-bidding-fzbgg",
+      "name": "国能e招·非招标公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.chnenergybidding.com.cn/bidweb/001/001003/moreinfo.html",
+        "parseMode": "html",
+        "itemSelector": "li.right-item",
+        "linkSelector": "a.infolink",
+        "titleSelector": "a.infolink",
+        "publishedAtSelector": "span.r",
+        "allowUrlPrefixes": [
+          "https://www.chnenergybidding.com.cn/bidweb/001/001003/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "chn-energy",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "招标",
+        "国家能源集团"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-chnenergy-bidding-hxr",
+      "name": "国能e招·中标候选人公示",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.chnenergybidding.com.cn/bidweb/001/001005/moreinfo.html",
+        "parseMode": "html",
+        "itemSelector": "li.right-item",
+        "linkSelector": "a.infolink",
+        "titleSelector": "a.infolink",
+        "publishedAtSelector": "span.r",
+        "allowUrlPrefixes": [
+          "https://www.chnenergybidding.com.cn/bidweb/001/001005/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "chn-energy",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "中标",
+        "国家能源集团"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-chnenergy-bidding-zbjg",
+      "name": "国能e招·中标公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.chnenergybidding.com.cn/bidweb/001/001006/moreinfo.html",
+        "parseMode": "html",
+        "itemSelector": "li.right-item",
+        "linkSelector": "a.infolink",
+        "titleSelector": "a.infolink",
+        "publishedAtSelector": "span.r",
+        "allowUrlPrefixes": [
+          "https://www.chnenergybidding.com.cn/bidweb/001/001006/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "chn-energy",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "中标",
+        "国家能源集团"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ah-ggzy-zb-gd",
+      "name": "安徽公共资源交易·招标检索「供电」",
+      "kind": "web_list",
+      "config": {
+        "url": "https://ggzy.ah.gov.cn/souSuo?param=%E4%BE%9B%E7%94%B5&order=time&timeParam=all&type=gcjszbgg",
+        "parseMode": "html",
+        "itemSelector": "div.search_left_content",
+        "linkSelector": "p.search_left_bt a",
+        "titleSelector": "p.search_left_bt a",
+        "publishedAtSelector": "p.search_link span",
+        "allowUrlPrefixes": [
+          "https://ggzy.ah.gov.cn/jsgc/newDetail"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "招标",
+        "安徽"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ah-ggzy-zb-bd",
+      "name": "安徽公共资源交易·招标检索「变电」",
+      "kind": "web_list",
+      "config": {
+        "url": "https://ggzy.ah.gov.cn/souSuo?param=%E5%8F%98%E7%94%B5&order=time&timeParam=all&type=gcjszbgg",
+        "parseMode": "html",
+        "itemSelector": "div.search_left_content",
+        "linkSelector": "p.search_left_bt a",
+        "titleSelector": "p.search_left_bt a",
+        "publishedAtSelector": "p.search_link span",
+        "allowUrlPrefixes": [
+          "https://ggzy.ah.gov.cn/jsgc/newDetail"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "招标",
+        "安徽"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ah-ggzy-zb-dl",
+      "name": "安徽公共资源交易·招标检索「电力」",
+      "kind": "web_list",
+      "config": {
+        "url": "https://ggzy.ah.gov.cn/souSuo?param=%E7%94%B5%E5%8A%9B&order=time&timeParam=all&type=gcjszbgg",
+        "parseMode": "html",
+        "itemSelector": "div.search_left_content",
+        "linkSelector": "p.search_left_bt a",
+        "titleSelector": "p.search_left_bt a",
+        "publishedAtSelector": "p.search_link span",
+        "allowUrlPrefixes": [
+          "https://ggzy.ah.gov.cn/jsgc/newDetail"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "招标",
+        "安徽"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ah-ggzy-jg-gd",
+      "name": "安徽公共资源交易·中标检索「供电」",
+      "kind": "web_list",
+      "config": {
+        "url": "https://ggzy.ah.gov.cn/souSuo?param=%E4%BE%9B%E7%94%B5&order=time&timeParam=all&type=gcjszbjg",
+        "parseMode": "html",
+        "itemSelector": "div.search_left_content",
+        "linkSelector": "p.search_left_bt a",
+        "titleSelector": "p.search_left_bt a",
+        "publishedAtSelector": "p.search_link span",
+        "allowUrlPrefixes": [
+          "https://ggzy.ah.gov.cn/jsgc/newDetail"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "中标",
+        "安徽"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ah-ggzy-jg-bd",
+      "name": "安徽公共资源交易·中标检索「变电」",
+      "kind": "web_list",
+      "config": {
+        "url": "https://ggzy.ah.gov.cn/souSuo?param=%E5%8F%98%E7%94%B5&order=time&timeParam=all&type=gcjszbjg",
+        "parseMode": "html",
+        "itemSelector": "div.search_left_content",
+        "linkSelector": "p.search_left_bt a",
+        "titleSelector": "p.search_left_bt a",
+        "publishedAtSelector": "p.search_link span",
+        "allowUrlPrefixes": [
+          "https://ggzy.ah.gov.cn/jsgc/newDetail"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "中标",
+        "安徽"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ccgp-search-ah",
+      "name": "中国政府采购网·检索「电力」安徽",
+      "kind": "web_list",
+      "config": {
+        "url": "http://search.ccgp.gov.cn/bxsearch?searchtype=1&page_index=1&bidSort=0&buyerName=&projectId=&pinMu=0&bidType=0&dbselect=bidx&kw=%E7%94%B5%E5%8A%9B&start_time=&end_time=&timeType=4&displayZone=&zoneId=34&pppStatus=0&agentName=",
+        "parseMode": "html",
+        "itemSelector": "ul.vT-srch-result-list-bid > li",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "http://www.ccgp.gov.cn/cggg/",
+          "https://www.ccgp.gov.cn/cggg/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "招标",
+        "政府采购",
+        "安徽"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ccgp-search-gs",
+      "name": "中国政府采购网·检索「电力」甘肃",
+      "kind": "web_list",
+      "config": {
+        "url": "http://search.ccgp.gov.cn/bxsearch?searchtype=1&page_index=1&bidSort=0&buyerName=&projectId=&pinMu=0&bidType=0&dbselect=bidx&kw=%E7%94%B5%E5%8A%9B&start_time=&end_time=&timeType=4&displayZone=&zoneId=62&pppStatus=0&agentName=",
+        "parseMode": "html",
+        "itemSelector": "ul.vT-srch-result-list-bid > li",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "http://www.ccgp.gov.cn/cggg/",
+          "https://www.ccgp.gov.cn/cggg/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "招标",
+        "政府采购",
+        "甘肃"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ccgp-search-nx",
+      "name": "中国政府采购网·检索「电力」宁夏",
+      "kind": "web_list",
+      "config": {
+        "url": "http://search.ccgp.gov.cn/bxsearch?searchtype=1&page_index=1&bidSort=0&buyerName=&projectId=&pinMu=0&bidType=0&dbselect=bidx&kw=%E7%94%B5%E5%8A%9B&start_time=&end_time=&timeType=5&displayZone=&zoneId=64&pppStatus=0&agentName=",
+        "parseMode": "html",
+        "itemSelector": "ul.vT-srch-result-list-bid > li",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "http://www.ccgp.gov.cn/cggg/",
+          "https://www.ccgp.gov.cn/cggg/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "招标",
+        "政府采购",
+        "宁夏"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ccgp-search-yn",
+      "name": "中国政府采购网·检索「电力」云南",
+      "kind": "web_list",
+      "config": {
+        "url": "http://search.ccgp.gov.cn/bxsearch?searchtype=1&page_index=1&bidSort=0&buyerName=&projectId=&pinMu=0&bidType=0&dbselect=bidx&kw=%E7%94%B5%E5%8A%9B&start_time=&end_time=&timeType=4&displayZone=&zoneId=53&pppStatus=0&agentName=",
+        "parseMode": "html",
+        "itemSelector": "ul.vT-srch-result-list-bid > li",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "http://www.ccgp.gov.cn/cggg/",
+          "https://www.ccgp.gov.cn/cggg/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "招标",
+        "政府采购",
+        "云南"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ccgp-search-sbd",
+      "name": "中国政府采购网·检索「输变电」",
+      "kind": "web_list",
+      "config": {
+        "url": "http://search.ccgp.gov.cn/bxsearch?searchtype=1&page_index=1&bidSort=0&buyerName=&projectId=&pinMu=0&bidType=0&dbselect=bidx&kw=%E8%BE%93%E5%8F%98%E7%94%B5&start_time=&end_time=&timeType=4&displayZone=&zoneId=&pppStatus=0&agentName=",
+        "parseMode": "html",
+        "itemSelector": "ul.vT-srch-result-list-bid > li",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "http://www.ccgp.gov.cn/cggg/",
+          "https://www.ccgp.gov.cn/cggg/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "招标",
+        "政府采购"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ccgp-search-bkq",
+      "name": "中国政府采购网·检索「布控球」",
+      "kind": "web_list",
+      "config": {
+        "url": "http://search.ccgp.gov.cn/bxsearch?searchtype=1&page_index=1&bidSort=0&buyerName=&projectId=&pinMu=0&bidType=0&dbselect=bidx&kw=%E5%B8%83%E6%8E%A7%E7%90%83&start_time=&end_time=&timeType=4&displayZone=&zoneId=&pppStatus=0&agentName=",
+        "parseMode": "html",
+        "itemSelector": "ul.vT-srch-result-list-bid > li",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "http://www.ccgp.gov.cn/cggg/",
+          "https://www.ccgp.gov.cn/cggg/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "招标",
+        "政府采购",
+        "产品词"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ccgp-search-zhgd",
+      "name": "中国政府采购网·检索「智慧工地」",
+      "kind": "web_list",
+      "config": {
+        "url": "http://search.ccgp.gov.cn/bxsearch?searchtype=1&page_index=1&bidSort=0&buyerName=&projectId=&pinMu=0&bidType=0&dbselect=bidx&kw=%E6%99%BA%E6%85%A7%E5%B7%A5%E5%9C%B0&start_time=&end_time=&timeType=4&displayZone=&zoneId=&pppStatus=0&agentName=",
+        "parseMode": "html",
+        "itemSelector": "ul.vT-srch-result-list-bid > li",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "http://www.ccgp.gov.cn/cggg/",
+          "https://www.ccgp.gov.cn/cggg/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "招标",
+        "政府采购",
+        "产品词"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-nx-fgw-xzsp",
+      "name": "宁夏发改委·行政审批（核准/可研批复）",
+      "kind": "web_list",
+      "config": {
+        "url": "https://fzggw.nx.gov.cn/zwgk/zwgkml/xzspsx/",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a)",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span.time",
+        "allowUrlPrefixes": [
+          "https://fzggw.nx.gov.cn/zwgk/zwgkml/xzspsx/"
+        ],
+        "ingestNoiseFilter": {
+          "requireMatches": [
+            "千伏",
+            "kV",
+            "KV",
+            "kv",
+            "输变电",
+            "输电",
+            "变电",
+            "电网",
+            "风电",
+            "光伏",
+            "储能",
+            "电站",
+            "电力",
+            "供电",
+            "配电",
+            "换流"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "前期信号",
+        "核准",
+        "宁夏"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-yn-fgw-xmpf",
+      "name": "云南发改委·项目批复结果",
+      "kind": "web_list",
+      "config": {
+        "url": "https://yndrc.yn.gov.cn/html/zhengwugongkai/fadingzhudonggongkaineirong/xiangmupifujieguo/",
+        "parseMode": "html",
+        "itemSelector": "li:has(a[href*='/xiangmupifujieguo_'])",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span:last-child",
+        "allowUrlPrefixes": [
+          "https://yndrc.yn.gov.cn/html/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "前期信号",
+        "核准",
+        "云南"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ah-fgw-spjg",
+      "name": "安徽发改委·审批结果",
+      "kind": "web_list",
+      "config": {
+        "url": "https://fzggw.ah.gov.cn/public/column/7011?type=2",
+        "parseMode": "html",
+        "itemSelector": "li:has(a.title)",
+        "linkSelector": "a.title",
+        "titleSelector": "a.title",
+        "publishedAtSelector": "span.date",
+        "allowUrlPrefixes": [
+          "https://fzggw.ah.gov.cn/site/tpl/1034671121"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 720,
+      "tags": [
+        "前期信号",
+        "核准",
+        "安徽"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-yn-sthjt-fslxmslqk",
+      "name": "云南生态环境厅·核与辐射类环评受理公示",
+      "kind": "web_list",
+      "config": {
+        "url": "https://sthjt.yn.gov.cn/fsgl/jsxmhjyxpj/fslxmslqk/",
+        "parseMode": "html",
+        "itemSelector": "p.ui-box:has(a)",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span.date",
+        "allowUrlPrefixes": [
+          "https://sthjt.yn.gov.cn/fsgl/jsxmhjyxpj/fslxmslqk/"
+        ],
+        "ingestNoiseFilter": {
+          "requireMatches": [
+            "输变电",
+            "千伏",
+            "kV",
+            "KV",
+            "变电站",
+            "换流站",
+            "线路"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "前期信号",
+        "环评",
+        "云南"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-yn-sthjt-fslnpzxmgs",
+      "name": "云南生态环境厅·核与辐射类环评拟批准公示",
+      "kind": "web_list",
+      "config": {
+        "url": "https://sthjt.yn.gov.cn/fsgl/jsxmhjyxpj/fslnpzxmgs/",
+        "parseMode": "html",
+        "itemSelector": "p.ui-box:has(a)",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span.date",
+        "allowUrlPrefixes": [
+          "https://sthjt.yn.gov.cn/fsgl/jsxmhjyxpj/fslnpzxmgs/"
+        ],
+        "ingestNoiseFilter": {
+          "requireMatches": [
+            "输变电",
+            "千伏",
+            "kV",
+            "KV",
+            "变电站",
+            "换流站",
+            "线路"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "前期信号",
+        "环评",
+        "云南"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-yn-sthjt-pzxmgs",
+      "name": "云南生态环境厅·核与辐射类环评批准公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://sthjt.yn.gov.cn/fsgl/jsxmhjyxpj/pzxmgs/",
+        "parseMode": "html",
+        "itemSelector": "p.ui-box:has(a)",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span.date",
+        "allowUrlPrefixes": [
+          "https://sthjt.yn.gov.cn/fsgl/jsxmhjyxpj/pzxmgs/"
+        ],
+        "ingestNoiseFilter": {
+          "requireMatches": [
+            "输变电",
+            "千伏",
+            "kV",
+            "KV",
+            "变电站",
+            "换流站",
+            "线路"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "前期信号",
+        "环评",
+        "云南"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-nx-sthjt-hjyxpjnscsp",
+      "name": "宁夏生态环境厅·环评拟审查/审批公示",
+      "kind": "web_list",
+      "config": {
+        "url": "https://sthjt.nx.gov.cn/zwgk/hjpj_63348/hjyxpjnscsp/",
+        "parseMode": "html",
+        "itemSelector": "tr:has(a)",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "td:last-child",
+        "allowUrlPrefixes": [
+          "https://sthjt.nx.gov.cn/zwgk/hjpj_63348/hjyxpjnscsp/"
+        ],
+        "ingestNoiseFilter": {
+          "requireMatches": [
+            "核与辐射",
+            "输变电",
+            "千伏",
+            "kV"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "前期信号",
+        "环评",
+        "宁夏"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-nx-sthjt-hjyxpjpfwj",
+      "name": "宁夏生态环境厅·环评批复文件",
+      "kind": "web_list",
+      "config": {
+        "url": "https://sthjt.nx.gov.cn/zwgk/hjpj_63348/hjyxpjpfwj/",
+        "parseMode": "html",
+        "itemSelector": "tr:has(a)",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "td:last-child",
+        "allowUrlPrefixes": [
+          "https://sthjt.nx.gov.cn/zwgk/hjpj_63348/hjyxpjpfwj/"
+        ],
+        "ingestNoiseFilter": {
+          "requireMatches": [
+            "核与辐射",
+            "输变电",
+            "千伏",
+            "kV"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "前期信号",
+        "环评",
+        "宁夏"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ah-sthjt-xxgk",
+      "name": "安徽生态环境厅·信息公开（输变电环评）",
+      "kind": "web_list",
+      "config": {
+        "url": "https://sthjt.ah.gov.cn/public/column/21691?type=4&action=list&nav=3",
+        "parseMode": "html",
+        "itemSelector": "ul.xxgk_nav_list > li",
+        "linkSelector": "a.title",
+        "titleSelector": "a.title",
+        "publishedAtSelector": "span.date",
+        "allowUrlPrefixes": [
+          "https://sthjt.ah.gov.cn/public/21691/"
+        ],
+        "ingestNoiseFilter": {
+          "requireMatches": [
+            "输变电",
+            "千伏",
+            "kV",
+            "KV",
+            "变电站",
+            "换流站",
+            "线路工程",
+            "电网"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "前期信号",
+        "环评",
+        "安徽"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-inen-power-item",
+      "name": "国际电力网·工程",
+      "kind": "web_list",
+      "config": {
+        "url": "https://power.in-en.com/item/",
+        "parseMode": "html",
+        "itemSelector": ".listTxt",
+        "linkSelector": "h5 a",
+        "titleSelector": "h5 a",
+        "allowUrlPrefixes": [
+          "https://power.in-en.com/html/"
+        ],
+        "detail": {
+          "publishedAtSelector": "p.source b",
+          "maxFetches": 30
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "前期信号",
+        "工程进展",
+        "媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-inen-power-tegaoya",
+      "name": "国际电力网·特高压",
+      "kind": "web_list",
+      "config": {
+        "url": "https://power.in-en.com/tegaoya/",
+        "parseMode": "html",
+        "itemSelector": ".listTxt",
+        "linkSelector": "h5 a",
+        "titleSelector": "h5 a",
+        "allowUrlPrefixes": [
+          "https://power.in-en.com/html/"
+        ],
+        "detail": {
+          "publishedAtSelector": "p.source b",
+          "maxFetches": 30
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "前期信号",
+        "工程进展",
+        "媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-nea-tz",
+      "name": "国家能源局·通知",
+      "kind": "json_list",
+      "config": {
+        "url": "https://www.nea.gov.cn/policy/ds_7290c82b05cc4d49be4971ade193edfc.json",
+        "mode": "json_api",
+        "itemsPath": "datasource",
+        "titlePaths": [
+          "linkUrls.0.linkTitle",
+          "title"
+        ],
+        "urlTemplate": "{raw:linkUrls.0.linkUrl}",
+        "urlTemplateFallback": "https://www.nea.gov.cn/policy/{raw:publishUrl}",
+        "publishedAtPath": "publishTime",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "contentId",
+        "allowUrlPrefixes": [
+          "https://www.nea.gov.cn/",
+          "http://www.nea.gov.cn/"
+        ],
+        "itemUrlPrefixRewrite": {
+          "from": "https://www.nea.gov.cn/policy/../",
+          "to": "https://www.nea.gov.cn/"
+        },
+        "ingestNoiseFilter": {
+          "dropMarkersTitleOnly": [
+            "欢迎报考",
+            "关于披露"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "nea",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "官方",
+        "申报"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-nea-gg",
+      "name": "国家能源局·公告",
+      "kind": "json_list",
+      "config": {
+        "url": "https://www.nea.gov.cn/policy/ds_6db2ed2a0ae946d882bcc769494c99be.json",
+        "mode": "json_api",
+        "itemsPath": "datasource",
+        "titlePaths": [
+          "linkUrls.0.linkTitle",
+          "title"
+        ],
+        "urlTemplate": "{raw:linkUrls.0.linkUrl}",
+        "urlTemplateFallback": "https://www.nea.gov.cn/policy/{raw:publishUrl}",
+        "publishedAtPath": "publishTime",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "contentId",
+        "allowUrlPrefixes": [
+          "https://www.nea.gov.cn/",
+          "http://www.nea.gov.cn/"
+        ],
+        "itemUrlPrefixRewrite": {
+          "from": "https://www.nea.gov.cn/policy/../",
+          "to": "https://www.nea.gov.cn/"
+        },
+        "ingestNoiseFilter": {
+          "dropMarkersTitleOnly": [
+            "欢迎报考",
+            "关于披露"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "nea",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "官方",
+        "申报"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-nea-aqs",
+      "name": "国家能源局·电力安全监管司",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.nea.gov.cn/sjzz/aqs/index.htm",
+        "parseMode": "html",
+        "itemSelector": "ul.dataList > li",
+        "linkSelector": "h3 a",
+        "titleSelector": "h3 a",
+        "publishedAtSelector": "span.time",
+        "allowUrlPrefixes": [
+          "https://www.nea.gov.cn/"
+        ],
+        "ingestNoiseFilter": {
+          "dropMarkersTitleOnly": [
+            "对十四届",
+            "关于十四届",
+            "关于全国政协",
+            "建议的答复",
+            "提案的答复"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "nea",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "官方",
+        "安全监管"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-nea-kjs",
+      "name": "国家能源局·能源节约和科技装备司",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.nea.gov.cn/sjzz/kjs/index.htm",
+        "parseMode": "html",
+        "itemSelector": "ul.dataList > li",
+        "linkSelector": "h3 a",
+        "titleSelector": "h3 a",
+        "publishedAtSelector": "span.time",
+        "allowUrlPrefixes": [
+          "https://www.nea.gov.cn/"
+        ],
+        "ingestNoiseFilter": {
+          "dropMarkersTitleOnly": [
+            "对十四届",
+            "关于十四届",
+            "关于全国政协",
+            "建议的答复",
+            "提案的答复"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "nea",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "官方",
+        "科技"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-nea-gsb-jgdt",
+      "name": "甘肃能源监管办·监管动态",
+      "kind": "web_list",
+      "config": {
+        "url": "https://gsb.nea.gov.cn/dtyw/jgdt/",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a > span + span)",
+        "linkSelector": "a",
+        "titleSelector": "a > span:first-child",
+        "publishedAtSelector": "a > span:last-child",
+        "allowUrlPrefixes": [
+          "https://gsb.nea.gov.cn/dtyw/jgdt/"
+        ],
+        "ingestNoiseFilter": {
+          "requireMatches": [
+            "安全",
+            "施工",
+            "工程",
+            "质量",
+            "事故",
+            "隐患",
+            "风险",
+            "应急",
+            "保电",
+            "防汛",
+            "迎峰",
+            "电网",
+            "输电",
+            "变电",
+            "配电",
+            "供电",
+            "安徽",
+            "宁夏",
+            "专项",
+            "通报",
+            "执法"
+          ]
+        },
+        "detail": {
+          "titleSelector": "div.wrapper_deatil_title",
+          "titleAuthoritative": true,
+          "maxFetches": 15
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "nea",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "安全监管",
+        "甘肃"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-nea-gsb-tzgg",
+      "name": "甘肃能源监管办·通知公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://gsb.nea.gov.cn/dtyw/tzgg/",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a > span + span)",
+        "linkSelector": "a",
+        "titleSelector": "a > span:first-child",
+        "publishedAtSelector": "a > span:last-child",
+        "allowUrlPrefixes": [
+          "https://gsb.nea.gov.cn/dtyw/tzgg/"
+        ],
+        "ingestNoiseFilter": {
+          "requireMatches": [
+            "安全",
+            "施工",
+            "工程",
+            "质量",
+            "事故",
+            "隐患",
+            "风险",
+            "应急",
+            "保电",
+            "防汛",
+            "迎峰",
+            "电网",
+            "输电",
+            "变电",
+            "配电",
+            "供电",
+            "安徽",
+            "宁夏",
+            "专项",
+            "通报",
+            "执法"
+          ]
+        },
+        "detail": {
+          "titleSelector": "div.wrapper_deatil_title",
+          "titleAuthoritative": true,
+          "maxFetches": 15
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "nea",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "安全监管",
+        "申报",
+        "甘肃"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-nea-ynb-gzdt",
+      "name": "云南能源监管办·工作动态",
+      "kind": "web_list",
+      "config": {
+        "url": "https://ynb.nea.gov.cn/dtyw/gzdt/",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a > span + span)",
+        "linkSelector": "a",
+        "titleSelector": "a > span:first-child",
+        "publishedAtSelector": "a > span:last-child",
+        "allowUrlPrefixes": [
+          "https://ynb.nea.gov.cn/dtyw/gzdt/"
+        ],
+        "ingestNoiseFilter": {
+          "requireMatches": [
+            "安全",
+            "施工",
+            "工程",
+            "质量",
+            "事故",
+            "隐患",
+            "风险",
+            "应急",
+            "保电",
+            "防汛",
+            "迎峰",
+            "电网",
+            "输电",
+            "变电",
+            "配电",
+            "供电",
+            "安徽",
+            "宁夏",
+            "专项",
+            "通报",
+            "执法"
+          ]
+        },
+        "detail": {
+          "titleSelector": "div.wrapper_deatil_title",
+          "titleAuthoritative": true,
+          "maxFetches": 15
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "nea",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "安全监管",
+        "云南"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-nea-xbj-jgdt",
+      "name": "西北能源监管局·监管动态",
+      "kind": "web_list",
+      "config": {
+        "url": "https://xbj.nea.gov.cn/dtyw/jgdt/",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a > span + span)",
+        "linkSelector": "a",
+        "titleSelector": "a > span:first-child",
+        "publishedAtSelector": "a > span:last-child",
+        "allowUrlPrefixes": [
+          "https://xbj.nea.gov.cn/dtyw/jgdt/"
+        ],
+        "ingestNoiseFilter": {
+          "requireMatches": [
+            "安全",
+            "施工",
+            "工程",
+            "质量",
+            "事故",
+            "隐患",
+            "风险",
+            "应急",
+            "保电",
+            "防汛",
+            "迎峰",
+            "电网",
+            "输电",
+            "变电",
+            "配电",
+            "供电",
+            "安徽",
+            "宁夏",
+            "专项",
+            "通报",
+            "执法"
+          ]
+        },
+        "detail": {
+          "titleSelector": "div.wrapper_deatil_title",
+          "titleAuthoritative": true,
+          "maxFetches": 15
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "nea",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "安全监管",
+        "宁夏"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-nea-xbj-tzgg",
+      "name": "西北能源监管局·通知公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://xbj.nea.gov.cn/dtyw/tzgg/",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a > span + span)",
+        "linkSelector": "a",
+        "titleSelector": "a > span:first-child",
+        "publishedAtSelector": "a > span:last-child",
+        "allowUrlPrefixes": [
+          "https://xbj.nea.gov.cn/dtyw/tzgg/"
+        ],
+        "ingestNoiseFilter": {
+          "requireMatches": [
+            "安全",
+            "施工",
+            "工程",
+            "质量",
+            "事故",
+            "隐患",
+            "风险",
+            "应急",
+            "保电",
+            "防汛",
+            "迎峰",
+            "电网",
+            "输电",
+            "变电",
+            "配电",
+            "供电",
+            "安徽",
+            "宁夏",
+            "专项",
+            "通报",
+            "执法"
+          ]
+        },
+        "detail": {
+          "titleSelector": "div.wrapper_deatil_title",
+          "titleAuthoritative": true,
+          "maxFetches": 15
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "nea",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "安全监管",
+        "申报",
+        "宁夏"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-nea-hdj-jgdt",
+      "name": "华东能源监管局·监管动态",
+      "kind": "web_list",
+      "config": {
+        "url": "https://hdj.nea.gov.cn/dtyw/jgdt/",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a > span + span)",
+        "linkSelector": "a",
+        "titleSelector": "a > span:first-child",
+        "publishedAtSelector": "a > span:last-child",
+        "allowUrlPrefixes": [
+          "https://hdj.nea.gov.cn/dtyw/jgdt/"
+        ],
+        "ingestNoiseFilter": {
+          "requireMatches": [
+            "安全",
+            "施工",
+            "工程",
+            "质量",
+            "事故",
+            "隐患",
+            "风险",
+            "应急",
+            "保电",
+            "防汛",
+            "迎峰",
+            "电网",
+            "输电",
+            "变电",
+            "配电",
+            "供电",
+            "安徽",
+            "宁夏",
+            "专项",
+            "通报",
+            "执法"
+          ]
+        },
+        "detail": {
+          "titleSelector": "div.wrapper_deatil_title",
+          "titleAuthoritative": true,
+          "maxFetches": 15
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "nea",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "安全监管",
+        "安徽"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-nea-hdj-tzgg",
+      "name": "华东能源监管局·通知公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://hdj.nea.gov.cn/dtyw/tzgg/",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a > span + span)",
+        "linkSelector": "a",
+        "titleSelector": "a > span:first-child",
+        "publishedAtSelector": "a > span:last-child",
+        "allowUrlPrefixes": [
+          "https://hdj.nea.gov.cn/dtyw/tzgg/"
+        ],
+        "ingestNoiseFilter": {
+          "requireMatches": [
+            "安全",
+            "施工",
+            "工程",
+            "质量",
+            "事故",
+            "隐患",
+            "风险",
+            "应急",
+            "保电",
+            "防汛",
+            "迎峰",
+            "电网",
+            "输电",
+            "变电",
+            "配电",
+            "供电",
+            "安徽",
+            "宁夏",
+            "专项",
+            "通报",
+            "执法"
+          ]
+        },
+        "detail": {
+          "titleSelector": "div.wrapper_deatil_title",
+          "titleAuthoritative": true,
+          "maxFetches": 15
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "nea",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "安全监管",
+        "申报",
+        "安徽"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-mem-tzgg",
+      "name": "应急管理部·通知公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.mem.gov.cn/gk/tzgg/",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a > span)",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "a > span",
+        "allowUrlPrefixes": [
+          "https://www.mem.gov.cn/gk/zfxxgkpt/fdzdgknr/",
+          "https://www.mem.gov.cn/gk/zcjd/"
+        ],
+        "detail": {
+          "titleRegex": "<title>\\s*([^<]+?)\\s*(?:--中华人民共和国应急管理部)?\\s*</title>",
+          "titleAuthoritative": true,
+          "maxFetches": 20
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "官方",
+        "安全监管"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-mem-zcjd",
+      "name": "应急管理部·政策解读",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.mem.gov.cn/gk/zcjd/",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a > span)",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "a > span",
+        "allowUrlPrefixes": [
+          "https://www.mem.gov.cn/gk/zfxxgkpt/fdzdgknr/",
+          "https://www.mem.gov.cn/gk/zcjd/"
+        ],
+        "detail": {
+          "titleRegex": "<title>\\s*([^<]+?)\\s*(?:--中华人民共和国应急管理部)?\\s*</title>",
+          "titleAuthoritative": true,
+          "maxFetches": 20
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "官方",
+        "安全监管"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-cepca-53",
+      "name": "中国电力建设企业协会·通知公告",
+      "kind": "web_list",
+      "config": {
+        "url": "http://www.cepca.org.cn/news/53.html",
+        "parseMode": "html",
+        "itemSelector": "li:has(a.title)",
+        "linkSelector": "a.title",
+        "titleSelector": "a.title",
+        "publishedAtSelector": "span.subDate",
+        "allowUrlPrefixes": [
+          "http://www.cepca.org.cn/news/show-"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1_5",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "申报",
+        "安全质量"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-cepca-52",
+      "name": "中国电力建设企业协会·行业动态",
+      "kind": "web_list",
+      "config": {
+        "url": "http://www.cepca.org.cn/news/52.html",
+        "parseMode": "html",
+        "itemSelector": "li:has(a.title)",
+        "linkSelector": "a.title",
+        "titleSelector": "a.title",
+        "publishedAtSelector": "span.subDate",
+        "allowUrlPrefixes": [
+          "http://www.cepca.org.cn/news/show-"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1_5",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "行业协会"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-cec-tzgg",
+      "name": "中电联·通知公告",
+      "kind": "json_list",
+      "config": {
+        "url": "https://cec.org.cn/ms-mcms/mcms/content/list?id=168&pageNumber=1&pageSize=20",
+        "mode": "json_api",
+        "itemsPath": "data.list",
+        "titlePaths": [
+          "basicTitle"
+        ],
+        "summaryPaths": [
+          "basicDescription"
+        ],
+        "urlTemplate": "{raw:linkUrl}",
+        "urlTemplateFallback": "https://www.cec.org.cn/detail/index.html?{raw:newType}-{raw:articleID}",
+        "publishedAtPath": "publicTime",
+        "publishedAtUnit": "epoch_ms",
+        "externalIdPath": "articleID",
+        "allowUrlPrefixes": [
+          "https://www.cec.org.cn/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1_5",
+      "owner_entity_id": "cec",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "申报",
+        "行业协会"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-cec-xbbz",
+      "name": "中电联·新颁标准",
+      "kind": "json_list",
+      "config": {
+        "url": "https://cec.org.cn/ms-mcms/mcms/content/list?id=287&pageNumber=1&pageSize=20",
+        "mode": "json_api",
+        "itemsPath": "data.list",
+        "titlePaths": [
+          "basicTitle"
+        ],
+        "summaryPaths": [
+          "basicDescription"
+        ],
+        "urlTemplate": "{raw:linkUrl}",
+        "urlTemplateFallback": "https://www.cec.org.cn/detail/index.html?{raw:newType}-{raw:articleID}",
+        "publishedAtPath": "publicTime",
+        "publishedAtUnit": "epoch_ms",
+        "externalIdPath": "articleID",
+        "allowUrlPrefixes": [
+          "https://www.cec.org.cn/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1_5",
+      "owner_entity_id": "cec",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "标准",
+        "行业协会"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ah-fgw-tzgg",
+      "name": "安徽省发展改革委（省能源局）·通知公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://fzggw.ah.gov.cn/ywdt/tzgg/index.html",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a.left)",
+        "linkSelector": "a.left",
+        "titleSelector": "a.left",
+        "publishedAtSelector": "span.date",
+        "allowUrlPrefixes": [
+          "https://fzggw.ah.gov.cn/ywdt/tzgg/"
+        ],
+        "ingestNoiseFilter": {
+          "dropMarkersTitleOnly": [
+            "成品油价格"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "申报",
+        "安徽"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ah-jxt-wjgg",
+      "name": "安徽省经信厅·文件公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://jx.ah.gov.cn/sy/wjgg/index.html",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a.left)",
+        "linkSelector": "a.left",
+        "titleSelector": "a.left",
+        "publishedAtSelector": "span.date",
+        "allowUrlPrefixes": [
+          "https://jx.ah.gov.cn/sy/wjgg/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "申报",
+        "安徽"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-ah-kjt-tzgg",
+      "name": "安徽省科技厅·通知公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://kjt.ah.gov.cn/kjzx/tzgg/index.html",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a.left)",
+        "linkSelector": "a.left",
+        "titleSelector": "a.left",
+        "publishedAtSelector": "span.date",
+        "allowUrlPrefixes": [
+          "https://kjt.ah.gov.cn/kjzx/tzgg/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "申报",
+        "安徽"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-nx-fgw-tzgg",
+      "name": "宁夏发展改革委·通知公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://fzggw.nx.gov.cn/tzgg/",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a)",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span.time",
+        "allowUrlPrefixes": [
+          "https://fzggw.nx.gov.cn/tzgg/"
+        ],
+        "ingestNoiseFilter": {
+          "dropMarkersTitleOnly": [
+            "成品油价格调整"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "申报",
+        "宁夏"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-nx-gxt-gsgg",
+      "name": "宁夏工信厅·公示公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://gxt.nx.gov.cn/zwgk/fdzdgknr/glfw/gsgg/",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a)",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "https://gxt.nx.gov.cn/zwgk/fdzdgknr/glfw/gsgg/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "申报",
+        "宁夏"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-nx-kjt-tzgg",
+      "name": "宁夏科技厅·通知公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://kjt.nx.gov.cn/kjdt/tzgg/",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a)",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span.times03",
+        "allowUrlPrefixes": [
+          "https://kjt.nx.gov.cn/kjdt/tzgg/"
+        ],
+        "detail": {
+          "titleSelector": "h1.h1",
+          "titleAuthoritative": true,
+          "maxFetches": 20
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "申报",
+        "宁夏"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-yn-nyj-tzgg",
+      "name": "云南省能源局·通知公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://nyj.yn.gov.cn/zfxxgk/fdzdgknr/tzgg/",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a)",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span.date",
+        "allowUrlPrefixes": [
+          "https://nyj.yn.gov.cn/zfxxgk/fdzdgknr/tzgg/"
+        ],
+        "ingestNoiseFilter": {
+          "dropMarkersTitleOnly": [
+            "云南省能源局公告"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 720,
+      "tags": [
+        "申报",
+        "云南"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-yn-gxt-tzgg",
+      "name": "云南省工信厅·通知公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://gxt.yn.gov.cn/zfxxgk/fdzdgknr/tzgg/",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a)",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span.date",
+        "allowUrlPrefixes": [
+          "https://gxt.yn.gov.cn/zfxxgk/fdzdgknr/tzgg/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "申报",
+        "云南"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-yn-kjt-tzgg",
+      "name": "云南省科技厅·通知公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://kjt.yn.gov.cn/xwdt/tzgg/",
+        "parseMode": "html",
+        "itemSelector": "li:has(> a)",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "https://kjt.yn.gov.cn/xwdt/tzgg/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "申报",
+        "云南"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
       "id": "mp-nea",
       "name": "国家能源局（公众号）",
       "kind": "mp_account",
