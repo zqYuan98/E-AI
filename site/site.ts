@@ -35,7 +35,7 @@ export const SITE = {
   /** 反馈表单邮箱框里的提示。 */
   feedbackEmailHint: "留下邮箱，我们可以回信联系你",
   /** 一句话介绍：搜索引擎、分享卡片、RSS、llms.txt 会用。 */
-  description: `盯着电网企业、能源主管部门和行业媒体，挑出电力行业里值得看的 AI 动态：大模型、场景落地、招采示范、政策标准，${EDITION_WHEN.daily} 出一份日报。`,
+  description: `盯着电网企业、能源主管部门和行业媒体，挑出电力行业里值得看的 AI 动态：大模型、场景落地、招采申报、政策标准，${EDITION_WHEN.daily} 出一份日报。`,
   /** llms.txt 里一句话介绍下面的一段详细介绍（选填）。 */
   llmsIntro: null as string | null,
   /** 一行小字：分享图、海报下方。 */
