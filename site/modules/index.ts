@@ -3,7 +3,8 @@
 // pages' parts. Each list keeps the order its entries appear in on the site.
 import type { ModuleDeclaration } from "@aihot/contracts/modules";
 import { access } from "@aihot/access/module";
+import { channels } from "@aihot/channels/module";
 import { policy } from "@aihot/policy/module";
 import { research } from "@aihot/research/module";
 
-export const MODULES: readonly ModuleDeclaration[] = [access, policy, research];
+export const MODULES: readonly ModuleDeclaration[] = [access, channels, policy, research];

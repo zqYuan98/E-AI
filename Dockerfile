@@ -22,6 +22,7 @@ COPY packages/contracts/package.json packages/contracts/
 COPY industry/package.json industry/
 COPY site/package.json site/
 COPY modules/access/package.json modules/access/
+COPY modules/channels/package.json modules/channels/
 COPY modules/policy/package.json modules/policy/
 COPY modules/research/package.json modules/research/
 COPY modules/wechat/package.json modules/wechat/

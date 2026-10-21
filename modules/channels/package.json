@@ -1,0 +1,10 @@
+{
+  "name": "@aihot/channels",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./module": "./module.ts",
+    "./channels": "./channels.ts",
+    "./web": "./web.tsx"
+  }
+}
