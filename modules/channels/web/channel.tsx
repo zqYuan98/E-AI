@@ -1,39 +1,14 @@
 // 频道页（招标商机、政策动态、行业热点）共用的页面：“全部动态”里这几类的条目，按分类或标签筛选、搜索、翻页。
 // 数据就是引擎的 /api/site/pool，和“全部动态”同一个读取层；频道只决定收哪几类、给哪些筛选。
-// 每个频道一个路由文件（tenders.tsx 等），只声明它在手机底栏属于哪个标签。
+// 每个频道一个路由文件（tenders.tsx 等），声明它在手机底栏属于哪个标签，loader 在 channel.server.ts。
 import { Link, useLoaderData, useNavigation } from "react-router";
 import type { PoolResponse } from "@aihot/contracts/site";
-import { apiGet, cachedPage } from "@aihot/web/lib/api.server";
 import { pageMeta } from "@aihot/web/lib/seo";
 import { IntentLink } from "@aihot/web/components/ui/IntentLink";
 import { EmptyState } from "@aihot/web/components/ui/Page";
 import { PhoneBar } from "@aihot/web/components/shell/PhoneBar";
 import { DayList, Pagination } from "@aihot/web/features/feed/DayList";
-import { CHANNELS, categoryLabel, channelAt, type Channel, type ChannelKey } from "../channels.ts";
-
-export { pageHeaders as headers } from "@aihot/web/lib/api.server";
-
-/** What the address asks for, kept to what the channel offers. */
-function readQuery(channel: Channel, params: URLSearchParams) {
-  const category = (channel.categories as readonly string[]).includes(params.get("category") ?? "") ? params.get("category")! : channel.categories[0]!;
-  const tag = channel.tagRows.some((r) => (r.tags as readonly string[]).includes(params.get("tag") ?? "")) ? params.get("tag") : null;
-  const q = params.get("q")?.trim().slice(0, 200) || null;
-  const page = Math.min(Math.max(Number(params.get("page")) || 1, 1), 50);
-  return { category, tag, q, page };
-}
-
-export async function loader({ request }: { request: Request }) {
-  const url = new URL(request.url);
-  const key = channelAt(url.pathname);
-  if (!key) throw new Response("Not found", { status: 404 });
-  const query = readQuery(CHANNELS[key], url.searchParams);
-  const api = new URLSearchParams({ category: query.category });
-  if (query.tag) api.set("tag", query.tag);
-  if (query.q) api.set("q", query.q);
-  if (query.page > 1) api.set("page", String(query.page));
-  const data = await apiGet<PoolResponse>(`/api/site/pool?${api}`, { request, signal: request.signal });
-  return cachedPage(60, { key, query, data });
-}
+import { CHANNELS, categoryLabel, channelAt, type Channel, type ChannelKey, type ChannelQuery } from "../channels.ts";
 
 export function meta({ location }: { location: { pathname: string } }) {
   const key = channelAt(location.pathname);
@@ -41,7 +16,7 @@ export function meta({ location }: { location: { pathname: string } }) {
   return pageMeta({ title: channel?.title ?? "频道", description: channel?.lead, path: channel?.path ?? location.pathname });
 }
 
-function href(path: string, query: { category: string; tag: string | null; q: string | null; page: number }, defaultCategory: string) {
+function href(path: string, query: ChannelQuery, defaultCategory: string) {
   const sp = new URLSearchParams();
   if (query.category !== defaultCategory) sp.set("category", query.category);
   if (query.tag) sp.set("tag", query.tag);
@@ -60,7 +35,7 @@ function Chip({ to, active, children }: { to: string; active: boolean; children:
 }
 
 export default function ChannelPage() {
-  const { key, query, data } = useLoaderData<typeof loader>() as { key: ChannelKey; query: ReturnType<typeof readQuery>; data: PoolResponse };
+  const { key, query, data } = useLoaderData() as { key: ChannelKey; query: ChannelQuery; data: PoolResponse };
   const channel: Channel = CHANNELS[key];
   const navigation = useNavigation();
   const busy = navigation.state === "loading" && navigation.location?.pathname === channel.path;

@@ -61,4 +61,15 @@ export function channelAt(pathname: string): ChannelKey | null {
   return key in CHANNELS ? (key as ChannelKey) : null;
 }
 
+/** 地址里的筛选，限定在这个频道提供的范围内。 */
+export interface ChannelQuery { category: string; tag: string | null; q: string | null; page: number }
+
+export function readQuery(channel: Channel, params: URLSearchParams): ChannelQuery {
+  const category = (channel.categories as readonly string[]).includes(params.get("category") ?? "") ? params.get("category")! : channel.categories[0]!;
+  const tag = channel.tagRows.some((r) => (r.tags as readonly string[]).includes(params.get("tag") ?? "")) ? params.get("tag") : null;
+  const q = params.get("q")?.trim().slice(0, 200) || null;
+  const page = Math.min(Math.max(Number(params.get("page")) || 1, 1), 50);
+  return { category, tag, q, page };
+}
+
 export const categoryLabel = (key: string) => CATEGORIES.find((c) => c.key === key)?.label ?? key;

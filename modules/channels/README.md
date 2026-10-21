@@ -15,4 +15,4 @@
 - 只有网页部分，没有后端：三页都读引擎的 `/api/site/pool`（`category`、`tag`、`q`、`page`），和“全部动态”同一个公开读取层。
 - 每个频道收哪几类、给哪些标签筛选，写在 `channels.ts`；分类和标签都是 `industry/taxonomy.ts` 里的词，改词表时一起改（类型检查会报出不在词表里的词）。
 - 一次只按一个标签筛选（接口只支持一个 `tag`）；地区、单位这类没有标签的，用搜索。
-- 三个路由文件（`web/tenders.tsx` 等）只声明它在手机底栏的位置，页面在 `web/channel.tsx`。
+- 三个路由文件（`web/tenders.tsx` 等）只声明它在手机底栏的位置，页面在 `web/channel.tsx`，loader 在 `web/channel.server.ts`（只在服务器上运行，不能进客户端包）。
