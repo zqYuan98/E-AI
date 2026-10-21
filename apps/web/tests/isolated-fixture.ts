@@ -9,7 +9,7 @@ export function isolatedFixture(source: string, mode: "internal" | "public") {
   const root = mkdtempSync(path.join(tmpdir(), `powerai-m1-${mode}-`));
   const excluded = new Set([".git", ".data", ".claude", "node_modules", "build", ".react-router", ".vite"]);
   const filter = (file: string) => !excluded.has(path.basename(file)) && !path.basename(file).startsWith(".env");
-  for (const entry of ["apps", "packages", "modules", "industry", "site", "tests", "scripts", "package.json", "package-lock.json", "tsconfig.base.json"]) {
+  for (const entry of ["apps", "packages", "modules", "industry", "site", "tests", "scripts", "assets", "package.json", "package-lock.json", "tsconfig.base.json"]) {
     cpSync(path.join(source, entry), path.join(root, entry), { recursive: true, filter });
   }
   const dependencies = path.join(root, "node_modules");

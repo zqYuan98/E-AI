@@ -15,6 +15,10 @@ import { reportDateLabel, type FeedItemSummary, type ReportCitation, type Report
 import { SITE, withSubject } from "@aihot/site";
 import { articleLd, readFilters, reportLd } from "../apps/web/app/lib/seo.ts";
 import { startWebServer, type WebServer } from "../apps/web/tests/web-server.ts";
+import { ACCESS } from "../apps/web/app/lib/access.ts";
+
+// Pages need a session on an internal site: these run in the public copy of apps/web/tests/check-isolated.ts.
+const publicOnly = { skip: ACCESS ? "internal site" : false };
 
 const at = "2026-10-04T08:00:00.000Z";
 const item: FeedItemSummary = { id: "metadata-fixture", title: "可核实的测试报道", summary: "报道摘要", reason: null, source: { name: "Fixture" }, publishedAt: at, timelineAt: at, category: "models", tags: [], score: 80, selected: true, channel: "news", x: null };
@@ -56,8 +60,8 @@ function structured($: cheerio.CheerioAPI): Array<Record<string, unknown>> {
   return $("script[type='application/ld+json']").toArray().flatMap((node) => JSON.parse($(node).text()));
 }
 
-test("filtered feeds keep their exact content address but leave indexing to the public landing pages", async () => {
-  for (const base of ["/", "/all"]) for (const query of ["channel=news", "category=ai-models", "tag=Agent", "channel=x&category=paper&tag=Agent"]) {
+test("filtered feeds keep their exact content address but leave indexing to the public landing pages", publicOnly, async () => {
+  for (const base of ["/", "/all"]) for (const query of ["channel=news", "category=models", "tag=Agent", "channel=x&category=research&tag=Agent"]) {
     const $ = await page(`${base}?${query}&utm_source=fixture&anchorAt=old&deep=1`);
     assert.equal($("meta[name=robots]").attr("content"), "noindex, follow", `${base}?${query}`);
     assert.equal($("link[rel=canonical]").attr("href"), `${web.origin}${base}?${query}`);
@@ -68,7 +72,7 @@ test("filtered feeds keep their exact content address but leave indexing to the 
   assert.equal($("link[rel=canonical]").attr("href"), `${web.origin}/all?q=Claude&tab=relevance&page=2`);
 });
 
-test("ordinary feed pages remain indexable and normalize ignored parameters", async () => {
+test("ordinary feed pages remain indexable and normalize ignored parameters", publicOnly, async () => {
   for (const [requested, canonical] of [["/?channel=invalid&category=invalid&tag=%20&utm_source=fixture", "/"], ["/all?channel=all&tab=relevance&anchorAt=old&page=2&utm_source=fixture", "/all?page=2"]]) {
     const $ = await page(requested!);
     assert.equal($("meta[name=robots]").attr("content"), undefined);
@@ -79,7 +83,7 @@ test("ordinary feed pages remain indexable and normalize ignored parameters", as
 
 // Chinese readers search issues by the date as they write it ("10月4日 AI 新闻"), not by the key.
 for (const [kind, label, date] of [["daily", "日报", "10月4日"], ["weekly", "周报", "9月28日—10月4日"], ["monthly", "月报", "2026年10月"]] as const) {
-  test(`${kind} issue metadata describes its visible lead while the permanent entry keeps its title`, async () => {
+  test(`${kind} issue metadata describes its visible lead while the permanent entry keeps its title`, publicOnly, async () => {
     const r = report(kind);
     const $ = await page(`/${kind}/${r.key}`);
     const title = `${withSubject(label)}｜${date}：${r.lead!.title}`;
@@ -108,13 +112,13 @@ test("a report without an edited lead uses only a still-public visible highlight
   assert.doesNotMatch(reportLd(r, "/weekly/2026-W40", "导读").headline, /已撤下/);
 });
 
-test("the homepage ties the founder to every public profile the site lists", async () => {
+test("the homepage ties the founder to every public profile the site lists", publicOnly, async () => {
   const founder = SITE.organization.founder;
   const organization = structured(await page("/")).find((entry) => entry["@type"] === "Organization")!;
   if (!founder) return assert.equal("founder" in organization, false);
   assert.deepEqual((organization.founder as Record<string, unknown>).sameAs, founder.sameAs);
 });
-test("article metadata has a representative image and does not invent an update timestamp", async () => {
+test("article metadata has a representative image and does not invent an update timestamp", publicOnly, async () => {
   const $ = await page(`/items/${item.id}`);
   const article = structured($).find((entry) => entry["@type"] === "NewsArticle")!;
   assert.equal(article.image, `${web.origin}/og/items/${item.id}.png`);
@@ -126,7 +130,7 @@ test("article metadata has a representative image and does not invent an update 
   assert.equal(articleLd({ path: "/items/test", headline: "更正", modifiedAt: modified }).dateModified, modified);
 });
 
-test("story metadata describes the visible collection, current summary and report list", async () => {
+test("story metadata describes the visible collection, current summary and report list", publicOnly, async () => {
   const $ = await page(`/story/${story.publicId}`);
   const collection = structured($).find((entry) => entry["@type"] === "CollectionPage")!;
   assert.ok(collection);

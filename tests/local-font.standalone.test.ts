@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runInNewContext } from "node:vm";
 import { APPEARANCE_BOOT_SCRIPT, exportBundle, getFontPreference, importBundle, KEYS, setFontPreference } from "../apps/web/app/lib/local-state.ts";
+import { ACCESS } from "../apps/web/app/lib/access.ts";
 
 class MemoryStorage {
   values = new Map<string, string>();
@@ -28,7 +29,8 @@ test("appearance startup applies a saved browser font before rendering and safel
   }
 });
 
-test("font choices survive version-1 backups and denied writes without touching existing reader data", () => {
+// An internal site keeps nothing but the theme in the browser (site/pages/privacy.md), so it has no backups to import.
+test("font choices survive version-1 backups and denied writes without touching existing reader data", { skip: ACCESS ? "internal site" : false }, () => {
   setFontPreference("browser");
   assert.equal(getFontPreference(), "browser");
   const backup = exportBundle();

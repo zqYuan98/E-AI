@@ -6,6 +6,10 @@ import Fastify from 'fastify';
 import { closeDb } from '@aihot/backend/db';
 import { registerOg } from '../apps/api/src/routes/og.ts';
 import { startWebServer, type WebServer } from '../apps/web/tests/web-server.ts';
+import { ACCESS } from '../apps/web/app/lib/access.ts';
+
+// Pages need a session on an internal site: the page tests run in the public copy of apps/web/tests/check-isolated.ts.
+const publicOnly = { skip: ACCESS ? 'internal site' : false };
 
 const app = Fastify();
 registerOg(app);
@@ -33,7 +37,7 @@ test('ordinary share cards keep their PNG and conditional cache responses', asyn
   assert.equal(cached.statusCode, 304);
 });
 
-test('decoded controls in topic paths return 404 without injecting response headers', async () => {
+test('decoded controls in topic paths return 404 without injecting response headers', publicOnly, async () => {
   for (const slug of ['abc%0D%0AX-Evil:1', 'abc%0A', 'abc%0D', 'abc%0A%09X-Evil:1', '%0AX-Evil:1']) {
     for (const suffix of ['', '/page/1', '/page/2']) {
       const response = await fetch(`${web.origin}/topics/${slug}${suffix}`, { redirect: 'manual' });
@@ -44,8 +48,8 @@ test('decoded controls in topic paths return 404 without injecting response head
   }
 });
 
-test('ordinary first topic page keeps its permanent redirect', async () => {
-  const response = await fetch(`${web.origin}/topics/openai/page/1`, { redirect: 'manual' });
+test('ordinary first topic page keeps its permanent redirect', publicOnly, async () => {
+  const response = await fetch(`${web.origin}/topics/sgcc/page/1`, { redirect: 'manual' });
   assert.equal(response.status, 308);
-  assert.equal(response.headers.get('location'), '/topics/openai');
+  assert.equal(response.headers.get('location'), '/topics/sgcc');
 });

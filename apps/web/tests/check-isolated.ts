@@ -31,7 +31,7 @@ for (const kind of mode === "both" ? ["internal", "public"] as const : [mode as 
   // All pre-existing public tests run unchanged in a site that really has no access module.
   // The access suites exercise the installed module, not an auth-bypass test flag.
   const suites = readdirSync(path.join(root, "apps/web/tests")).filter(name => name.endsWith(".test.ts") && name.startsWith("access-") === (kind === "internal"));
-  if (built) run(root, ["--test", "--test-concurrency=1", ...suites.map(name => `tests/${name}`), ...(kind === "public" ? ["../../tests/web-error-logging.standalone.test.ts", "../../tests/web-render-recovery.standalone.test.ts"] : [])]);
+  if (built) run(root, ["--test", "--test-concurrency=1", ...suites.map(name => `tests/${name}`), ...(kind === "public" ? ["../../tests/web-error-logging.standalone.test.ts", "../../tests/web-render-recovery.standalone.test.ts", "../../tests/page-metadata.standalone.test.ts", "../../tests/malformed-public-paths.standalone.test.ts", "../../tests/local-font.standalone.test.ts"] : [])]);
   else console.error(JSON.stringify({ notRun: suites, reason: "build failed", root }));
 }
 

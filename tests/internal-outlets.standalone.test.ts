@@ -8,13 +8,11 @@ import { indexSubmissionDenied, installModules, remoteBackupDenied, serverModule
 
 const now = new Date("2026-10-16T06:00:00Z");
 const state = {
-  queries: [] as string[], links: [] as string[], topics: 0, queues: [] as string[],
+  queries: [] as string[], links: [] as string[], discovery: 0, queues: [] as string[],
   config: { indexNowSubmitEnabled: true, indexNowKey: "0123456789abcdef0123456789abcdef", siteUrl: "https://internal-fixture.invalid" },
   sql: Object.assign(async (parts: TemplateStringsArray) => {
     const query = parts.join("?");
     state.queries.push(query);
-    if (query.includes("SELECT kind, key")) return [{ kind: "daily", key: "2026-10-16" }];
-    if (query.includes("SELECT article_id AS id")) return [{ id: "fixture-item", updated_at: now }];
     return [];
   }, { json: (value: unknown) => value }),
 };
@@ -32,6 +30,7 @@ const stubs: Record<string, string> = {
   "@aihot/backend/editorial/translate": "export const translatePending = async () => {};",
   "@aihot/backend/sources/collect": "export const adaptIntervals = async () => {}; export const scheduleDueSources = async () => {};",
   "@aihot/backend/sources/mp": "export const scheduleMpReconcile = async () => {};",
+  "@aihot/backend/sources/x-renames": "export const followXRenames = async () => {};",
   "@aihot/backend/providers/dajiala": "export const dajialaConfigured = () => false;",
   "@aihot/backend/sources/icons": "export const refreshSourceIcons = async () => {};",
   "@aihot/backend/events/hot": "export const computeHotRanking = async () => {}; export const snapshotHeat = async () => {};",
@@ -52,8 +51,11 @@ const hook = registerHooks({
       if (specifier === "../config.ts") source = `${shared} export const config = s.config;`;
       if (specifier === "../db.ts") source = `${shared} export const sql = s.sql;`;
       if (specifier === "../publication/links.ts") source = `${shared} export const siteUrl = (path) => { s.links.push(path); return s.config.siteUrl + path; };`;
-      if (specifier === "../publication/scope.ts") source = "export const evidenceCondition = () => ''; export const listedCondition = () => '';";
-      if (specifier === "../publication/topics.ts") source = `${shared} export const topicPageCounts = async () => { s.topics++; return [{ indexable: true, slug: 'fixture-topic', changedAt: new Date('2026-10-16T05:00:00Z') }]; };`;
+      if (specifier === "../publication/sitemap.ts") source = `${shared} export const loadDiscoveryEntries = async () => { s.discovery++; return [
+        { loc: '/items/fixture-item', revision: 1, lastmod: new Date('2026-10-16T05:00:00Z') },
+        { loc: '/daily/2026-10-16', lastmod: new Date('2026-10-16T00:00:00Z') },
+        { loc: '/topics/fixture-topic', lastmod: new Date('2026-10-16T05:00:00Z') },
+      ]; };`;
     }
     if (context.parentURL === accessUrl) {
       if (specifier === "@aihot/backend/db") source = `${shared} export const sql = s.sql;`;
@@ -80,7 +82,7 @@ const { submitIndexNow } = await import("../packages/backend/src/operations/inde
 const { registerSchedules } = await import("../apps/worker/src/schedules.ts");
 after(() => { installModules(original); network.mock.restore(); hook.deregister(); delete (globalThis as unknown as Record<symbol, unknown>)[key]; });
 
-function reset() { state.queries.length = 0; state.links.length = 0; state.topics = 0; state.queues.length = 0; fetched.length = 0; }
+function reset() { state.queries.length = 0; state.links.length = 0; state.discovery = 0; state.queues.length = 0; fetched.length = 0; }
 
 test("index submission defaults to allowed, one veto wins and backup policy is independent", () => {
   installModules([]);
@@ -103,7 +105,7 @@ test("internal submission denies before reads, URL construction and fetch, despi
   assert.deepEqual(await submitIndexNow(now), { status: "denied", httpStatus: null, urls: 0, more: false, sample: [] });
   assert.equal(state.queries.length, 0);
   assert.equal(state.links.length, 0);
-  assert.equal(state.topics, 0);
+  assert.equal(state.discovery, 0);
   assert.equal(fetched.length, 0);
 });
 

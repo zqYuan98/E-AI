@@ -13,7 +13,7 @@ import { agentHandoffs, closeAgentWake, wakeAgent } from "../notify/agent.ts";
 import { duration, formatAlert, formatRecovery, sendAlert, type Finding, type Level } from "../notify/feishu.ts";
 import { stepsOnService } from "../editorial/models.ts";
 import { backupConfigured } from "./backup.ts";
-import { collectionOn, modelCallsOn } from "./switches.ts";
+import { collectionOn, runSwitches } from "./switches.ts";
 import { GROUPING_WARN_AFTER_MS, waitingSelectedNews } from "./grouping.ts";
 import { upstreamFindings } from "../media/upstream.ts";
 import { remoteBackupDenied, serverModules } from "../modules.ts";
@@ -25,7 +25,7 @@ const REPEAT_MS: Record<Exclude<Level, "later">, number> = { now: 3600_000, toda
 // Valves default off: read at call time, only an explicit "true" turns them on.
 // Paused on the admin settings page counts as off: no "nothing new" alerts while collection is paused.
 const collecting = () => collectionOn();
-const modelsOn = () => modelCallsOn();
+const modelsOn = async () => process.env.MODEL_CALLS_ENABLED === "true" && (await runSwitches()).models;
 /**
  * How long the site may go without a new article before it counts as stalled (ALERT_QUIET_MINUTES, else
  * the site's own setting; small source lists are quieter). At most a day: the check looks one day back.
