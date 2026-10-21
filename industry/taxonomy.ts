@@ -8,18 +8,20 @@
  * 和相邻类别的边界在哪（总的归类原则写在 prompts/structure.md 里）。
  * commentary 标出评论类（教程、观点）：日报写过的事又有评论类的后续报道，只占一行快讯（报道它的信源够多时除外）。
  * 没归上类的资料在日报里放进第一个 key 为 industry 的类别所在的节（没有就放最后一节）。
+ * tagColor 是飞书推送卡片里跟在标题后面的这一类小标签的颜色（飞书 text_tag 的颜色名）。
+ * tagColor 是飞书推送卡片里跟在标题后面的这一类小标签的颜色（飞书 text_tag 的颜色名）。
  * feedLabel 是分类 RSS 标题里的名字（不写就用 label）。公开接口、RSS 和 MCP 里要把一类并进另一类发布，写在站点设置里（site/site.ts 的 PUBLIC_CATEGORIES）。
  */
 export const CATEGORIES = [
-  { key: "models", label: "大模型", feedLabel: "电力大模型", section: "大模型与平台", guide: "电力、能源行业大模型、智能体和 AI 平台本身的发布、版本升级、开放接入和能力变化，包括通用大模型厂商推出的电力专版、电网企业把通用大模型接入自家平台。只是在某个业务里用了大模型，归场景落地。" },
-  { key: "applications", label: "场景落地", feedLabel: "电力 AI 应用", section: "场景落地", guide: "AI 在发电、输电、变电、配电、用电、调度、营销、基建、安全管控等具体业务里投运或试运行，重点是做了什么、用在哪、有多大规模或效果。还只是招标采购的归招采申报，只是发布平台本身的归大模型。" },
-  { key: "procurement", label: "招采申报", feedLabel: "招采、前期与申报", section: "招采、前期与申报", guide: "与 AI 相关的招标公告、中标结果、采购意向，以及试点示范项目的申报、立项、评选和验收；另外收本站读者公司业务线（电力施工现场安全与质量）的商机：现场安全装备（布控球、视频监控终端、临近带电预警与防触电、边缘代理和边缘计算终端）、安全质量管控平台（作业风险管控、视频监督、智慧工地、数字化值班）相关的招标、中标、采购意向和招标计划，输变电工程的核准、可研批复、环评公示等前期信号，以及科技项目、首台套、示范工程、成果和案例征集等申报通知。项目已经投运并讲效果的归场景落地。" },
-  { key: "policy", label: "政策标准", feedLabel: "政策与标准", section: "政策标准", guide: "国家和地方主管部门关于人工智能与能源、电力的政策文件、行动方案和监管要求，电网和发电企业的 AI 规划与专项行动，以及国标、行标、团标、企标的发布和征求意见。领导讲话没有新文件、新要求的，不归这里。" },
-  { key: "compute", label: "算电协同", feedLabel: "算电协同", section: "算电协同", guide: "AI 算力与电力的关系：智算中心和数据中心的用电负荷、供电与绿电直供、算力与电力协同调度、相关电价、规划和项目。只是数据中心建设、和电力无关的，不归这里。" },
-  { key: "industry", label: "产业动态", feedLabel: "产业动态", section: "产业动态", guide: "已发生的企业经营活动：合作签约、融资并购、财报和业绩里的 AI 业务、组织与人事、产品商用和订单，以及会议上有具体发布的消息。没有具体发布的会议通稿、领导调研不算有效信息。" },
-  { key: "research", label: "研究进展", feedLabel: "研究进展", section: "研究进展", guide: "以新方法、实验和发现为核心的论文、技术报告、竞赛结果，以及开源模型、开源数据集和实验室成果。已经部署到生产业务并讲效果的归场景落地。" },
-  { key: "opinion", label: "观点解读", feedLabel: "观点解读", section: "观点解读", guide: "重点是作者的分析、判断、预测、经验复盘或访谈观点，包括政策解读和行业趋势文章。文章里报道了一项新的具体发生时，按那项发生归类。", commentary: true },
-] as const satisfies ReadonlyArray<{ key: string; label: string; feedLabel?: string; section: string; guide: string; commentary?: true }>;
+  { key: "models", tagColor: "indigo", label: "大模型", feedLabel: "电力大模型", section: "大模型与平台", guide: "电力、能源行业大模型、智能体和 AI 平台本身的发布、版本升级、开放接入和能力变化，包括通用大模型厂商推出的电力专版、电网企业把通用大模型接入自家平台。只是在某个业务里用了大模型，归场景落地。" },
+  { key: "applications", tagColor: "turquoise", label: "场景落地", feedLabel: "电力 AI 应用", section: "场景落地", guide: "AI 在发电、输电、变电、配电、用电、调度、营销、基建、安全管控等具体业务里投运或试运行，重点是做了什么、用在哪、有多大规模或效果。还只是招标采购的归招采申报，只是发布平台本身的归大模型。" },
+  { key: "procurement", tagColor: "orange", label: "招采申报", feedLabel: "招采、前期与申报", section: "招采、前期与申报", guide: "与 AI 相关的招标公告、中标结果、采购意向，以及试点示范项目的申报、立项、评选和验收；另外收本站读者公司业务线（电力施工现场安全与质量）的商机：现场安全装备（布控球、视频监控终端、临近带电预警与防触电、边缘代理和边缘计算终端）、安全质量管控平台（作业风险管控、视频监督、智慧工地、数字化值班）相关的招标、中标、采购意向和招标计划，输变电工程的核准、可研批复、环评公示等前期信号，以及科技项目、首台套、示范工程、成果和案例征集等申报通知。项目已经投运并讲效果的归场景落地。" },
+  { key: "policy", tagColor: "red", label: "政策标准", feedLabel: "政策与标准", section: "政策标准", guide: "国家和地方主管部门关于人工智能与能源、电力的政策文件、行动方案和监管要求，电网和发电企业的 AI 规划与专项行动，以及国标、行标、团标、企标的发布和征求意见。领导讲话没有新文件、新要求的，不归这里。" },
+  { key: "compute", tagColor: "wathet", label: "算电协同", feedLabel: "算电协同", section: "算电协同", guide: "AI 算力与电力的关系：智算中心和数据中心的用电负荷、供电与绿电直供、算力与电力协同调度、相关电价、规划和项目。只是数据中心建设、和电力无关的，不归这里。" },
+  { key: "industry", tagColor: "blue", label: "产业动态", feedLabel: "产业动态", section: "产业动态", guide: "已发生的企业经营活动：合作签约、融资并购、财报和业绩里的 AI 业务、组织与人事、产品商用和订单，以及会议上有具体发布的消息。没有具体发布的会议通稿、领导调研不算有效信息。" },
+  { key: "research", tagColor: "violet", label: "研究进展", feedLabel: "研究进展", section: "研究进展", guide: "以新方法、实验和发现为核心的论文、技术报告、竞赛结果，以及开源模型、开源数据集和实验室成果。已经部署到生产业务并讲效果的归场景落地。" },
+  { key: "opinion", tagColor: "purple", label: "观点解读", feedLabel: "观点解读", section: "观点解读", guide: "重点是作者的分析、判断、预测、经验复盘或访谈观点，包括政策解读和行业趋势文章。文章里报道了一项新的具体发生时，按那项发生归类。", commentary: true },
+] as const satisfies ReadonlyArray<{ key: string; tagColor: string; label: string; feedLabel?: string; section: string; guide: string; commentary?: true }>;
 
 /**
  * 这个行业最受关注的一类发布（AI 行业是新模型）：日报报头的“N 个新模型”、改分类后修订已出的报告都按它数。
@@ -85,10 +87,11 @@ export const TAG_SYNONYMS: Readonly<Record<string, string>> = {
 
 /**
  * 公司主题：id → 显示名、卡片上显示的标签（null 表示只用 entity:<id> 归类）、别名。
- * aliases 给结构抽取模型看；otherNames 是公司自己的其他称呼（官方账号名、子品牌），
- * 把事实的主体对到发布方时也认它们。
+ * aliases 给结构抽取模型看；orgNames 是这家公司发消息时开头用的组织名（公司、实验室、团队），
+ * 在它自己的主题页上读者知道说的是谁，可以省去；otherNames 是公司的其他称呼（官方账号名、子品牌）。
+ * 所有这些名字都用来认出说的是哪家公司，比如把事实的主体对到发布方。
  */
-export const ENTITIES: Record<string, { name: string; displayTag: string | null; aliases: string[]; otherNames?: string[] }> = {
+export const ENTITIES: Record<string, { name: string; displayTag: string | null; aliases: string[]; orgNames?: string[]; otherNames?: string[] }> = {
   sgcc: { name: "国家电网", displayTag: "国家电网", aliases: ["国家电网", "国网", "State Grid", "光明电力大模型"], otherNames: ["国家电网有限公司", "国家电网报", "国网能源研究院", "中国电力科学研究院", "国网信通产业集团", "国网智能电网研究院"] },
   csg: { name: "南方电网", displayTag: "南方电网", aliases: ["南方电网", "南网", "China Southern Power Grid", "大瓦特"], otherNames: ["中国南方电网有限责任公司", "南方电网报", "南网数研院", "南方电网数字电网集团", "南方电网科学研究院"] },
   nea: { name: "国家能源局", displayTag: "国家能源局", aliases: ["国家能源局", "能源局", "NEA"] },

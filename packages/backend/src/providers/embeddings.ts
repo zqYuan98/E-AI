@@ -6,8 +6,7 @@ import { config, credential } from "../config.ts";
 import { sql } from "../db.ts";
 import { sha256 } from "../lib/ids.ts";
 import { z } from "zod";
-import { ModelOutputError } from "./llm.ts";
-import { completeReceipt, paidRequest, ProviderRejectedError, rejectReceivedResponse } from "./receipts.ts";
+import { assertAccepted, completeReceipt, ModelOutputError, ModelUnavailableError, paidRequest, rejectReceivedResponse } from "./receipts.ts";
 import { ModelCallsPaused, modelCallsOn } from "../operations/switches.ts";
 import { open } from "../lib/secret-box.ts";
 
@@ -62,10 +61,10 @@ export async function embeddingsAvailable(): Promise<boolean> {
 }
 
 async function embedBatch(texts: string[], subject: string, purpose = "embedding"): Promise<{ vectors: number[][]; receiptId: number }> {
-  if (!config.modelCallsEnabled) throw new Error("Model calls are disabled (MODEL_CALLS_ENABLED=false)");
+  if (!config.modelCallsEnabled) throw new ModelUnavailableError("Model calls are disabled (MODEL_CALLS_ENABLED=false)");
   if (!(await modelCallsOn())) throw new ModelCallsPaused();
   const svc = await embeddingService();
-  if (!svc) throw new Error("No embedding service: EMBEDDING_API_KEY, DASHSCOPE_API_KEY or the admin settings page");
+  if (!svc) throw new ModelUnavailableError("No embedding service: EMBEDDING_API_KEY, DASHSCOPE_API_KEY or the admin settings page");
   const { service: SERVICE, model: EMBEDDING_MODEL, dims: EMBEDDING_DIMS, baseUrl: base, apiKey: key } = svc;
   const VECTOR = vectorOf(EMBEDDING_DIMS);
   const receipt = await paidRequest(
@@ -78,7 +77,7 @@ async function embedBatch(texts: string[], subject: string, purpose = "embedding
         signal: AbortSignal.timeout(60_000),
       });
       const text = await res.text();
-      if (!res.ok) throw new ProviderRejectedError(`embeddings HTTP ${res.status}: ${text.slice(0, 200)}`, res.status, res.status === 429 || res.status >= 500);
+      assertAccepted(SERVICE, res.status, text);
       let response: unknown;
       try { response = JSON.parse(text); }
       catch { response = { unparsable: text.slice(0, 20000) }; }

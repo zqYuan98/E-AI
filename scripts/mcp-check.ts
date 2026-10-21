@@ -17,7 +17,7 @@ export async function runPublicMcpCheck(url: URL, full = false) {
   const { SERVER_MODULES } = await import("@aihot/site/modules/server");
   const { Client, StreamableHTTPClientTransport } = await import("@modelcontextprotocol/client");
   const moduleTools = SERVER_MODULES.flatMap((m) => m.agent?.abilities ?? []).map((a) => ({
-    name: mcpToolName(a.mcp.tool), args: a.mcp.checkArgs, input: a.mcp.input,
+    name: mcpToolName(a.mcp.tool), input: a.mcp.input,
   }));
   const client = new Client({ name: `${SITE.mcpPrefix}-mcp-check`, version: "1.0.0" });
 
@@ -62,8 +62,7 @@ export async function runPublicMcpCheck(url: URL, full = false) {
     await call(T.search, { q: "OpenAI", limit: 2 });
     await call(T.hot, { limit: 3 });
     for (const tool of moduleTools) {
-      if (tool.args !== undefined) await call(tool.name, tool.args);
-      else if ((await tool.input.safeParseAsync({})).success) await call(tool.name, {});
+      if ((await tool.input.safeParseAsync({})).success) await call(tool.name, {});
       else console.log(`MCP 工具 ${tool.name}：仅校验发现契约（无可用的空参数）`);
     }
     // Missing reports/stories and schema validation still exercise all remaining tools.

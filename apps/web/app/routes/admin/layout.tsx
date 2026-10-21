@@ -2,8 +2,9 @@ import { notifyAccessChange } from "../../lib/access-browser";
 import { ACCESS } from "../../lib/access";
 import { useState } from "react";
 import { motion } from "motion/react";
+import { Suspense } from "react";
 import { SITE } from "@aihot/site";
-import { NavLink, Outlet, useLocation, useNavigation, type ShouldRevalidateFunction } from "react-router";
+import { Await, NavLink, Outlet, useLocation, useNavigation, type ShouldRevalidateFunction } from "react-router";
 import type { Route } from "./+types/layout";
 import { RingMark } from "@aihot/site/brand/Logo.tsx";
 import { NavigationProgress } from "../../components/shell/Chrome";
@@ -14,16 +15,18 @@ import type { AdminNavEntry } from "../../modules";
 import { webModules } from "../../site-modules";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const [me, counts] = await Promise.all([adminGet<AdminMe>(request, "/api/admin/me"), adminGet<AdminNavCounts>(request, "/api/admin/nav-counts").catch((): AdminNavCounts => ({}))]);
-  return { me, counts };
+  const counts = adminGet<AdminNavCounts>(request, "/api/admin/nav-counts").catch((): AdminNavCounts => ({}));
+  const me = await adminGet<AdminMe>(request, "/api/admin/me");
+  // Reset the badge boundaries so a navigation transition never keeps the old page waiting on them.
+  return { me, counts, countsKey: crypto.randomUUID() };
 }
 
-// Counts follow every navigation and command; the identity does not change.
+// Verify identity and update badges on every navigation/command; badges do not hold up the page.
 export const shouldRevalidate: ShouldRevalidateFunction = () => true;
 
 export const meta: Route.MetaFunction = () => [{ title: `${SITE.name} 后台` }, { name: "robots", content: "noindex, nofollow" }];
 
-export const headers: Route.HeadersFunction = () => ({ "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" });
+export const headers: Route.HeadersFunction = () => ({ "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "X-Accel-Buffering": "no" });
 
 /** The modules' admin groups; groups of the same name from several modules are one group, in module order. */
 function moduleGroups(): Array<{ group: string; items: AdminNavEntry[] }> {
@@ -60,16 +63,27 @@ const nav = (): Array<{ group: string; items: AdminNavEntry[] }> => [
   },
 ];
 
-function NavItem({ to, label, count, tone }: { to: string; label: string; count?: number; tone?: "bad" | "accent" }) {
+type Counts = Pick<Route.ComponentProps["loaderData"], "counts" | "countsKey">;
+
+function NavCount({ counts, countsKey, name, className }: Counts & { name: string | undefined; className: string }) {
+  if (!name) return null;
   return (
-    <NavLink to={to} reloadDocument={!!ACCESS} prefetch={ACCESS ? "none" : "intent"} className="group relative block">
+    <Suspense key={countsKey} fallback={null}>
+      <Await resolve={counts} errorElement={null}>
+        {(resolved: AdminNavCounts) => resolved[name] ? <span className={className}>{resolved[name]}</span> : null}
+      </Await>
+    </Suspense>
+  );
+}
+
+function NavItem({ to, label, count, counts, countsKey, tone }: AdminNavEntry & Counts) {
+  return (
+    <NavLink to={to} reloadDocument={!!ACCESS} className="group relative block">
       {({ isActive }) => (
         <span className={`relative flex items-center justify-between rounded-control px-3 py-[7px] text-[13.5px] transition-colors ${isActive ? "font-medium text-ink" : "text-ink-3 hover:text-ink"}`}>
           {isActive && <motion.span layoutId="admin-nav" className="absolute inset-0 rounded-control bg-surface shadow-sm ring-1 ring-line" transition={{ type: "spring", stiffness: 520, damping: 38 }} />}
           <span className="relative">{label}</span>
-          {!!count && (
-            <span className={`num relative min-w-5 rounded-full px-1.5 text-center text-[11px] font-semibold leading-5 ${tone === "bad" ? "bg-hot text-white" : "bg-accent-soft text-accent"}`}>{count}</span>
-          )}
+          <NavCount counts={counts} countsKey={countsKey} name={count} className={`num relative min-w-5 rounded-full px-1.5 text-center text-[11px] font-semibold leading-5 ${tone === "bad" ? "bg-hot text-white" : "bg-accent-soft text-accent"}`} />
         </span>
       )}
     </NavLink>
@@ -77,7 +91,7 @@ function NavItem({ to, label, count, tone }: { to: string; label: string; count?
 }
 
 export default function AdminLayout({ loaderData }: Route.ComponentProps) {
-  const { me, counts } = loaderData;
+  const { me, counts, countsKey } = loaderData;
   const navigation = useNavigation();
   const location = useLocation();
   const groups = nav();
@@ -96,7 +110,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
               <div className="mb-1 px-3 text-[11.5px] font-medium tracking-wide text-ink-4">{g.group}</div>
               <div className="space-y-0.5">
                 {g.items.map((i) => (
-                  <NavItem key={i.to} to={i.to} label={i.label} count={i.count ? counts[i.count] : undefined} tone={i.tone} />
+                  <NavItem key={i.to} {...i} counts={counts} countsKey={countsKey} />
                 ))}
               </div>
             </div>
@@ -105,7 +119,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
         <div className="mt-3 border-t border-line px-2 pt-3 text-[12.5px] text-ink-3">
           <div className="flex items-center justify-between gap-2">
             <span className="truncate">{me.name}</span>
-            {me.dev && <span className="rounded bg-amber/15 px-1.5 text-[11px] font-medium text-amber">开发</span>}
+            {me.dev && <span className="rounded-mark bg-amber/15 px-1.5 text-[11px] font-medium text-amber">开发</span>}
           </div>
           <AdminLogout csrf={me.csrf} />
         </div>
@@ -115,17 +129,16 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
           <div className="flex items-center gap-2 px-4 pt-3">
             <RingMark className="size-5 text-accent" />
             <span className="text-[14px] font-semibold text-ink">{`${SITE.name} 后台`}</span>
-            {me.dev && <span className="rounded bg-amber/15 px-1.5 text-[11px] font-medium text-amber">开发</span>}
+            {me.dev && <span className="rounded-mark bg-amber/15 px-1.5 text-[11px] font-medium text-amber">开发</span>}
             <div className="ml-auto"><AdminLogout csrf={me.csrf} /></div>
           </div>
           <nav className="no-scrollbar flex gap-1 overflow-x-auto px-3 py-2">
             {flat.map((i) => {
               const active = location.pathname === i.to || location.pathname.startsWith(`${i.to}/`);
-              const n = i.count ? counts[i.count] : 0;
               return (
                 <NavLink key={i.to} to={i.to} className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-[13px] ${active ? "bg-ink text-bg" : "text-ink-3"}`}>
                   {i.label}
-                  {!!n && <span className="num ml-1 text-[11px] opacity-70">{n}</span>}
+                  <NavCount counts={counts} countsKey={countsKey} name={i.count} className="num ml-1 text-[11px] opacity-70" />
                 </NavLink>
               );
             })}

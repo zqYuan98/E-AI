@@ -16,18 +16,21 @@ async function findings(options: { summary?: object; lastOk?: string | null; las
   };
   const unexpected = () => { throw new Error("standalone must not send notifications, inspect credentials or call providers"); };
   const alerts = await isolated<typeof Alerts>("../packages/backend/src/operations/alerts.ts", {
-    "@aihot/contracts/time": { beijingAt: unexpected, beijingDate: unexpected },
+    "@aihot/contracts/time": { addDays: unexpected, beijingAt: unexpected, beijingDate: unexpected, beijingDay: unexpected, isValidDate: unexpected, beijingStamp: (value: string | number | Date) => new Date(value).toISOString() },
     "@aihot/site": { ALERTS: { quietMinutes: 60 }, EDITION_TIMES: { daily: "08:00" } },
+    "../audit.ts": { audit: unexpected },
     "../db.ts": { sql },
-    "../notify/feishu.ts": { beijingStamp: (value: string | number | Date) => new Date(value).toISOString(), duration: (ms: number) => `${ms / 3600000}h`, beijingDay: unexpected, sendAlert: unexpected, formatAlert: unexpected, formatRecovery: unexpected },
+    "../notify/agent.ts": { agentHandoffs: async () => [], closeAgentWake: unexpected, wakeAgent: unexpected },
+    "../notify/feishu.ts": { duration: (ms: number) => `${ms / 3600000}h`, sendAlert: unexpected, formatAlert: unexpected, formatRecovery: unexpected },
     "../editorial/models.ts": { stepsOnService: unexpected },
     "./backup.ts": { backupConfigured: unexpected },
     // Collection and model calls read as off, as in the environment of these tests.
     "./switches.ts": { collectionOn: async () => false, modelCallsOn: async () => false },
     "./grouping.ts": { GROUPING_WARN_AFTER_MS: 600000, waitingSelectedNews: unexpected },
     "../media/upstream.ts": { upstreamFindings: async () => [] },
-    "../modules.ts": { remoteBackupDenied: () => true, responder: () => null, serverModules: () => [] },
-    "../sources/health.ts": { sourceHealth: unexpected, sourceHealthList: unexpected },
+    "../modules.ts": { remoteBackupDenied: () => true, serverModules: () => [] },
+    "../providers/receipts.ts": { awaitingRelease: () => "", providerAccessRefused: () => false },
+    "../sources/health.ts": { SOURCE_PROBLEMS: [], sourceHealth: unexpected },
   });
   return (await alerts.collectFindings(Date.parse(options.now ?? "2026-11-02T04:01:00Z"))).filter(finding => finding.key.startsWith("backup."));
 }

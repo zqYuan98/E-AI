@@ -73,7 +73,7 @@ export default function PolicyDetail() {
                 <ul className="space-y-3 text-[13px]">
                   {d.reports.map((r, i) => (
                     <li key={i}>
-                      <span className="mr-1.5 rounded bg-bg-sunk px-1 py-0.5 text-[11px] text-ink-4">{ROLE_LABEL[r.role] ?? r.role}</span>
+                      <span className="mr-1.5 rounded-mark bg-bg-sunk px-1 py-0.5 text-[11px] text-ink-4">{ROLE_LABEL[r.role] ?? r.role}</span>
                       {r.itemId ? (
                         <IntentLink to={`/items/${r.itemId}`} className="text-ink-2 hover:text-accent">{r.title}</IntentLink>
                       ) : (
@@ -94,9 +94,9 @@ export default function PolicyDetail() {
         <article className="pt-3 lg:pt-1">
           <IntentLink to="/policy" className="text-[12.5px] text-ink-4 hover:text-accent">← 政策规划库</IntentLink>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[11.5px]">
-            <span className="rounded bg-bg-sunk px-1.5 py-0.5 text-ink-3">{levelLabel(d.level)}</span>
-            <span className="rounded bg-bg-sunk px-1.5 py-0.5 text-ink-3">{d.docType}</span>
-            <span className={`rounded px-1.5 py-0.5 ${AI_TONE[d.aiRelevance]}`}>{aiLabel(d.aiRelevance)}</span>
+            <span className="rounded-mark bg-bg-sunk px-1.5 py-0.5 text-ink-3">{levelLabel(d.level)}</span>
+            <span className="rounded-mark bg-bg-sunk px-1.5 py-0.5 text-ink-3">{d.docType}</span>
+            <span className={`rounded-mark px-1.5 py-0.5 ${AI_TONE[d.aiRelevance]}`}>{aiLabel(d.aiRelevance)}</span>
           </div>
           <h1 data-page-title="" className="mt-2 text-[24px] font-semibold leading-[1.4] text-ink">{d.name}</h1>
           {d.summary && <p className="mt-4 text-[15px] leading-[1.85] text-ink-2">{d.summary}</p>}

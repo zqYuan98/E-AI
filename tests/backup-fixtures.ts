@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { stripTypeScriptTypes } from "node:module";
 import { promisify } from "node:util";
 import { gzipSync } from "node:zlib";
+import * as time from "@aihot/contracts/time";
 import * as modules from "../packages/backend/src/modules.ts";
 import type * as Backup from "../packages/backend/src/operations/backup.ts";
 
@@ -113,7 +114,7 @@ export async function fixture(options: { denied?: boolean; dirs?: string[]; conf
     ? (...args: unknown[]) => state.hooks[name] ? state.hooks[name]!(...args) : (fn as Hook)(...args) : fn]));
   const backup = await isolated<typeof Backup>("../packages/backend/src/operations/backup.ts", {
     "../config.ts": { config, credential: () => { state.credentialReads++; if (state.credentialFailure) throw new Error("fixture credentials must not be read"); return null; } },
-    "../db.ts": { sql }, "../modules.ts": modules, "./feedback.ts": { screenshotsForwarded: () => false },
+    "../db.ts": { sql }, "../modules.ts": modules, "./feedback.ts": { screenshotsForwarded: () => false }, "@aihot/contracts/time": time,
     "node:fs/promises": wrappedFs, "node:child_process": { execFile },
   });
   return Object.assign(state, { backup, modules, execDefault,

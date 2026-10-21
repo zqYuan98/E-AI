@@ -55,9 +55,9 @@ function DocCard({ d }: { d: PolicyDocCard }) {
   return (
     <IntentLink to={`/policy/${d.id}`} className="card card-hover block px-5 py-4">
       <div className="flex flex-wrap items-center gap-2 text-[11.5px]">
-        <span className="rounded bg-bg-sunk px-1.5 py-0.5 text-ink-3">{levelLabel(d.level)}</span>
-        <span className="rounded bg-bg-sunk px-1.5 py-0.5 text-ink-3">{d.docType}</span>
-        <span className={`rounded px-1.5 py-0.5 ${AI_TONE[d.aiRelevance]}`}>{aiLabel(d.aiRelevance)}</span>
+        <span className="rounded-mark bg-bg-sunk px-1.5 py-0.5 text-ink-3">{levelLabel(d.level)}</span>
+        <span className="rounded-mark bg-bg-sunk px-1.5 py-0.5 text-ink-3">{d.docType}</span>
+        <span className={`rounded-mark px-1.5 py-0.5 ${AI_TONE[d.aiRelevance]}`}>{aiLabel(d.aiRelevance)}</span>
         {d.date && <time className="num text-ink-4" dateTime={d.date}>{d.date}</time>}
       </div>
       <h3 className="mt-2 text-[15.5px] font-semibold leading-[1.5] text-ink">{d.name}</h3>

@@ -8,7 +8,8 @@ import { lstat, mkdir, mkdtemp, open, readdir, readFile, realpath, rename, rm, r
 import path from "node:path";
 import { promisify } from "node:util";
 import { createGunzip } from "node:zlib";
-import { config, credential } from "../config.ts";
+import { beijingDate, beijingWeekday } from "@aihot/contracts/time";
+import { config } from "../config.ts";
 import { sql } from "../db.ts";
 import { backupDirs, remoteBackupDenied } from "../modules.ts";
 import { screenshotsForwarded } from "./feedback.ts";
@@ -30,14 +31,14 @@ export function backupConfigured(): boolean {
   return store() !== null;
 }
 
+/** The object store, from the environment (backend.env); named one by one so the template check sees them. */
 function store(): Store | null {
-  const get = (k: string) => process.env[k] || credential("integrations", k) || null;
-  const secretId = get("DB_BACKUP_STORE_SECRET_ID");
-  const secretKey = get("DB_BACKUP_STORE_SECRET_KEY");
-  const bucket = get("DB_BACKUP_STORE_BUCKET");
-  const region = get("DB_BACKUP_STORE_REGION");
+  const secretId = process.env.DB_BACKUP_STORE_SECRET_ID;
+  const secretKey = process.env.DB_BACKUP_STORE_SECRET_KEY;
+  const bucket = process.env.DB_BACKUP_STORE_BUCKET;
+  const region = process.env.DB_BACKUP_STORE_REGION;
   if (!secretId || !secretKey || !bucket || !region) return null;
-  const domain = get("DB_BACKUP_STORE_DOMAIN");
+  const domain = process.env.DB_BACKUP_STORE_DOMAIN;
   return { secretId, secretKey, bucket, region, endpoint: domain ? `https://${domain.replace(/^https?:\/\//, "")}` : `https://${bucket}.cos.${region}.myqcloud.com` };
 }
 
@@ -494,8 +495,24 @@ export async function runBackup(now = new Date()) {
   const archiveName = `${name}-files-${stamp}.tar.gz`;
   let published = false;
   let failure: unknown;
+  // execFile includes argv in failures. Give libpq credentials through its environment so neither
+  // process listings nor a failed job's stored error contain them; keep other connection options.
+  const connection = new URL(config.databaseUrl);
+  const env = { ...process.env,
+    ...(connection.username ? { PGUSER: decodeURIComponent(connection.username) } : {}),
+    ...(connection.password ? { PGPASSWORD: decodeURIComponent(connection.password) } : {}),
+  };
+  connection.username = connection.password = "";
+  // libpq decodes percent escapes but not form-style '+'. Keep non-credential options byte-for-byte.
+  connection.search = connection.search.slice(1).split("&").filter(option => {
+    const separator = option.indexOf("=");
+    const key = decodeURIComponent(option.slice(0, separator));
+    if (key !== "user" && key !== "password") return true;
+    env[key === "user" ? "PGUSER" : "PGPASSWORD"] = decodeURIComponent(option.slice(separator + 1));
+    return false;
+  }).join("&");
   try {
-    await run("pg_dump", ["--format=custom", "--compress=6", "--no-owner", "--file", path.join(workspace, dumpName), config.databaseUrl], { maxBuffer: 16 * 1024 * 1024 });
+    await run("pg_dump", ["--format=custom", "--compress=6", "--no-owner", "--file", path.join(workspace, dumpName), connection.href], { env, maxBuffer: 16 * 1024 * 1024 });
     await checkOwned([...parents, workspaceOwner]);
     // TOC validation only. A real restore is tested separately against a disposable database.
     await run("pg_restore", ["--list", path.join(workspace, dumpName)], { maxBuffer: 64 * 1024 * 1024 });
@@ -517,10 +534,10 @@ export async function runBackup(now = new Date()) {
       uploadError: undefined as string | undefined, retentionError: undefined as string | undefined };
     const record = () => sql`INSERT INTO settings (key, value, updated_by) VALUES ('backup.last', ${sql.json(summary as never)}, 'backup')
       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`;
-    const bj = new Date(now.getTime() + 8 * 3600_000);
+    const today = beijingDate(now);
     const prefixes = ["daily"];
-    if (bj.getUTCDay() === 0) prefixes.push("weekly");
-    if (bj.getUTCDate() === 1) prefixes.push("monthly");
+    if (beijingWeekday(today) === "星期日") prefixes.push("weekly");
+    if (today.endsWith("-01")) prefixes.push("monthly");
     // Record local success before maintenance or remote IO; neither can unpublish this snapshot.
     await record();
     let uploadFailure: unknown, retentionFailure: unknown;

@@ -27,7 +27,7 @@ function Card({ r }: { r: ResearchCard }) {
   return (
     <IntentLink to={`/research/${r.id}`} className="card card-hover block px-5 py-4">
       <div className="flex flex-wrap items-center gap-2 text-[11.5px] text-ink-4">
-        {r.institution && <span className="rounded bg-bg-sunk px-1.5 py-0.5 text-ink-3">{r.institution}</span>}
+        {r.institution && <span className="rounded-mark bg-bg-sunk px-1.5 py-0.5 text-ink-3">{r.institution}</span>}
         {r.date && <span className="num">{r.date}</span>}
         {r.pointCount > 0 && <span>{r.pointCount} 条要点</span>}
       </div>
