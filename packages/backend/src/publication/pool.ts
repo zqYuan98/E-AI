@@ -1,10 +1,11 @@
 // Public pool (/all) with numeric pages, and search in its two orderings.
 import type { PoolResponse, TimelineFilters } from "@aihot/contracts/site";
+import type { CategoryKey } from "@aihot/contracts/taxonomy";
 import { beijingDate, beijingMidnight } from "@aihot/contracts/time";
 import { one, sql, withCustomPlans, type Db } from "../db.ts";
 import { cachedByKey, sharedSearch } from "../lib/cache.ts";
 import {
-  categoryCondition, channelCondition, ITEM_COLUMNS, ITEM_FROM, seatHolders, tagCondition, toFeedItemSummary,
+  categoriesCondition, categoryCondition, channelCondition, ITEM_COLUMNS, ITEM_FROM, seatHolders, tagCondition, toFeedItemSummary,
   type ItemRow,
 } from "./items.ts";
 import { listedCondition } from "./scope.ts";
@@ -112,16 +113,21 @@ export function publicMatchCondition(terms: string[]) {
 }
 
 /** The listed items under the filters, up to the pages the pool offers. */
-async function listedCount(f: TimelineFilters, now: Date): Promise<number> {
+async function listedCount(f: PoolFilters, now: Date): Promise<number> {
   return Number(one(await sql<{ n: number }[]>`
     SELECT count(*) AS n FROM (SELECT 1 FROM publications p WHERE ${listedCondition(now)}
-      ${channelCondition(f.channel)} ${categoryCondition(f.category)} ${tagCondition(f.tag)} LIMIT ${POOL_MAX_PAGES * POOL_PAGE_SIZE}) t`).n);
+      ${channelCondition(f.channel)} ${categoryCondition(f.category)} ${categoriesCondition(f.categories)} ${tagCondition(f.tag)} LIMIT ${POOL_MAX_PAGES * POOL_PAGE_SIZE}) t`).n);
 }
 
 /** Without a search the total only sets the page count: it is reused for 30 seconds per filter. */
-const poolTotal = cachedByKey((f: TimelineFilters) => JSON.stringify([f.channel, f.category, f.tag]), (f) => listedCount(f, new Date()), { freshMs: 30_000, maxStaleMs: 30_000, maxKeys: 200 });
+const poolTotal = cachedByKey((f: PoolFilters) => JSON.stringify([f.channel, f.category, f.categories, f.tag]), (f) => listedCount(f, new Date()), { freshMs: 30_000, maxStaleMs: 30_000, maxKeys: 200 });
 
-export interface PoolQuery extends TimelineFilters {
+/** The website's filters, and the several categories a channel shows at once. */
+interface PoolFilters extends TimelineFilters {
+  categories?: readonly CategoryKey[] | null;
+}
+
+export interface PoolQuery extends PoolFilters {
   q?: string | null;
   tab?: "time" | "relevance";
   page?: number;
@@ -130,7 +136,7 @@ export interface PoolQuery extends TimelineFilters {
 
 // Identical searches share their read before taking search capacity.
 const searchPool = sharedSearch(
-  (q: PoolQuery) => JSON.stringify([q.channel, q.category, q.tag, q.q, q.tab, q.page]),
+  (q: PoolQuery) => JSON.stringify([q.channel, q.category, q.categories, q.tag, q.q, q.tab, q.page]),
   queryPool, (q) => !!q.q?.trim(),
 );
 
@@ -144,7 +150,7 @@ async function queryPool(query: PoolQuery, now: Date): Promise<PoolResponse> {
   const tab = q && query.tab === "relevance" ? "relevance" : "time";
   const terms = q ? searchTerms(q) : [];
   const entityTag = q ? queryEntityTag(q) : null;
-  const filters = sql`${channelCondition(query.channel)} ${categoryCondition(query.category)} ${tagCondition(query.tag)}`;
+  const filters = sql`${channelCondition(query.channel)} ${categoryCondition(query.category)} ${categoriesCondition(query.categories)} ${tagCondition(query.tag)}`;
   const offset = (page - 1) * POOL_PAGE_SIZE;
   const cap = POOL_MAX_PAGES * POOL_PAGE_SIZE;
 
@@ -171,7 +177,7 @@ async function queryPool(query: PoolQuery, now: Date): Promise<PoolResponse> {
       // can make PostgreSQL scan every toasted body instead. Keep other searches inline so short
       // terms, additional terms and selective publication filters retain their existing plans.
       const splitFields = terms.length === 1 && /[\p{L}\p{N}]{3}/u.test(terms[0]!)
-        && (!query.channel || query.channel === "all") && !query.category && !query.tag;
+        && (!query.channel || query.channel === "all") && !query.category && !query.categories?.length && !query.tag;
       const partScore = terms.reduce(
         (acc, t) => sql`${acc} + (CASE WHEN ${like(sql`ps.direct`, t)} THEN 3 ELSE 0 END) + (CASE WHEN ${like(sql`ps.body`, t)} THEN 1 ELSE 0 END)`,
         sql`0`,

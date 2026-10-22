@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     "./module": "./module.ts",
+    "./server": "./server.ts",
     "./channels": "./channels.ts",
     "./web": "./web.tsx"
   }

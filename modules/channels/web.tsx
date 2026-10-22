@@ -1,4 +1,4 @@
-// 频道在网页上的入口：侧栏“频道”一节，手机底栏的“商机”“热点”，“我的”页一行政策动态。
+// 频道在网页上的入口：侧栏“频道”一节，手机底栏的“商机”“热点”，“我的”页一行政策动态，后台“内容”里的频道设置。
 import { defineWebModule } from "@aihot/web/modules";
 import { IconChart, IconInfo, IconTrendUp } from "@aihot/web/components/icons";
 
@@ -17,4 +17,5 @@ export const channelsWeb = defineWebModule({
     { key: "trends", to: "/trends", label: "热点", icon: IconTrendUp },
   ],
   tools: [{ to: "/policy-news", label: "政策动态", icon: <IconInfo size={18} /> }],
+  admin: { content: [{ to: "/admin/channels", label: "频道设置" }] },
 });

@@ -4770,6 +4770,290 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false
+    },
+    {
+      "id": "rss-qbitai",
+      "name": "量子位",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.qbitai.com/feed",
+        "allowUrlPrefixes": [
+          "https://www.qbitai.com/"
+        ],
+        "ingestNoiseFilter": {
+          "requireMatches": [
+            "大模型",
+            "智能体",
+            "开源模型",
+            "推理模型",
+            "多模态模型",
+            "DeepSeek",
+            "千问",
+            "Qwen",
+            "通义",
+            "文心",
+            "混元",
+            "豆包",
+            "Kimi",
+            "智谱",
+            "GLM",
+            "盘古",
+            "星火",
+            "MiniMax",
+            "阶跃",
+            "GPT",
+            "OpenAI",
+            "Gemini",
+            "Claude",
+            "Llama"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "媒体",
+        "大模型"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-leiphone",
+      "name": "雷峰网",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.leiphone.com/feed",
+        "allowUrlPrefixes": [
+          "https://www.leiphone.com/"
+        ],
+        "ingestNoiseFilter": {
+          "requireMatches": [
+            "大模型",
+            "智能体",
+            "开源模型",
+            "推理模型",
+            "多模态模型",
+            "DeepSeek",
+            "千问",
+            "Qwen",
+            "通义",
+            "文心",
+            "混元",
+            "豆包",
+            "Kimi",
+            "智谱",
+            "GLM",
+            "盘古",
+            "星火",
+            "MiniMax",
+            "阶跃",
+            "GPT",
+            "OpenAI",
+            "Gemini",
+            "Claude",
+            "Llama"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "媒体",
+        "大模型"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-tmtpost",
+      "name": "钛媒体",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.tmtpost.com/rss",
+        "allowUrlPrefixes": [
+          "https://www.tmtpost.com/"
+        ],
+        "ingestNoiseFilter": {
+          "requireMatches": [
+            "大模型",
+            "智能体",
+            "开源模型",
+            "推理模型",
+            "多模态模型",
+            "DeepSeek",
+            "千问",
+            "Qwen",
+            "通义",
+            "文心",
+            "混元",
+            "豆包",
+            "Kimi",
+            "智谱",
+            "GLM",
+            "盘古",
+            "星火",
+            "MiniMax",
+            "阶跃",
+            "GPT",
+            "OpenAI",
+            "Gemini",
+            "Claude",
+            "Llama"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "媒体",
+        "大模型"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-ithome",
+      "name": "IT之家",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.ithome.com/rss/",
+        "allowUrlPrefixes": [
+          "https://www.ithome.com/"
+        ],
+        "ingestNoiseFilter": {
+          "requireMatches": [
+            "大模型",
+            "智能体",
+            "开源模型",
+            "推理模型",
+            "多模态模型",
+            "DeepSeek",
+            "千问",
+            "Qwen",
+            "通义",
+            "文心",
+            "混元",
+            "豆包",
+            "Kimi",
+            "智谱",
+            "GLM",
+            "盘古",
+            "星火",
+            "MiniMax",
+            "阶跃",
+            "GPT",
+            "OpenAI",
+            "Gemini",
+            "Claude",
+            "Llama"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "媒体",
+        "大模型"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-geekpark",
+      "name": "极客公园",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.geekpark.net/rss",
+        "allowUrlPrefixes": [
+          "https://www.geekpark.net/"
+        ],
+        "ingestNoiseFilter": {
+          "requireMatches": [
+            "大模型",
+            "智能体",
+            "开源模型",
+            "推理模型",
+            "多模态模型",
+            "DeepSeek",
+            "千问",
+            "Qwen",
+            "通义",
+            "文心",
+            "混元",
+            "豆包",
+            "Kimi",
+            "智谱",
+            "GLM",
+            "盘古",
+            "星火",
+            "MiniMax",
+            "阶跃",
+            "GPT",
+            "OpenAI",
+            "Gemini",
+            "Claude",
+            "Llama"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 10
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "媒体",
+        "大模型"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-deepseek-news",
+      "name": "DeepSeek·新闻",
+      "kind": "web_list",
+      "config": {
+        "url": "https://api-docs.deepseek.com/zh-cn/news/news250120",
+        "parseMode": "html",
+        "itemSelector": "a.menu__link[href^=\"/zh-cn/news/news\"]",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "publishedAtRegex": "([0-9]{4}/[0-9]{2}/[0-9]{2})",
+        "allowUrlPrefixes": [
+          "https://api-docs.deepseek.com/zh-cn/news/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 5
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "deepseek",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": [
+        "官方",
+        "大模型"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
     }
   ]
 }

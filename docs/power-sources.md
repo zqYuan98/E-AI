@@ -2,7 +2,7 @@
 
 测试日期：2026-10-14。方法：用项目真实解析器（`fetchWebList` / `fetchJsonList` / `fetchRss` + `fetchDetail`）预览，要求 ≥5 条真实文章、日期可解析（列表或详情页实测 2 篇）、内容与电力/能源/政策相关。配置全部写在 `industry/sources.json`，`node .data/check-sources.ts` 通过。
 
-## 已接入（45 个网页/RSS/JSON + 10 个公众号）
+## 已接入（45 个网页/RSS/JSON + 10 个公众号，另有大模型信源 6 个）
 
 ### 政策规划（政府、协会）
 
@@ -83,6 +83,19 @@
 
 未找到原始 ID 的证据：国家电网、电网头条/国家电网报、南方电网报、国网能源研究院、南网能源院（检索到的文章已删除、账号已迁移或 __biz 链接要求验证）。
 
+### 大模型（通用大模型重大发布，在腾讯云服务器上用项目解析器实测）
+
+媒体源只收标题或摘要里出现“大模型、智能体、开源模型、推理模型、多模态模型”或主流模型与厂商名的条目（`ingestNoiseFilter.requireMatches`），再由预筛判断是不是重大发布。
+
+| id | 名称 | 类型 | 层级 | 条数（过滤后） | 日期来源 | 备注 |
+|---|---|---|---|---|---|---|
+| rss-qbitai | 量子位 | rss | T2 | 10（3） | RSS | |
+| rss-leiphone | 雷峰网 | rss | T2 | 20（9） | RSS | |
+| rss-tmtpost | 钛媒体 | rss | T2 | 17（0） | RSS | 商业资讯为主，命中少 |
+| rss-ithome | IT之家 | rss | T2 | 60（6） | RSS | 量大，靠过滤词 |
+| rss-geekpark | 极客公园 | rss | T2 | 30（22） | RSS | 摘要长，命中多 |
+| web-deepseek-news | DeepSeek·新闻 | web_list | T1 | 18 | 标题里的日期（publishedAtRegex） | 读文档站侧栏的新闻列表 |
+
 ## 测试过但未接入
 
 | 候选 | 原因 |
@@ -126,3 +139,7 @@
 | DatacenterDynamics RSS | 可用，但以 IT 数据中心为主 |
 | Renewable Energy World | 403 |
 | 知网 RSS（中国电机工程学报 ZGDC / 电网技术 DWJS） | 可用，但文章链接带一次性 token，每次抓取网址都变，会重复入库；需自定义适配 |
+| InfoQ 中文 feed | 浏览器能打开，解析器读到的不是 RSS/Atom |
+| 通义千问博客 RSS（qwenlm.github.io） | 英文版可用但 2025 年 9 月后不再更新；中文版在服务器上连不上 |
+| 机器之心 /rss、36氪 /feed | 返回的是网页或验证页，不是订阅 |
+| 智谱、MiniMax、字节 Seed、文心、混元、Kimi 官网 | 新闻列表由前端渲染，没有订阅；Kimi、Hugging Face 在服务器上连不上 |

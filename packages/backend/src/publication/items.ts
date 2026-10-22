@@ -92,6 +92,12 @@ export function publicCategoryCondition(category: PublicApiCategoryKey | null | 
   return sql`AND p.category IN ${sql(CATEGORY_KEYS.filter((k) => toPublicApiCategory(k) === category))}`;
 }
 
+/** Several of the website's categories at once (the site's channels); none, or an empty list, filters nothing. */
+export function categoriesCondition(categories: readonly CategoryKey[] | null | undefined) {
+  if (!categories?.length) return sql``;
+  return sql`AND p.category IN ${sql(categories as CategoryKey[])}`;
+}
+
 export function tagCondition(tag: string | null | undefined) {
   if (!tag) return sql``;
   return sql`AND p.tags @> ${[tag]}::text[]`;
