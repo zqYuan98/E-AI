@@ -355,3 +355,112 @@ test("admin logout uses real admin CSRF even with a member cookie and revokes on
   assert.equal(await sessionStatus(adminCookie), 401);
   assert.equal(await sessionStatus(signed.cookie), 200);
 });
+
+/** A stand-in for DingTalk's server: codes map to people; anything else is refused as DingTalk refuses an unknown code. */
+function fakeDingtalk(people: Record<string, { userid: string; name: string }>) {
+  const calls: string[] = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(String(input instanceof Request ? input.url : input));
+    if (url.origin !== "https://oapi.dingtalk.com") return realFetch(input, init);
+    calls.push(url.pathname);
+    if (url.pathname === "/gettoken") {
+      return Response.json(url.searchParams.get("appsecret") === "test-dingtalk-secret" ? { errcode: 0, access_token: "fake-token", expires_in: 7200 } : { errcode: 40089, errmsg: "invalid appsecret" });
+    }
+    const code = (JSON.parse(String(init?.body)) as { code: string }).code;
+    const person = people[code];
+    return Response.json(person ? { errcode: 0, errmsg: "ok", result: person } : { errcode: 40078, errmsg: "不存在的临时授权码" });
+  }) as typeof fetch;
+  return { calls, restore: () => { globalThis.fetch = realFetch; } };
+}
+function dingtalkApp(t: { after: (fn: () => void) => void }) {
+  const names = ["DINGTALK_CORP_ID", "DINGTALK_APP_KEY", "DINGTALK_APP_SECRET"] as const;
+  const previous = names.map((name) => process.env[name]);
+  Object.assign(process.env, { DINGTALK_CORP_ID: "ding-test-corp", DINGTALK_APP_KEY: "ding-test-key", DINGTALK_APP_SECRET: "test-dingtalk-secret" });
+  t.after(() => names.forEach((name, i) => { if (previous[i] === undefined) delete process.env[name]; else process.env[name] = previous[i]; }));
+}
+const signInDingtalk = (code: string, headers: Record<string, string> = { origin: config.siteUrl }) =>
+  app.inject({ method: "POST", url: "/api/access/dingtalk", remoteAddress: `127.0.1.${address++ % 250}`, headers, payload: { code, returnTo: "/research" } });
+
+test("the sign-in page learns whether DingTalk sign-in is on, anonymously, and never sees the secret", async (t) => {
+  assert.deepEqual((await app.inject({ url: "/api/access/options" })).json(), { dingtalk: null });
+  assert.equal((await signInDingtalk("any-code")).statusCode, 404, "off until all three settings are given");
+  dingtalkApp(t);
+  const options = await app.inject({ url: "/api/access/options" });
+  assert.equal(options.statusCode, 200);
+  privateResponse(options);
+  assert.deepEqual(options.json(), { dingtalk: { corpId: "ding-test-corp", clientId: "ding-test-key" } });
+  assert.equal(options.body.includes("test-dingtalk-secret"), false);
+});
+
+test("a company member signing in from DingTalk gets one account, named as in DingTalk, and no password", async (t) => {
+  dingtalkApp(t);
+  const userid = `ding-${tag()}`;
+  const dingtalk = fakeDingtalk({ first: { userid, name: "钉钉甲" }, again: { userid, name: "钉钉甲（改名）" }, other: { userid: `${userid}-b`, name: "钉钉乙" } });
+  t.after(dingtalk.restore);
+
+  const first = await signInDingtalk("first");
+  assert.equal(first.statusCode, 200, first.body);
+  privateResponse(first);
+  assert.deepEqual(first.json(), { redirect: "/research" });
+  const cookie = String(first.headers["set-cookie"]).split(";")[0]!;
+  assert.match(String(first.headers["set-cookie"]), /^aihot_member=.+HttpOnly/);
+  const principal = (await app.inject({ url: "/api/access/session", headers: { cookie } })).json<AccessPrincipal>();
+  assert.equal(principal.kind, "member");
+  assert.equal(principal.name, "钉钉甲");
+
+  const again = await signInDingtalk("again");
+  assert.equal(again.statusCode, 200, again.body);
+  const renamed = (await app.inject({ url: "/api/access/session", headers: { cookie: String(again.headers["set-cookie"]).split(";")[0]! } })).json<AccessPrincipal>();
+  assert.equal(renamed.id, principal.id, "the same person is the same member");
+  assert.equal(renamed.name, "钉钉甲（改名）", "the name follows DingTalk");
+  assert.equal((await signInDingtalk("other")).statusCode, 200);
+
+  const id = Number(principal.id.slice("member:".length));
+  const [member] = await sql<{ username: string; password_hash: string }[]>`SELECT username, password_hash FROM access_members WHERE id = ${id}`;
+  const links = await sql`SELECT member_id FROM access_dingtalk_users WHERE userid = ${userid}`;
+  assert.deepEqual(links.map((l) => l.member_id), [id]);
+  assert.equal((await signIn(member!.username, "dingtalk-only")).statusCode, 401, "an account DingTalk made has no password");
+  assert.equal((await signIn(member!.username, "dingtalk-only padding")).statusCode, 401);
+  assert.equal(dingtalk.calls.filter((p) => p === "/gettoken").length, 1, "the app token is reused while it is valid");
+  const events = await sql`SELECT action, after FROM audit_log WHERE subject = ${principal.id} ORDER BY id`;
+  assert.deepEqual(events.map((e) => e.action), ["access.member.dingtalk", "access.login", "access.login"]);
+  assert.deepEqual(events[1]!.after, { via: "dingtalk" });
+});
+
+test("two first sign-ins of one person at once make one member", async (t) => {
+  dingtalkApp(t);
+  const userid = `ding-${tag()}`;
+  const dingtalk = fakeDingtalk({ a: { userid, name: "并发" }, b: { userid, name: "并发" } });
+  t.after(dingtalk.restore);
+  const [a, b] = await Promise.all([signInDingtalk("a"), signInDingtalk("b")]);
+  assert.deepEqual([a.statusCode, b.statusCode], [200, 200]);
+  const links = await sql`SELECT member_id FROM access_dingtalk_users WHERE userid = ${userid}`;
+  assert.equal(links.length, 1);
+});
+
+test("a refused code, a disabled member and a cross-site post get no session", async (t) => {
+  dingtalkApp(t);
+  const userid = `ding-${tag()}`;
+  const dingtalk = fakeDingtalk({ good: { userid, name: "钉钉丙" } });
+  t.after(dingtalk.restore);
+
+  const before = await sql`SELECT count(*)::int AS n FROM access_members`;
+  const refused = await signInDingtalk("expired-code");
+  assert.equal(refused.statusCode, 401);
+  assert.equal(refused.headers["set-cookie"], undefined);
+  assert.deepEqual(await sql`SELECT count(*)::int AS n FROM access_members`, before, "nobody is made from a refused code");
+  assert.equal((await signInDingtalk("good", {})).statusCode, 403, "the page's own origin is required");
+  assert.equal((await signInDingtalk("bad code with spaces")).statusCode, 400);
+
+  const tokens = dingtalk.calls.filter((p) => p === "/gettoken").length;
+  const ok = await signInDingtalk("good");
+  assert.equal(ok.statusCode, 200, ok.body);
+  assert.equal(dingtalk.calls.filter((p) => p === "/gettoken").length, tokens + 1, "a refusal drops the cached app token");
+  const id = Number(((await app.inject({ url: "/api/access/session", headers: { cookie: String(ok.headers["set-cookie"]).split(";")[0]! } })).json<AccessPrincipal>()).id.slice("member:".length));
+  await changeMember(id, { disable: true }, "admin:test");
+  const disabled = await signInDingtalk("good");
+  assert.equal(disabled.statusCode, 403);
+  assert.match(disabled.json().detail, /已停用/);
+  assert.equal(disabled.headers["set-cookie"], undefined);
+});

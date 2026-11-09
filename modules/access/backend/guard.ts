@@ -7,11 +7,12 @@ import { accessPrincipal, realAdmin } from "./members.ts";
 import { LoginLimits } from "./limits.ts";
 
 const OPEN_READS = new Set([
-  "/api/auth/login", "/api/auth/options", "/api/auth/feishu", "/api/auth/callback",
+  "/api/auth/login", "/api/auth/options", "/api/auth/feishu", "/api/auth/callback", "/api/access/options",
   "/logo.svg", "/favicon.ico", "/icon.png", "/icon-192.png", "/apple-icon.png",
 ]);
-const LOGIN_POSTS = new Set(["/api/access/login", "/api/auth/password"]);
-const MEMBER_WRITES = new Set(["/api/access/logout", "/api/access/password", "/api/site/feedback"]);
+const LOGIN_POSTS = new Set(["/api/access/login", "/api/access/dingtalk", "/api/auth/password"]);
+// /api/site/visit: the usage module's page-visit report, sent by the member's browser with the CSRF token.
+const MEMBER_WRITES = new Set(["/api/access/logout", "/api/access/password", "/api/site/feedback", "/api/site/visit"]);
 const attempts = new LoginLimits();
 
 export function allowedOrigins(): string[] {

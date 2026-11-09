@@ -4,7 +4,8 @@ import { cookie } from "@aihot/backend/admin/auth";
 import { config } from "@aihot/backend/config";
 import { adminHandler } from "../../../apps/api/src/routes/admin-auth.ts";
 import { sendProblem } from "../../../apps/api/src/http/respond.ts";
-import { AccessError, SESSION_SECONDS, accessPrincipal, changeMember, changeOwnPassword, createMember, listMembers, loginMember, logoutMember, memberPrincipal } from "./members.ts";
+import { DingtalkRefused, dingtalkLogin, dingtalkUser } from "./dingtalk.ts";
+import { AccessError, SESSION_SECONDS, accessPrincipal, changeMember, changeOwnPassword, createMember, listMembers, loginDingtalk, loginMember, logoutMember, memberPrincipal } from "./members.ts";
 import { PasswordBusy } from "./password.ts";
 
 const secure = () => config.siteUrl.startsWith("https://");
@@ -34,6 +35,26 @@ export function registerAccess(app: FastifyInstance): void {
   app.post("/api/access/login", { bodyLimit: 8 * 1024 }, (req, reply) => respond(req, reply, async () => {
     const b = body(req);
     const token = await loginMember(b.username, b.password, req.id);
+    reply.header("Set-Cookie", cookie(MEMBER_COOKIE, token, SESSION_SECONDS, secure()));
+    return { redirect: safeReturnPath(b.returnTo, { loginPath: "/login" }) };
+  }));
+  // What the sign-in page offers besides the password: DingTalk sign-in when the site has a DingTalk app.
+  app.get("/api/access/options", async (_req, reply) => reply.header("Cache-Control", "no-store").send({ dingtalk: dingtalkLogin() }));
+  // The sign-in page inside DingTalk posts the code DingTalk gave it; DingTalk says who it is.
+  app.post("/api/access/dingtalk", { bodyLimit: 8 * 1024 }, (req, reply) => respond(req, reply, async () => {
+    const b = body(req);
+    if (typeof b.code !== "string" || !/^[!-~]{1,256}$/.test(b.code)) throw new AccessError(400, "invalid_request", "A DingTalk code is required.");
+    if (!dingtalkLogin()) throw new AccessError(404, "not_found", "钉钉登录没有开启。");
+    let user: { userId: string; name: string };
+    try {
+      user = await dingtalkUser(b.code);
+    } catch (error) {
+      if (!(error instanceof DingtalkRefused)) throw error;
+      // DingTalk's own message names the cause (an expired code, a server address missing from the app's allowlist); it holds no credentials.
+      req.log.warn({ errcode: error.errcode, err: error.message }, "dingtalk sign-in refused");
+      throw new AccessError(401, "unauthorized", "钉钉身份验证没有通过。");
+    }
+    const token = await loginDingtalk(user, req.id);
     reply.header("Set-Cookie", cookie(MEMBER_COOKIE, token, SESSION_SECONDS, secure()));
     return { redirect: safeReturnPath(b.returnTo, { loginPath: "/login" }) };
   }));

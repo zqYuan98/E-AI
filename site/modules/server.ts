@@ -4,6 +4,7 @@ import { access } from "@aihot/access/server";
 import { channels } from "@aihot/channels/server";
 import { policy } from "@aihot/policy/server";
 import { research } from "@aihot/research/server";
+import { usage } from "@aihot/usage/server";
 import { wechat } from "@aihot/wechat/server";
 
-export const SERVER_MODULES: readonly ServerModule[] = [access, channels, policy, research, wechat];
+export const SERVER_MODULES: readonly ServerModule[] = [access, channels, policy, research, usage, wechat];

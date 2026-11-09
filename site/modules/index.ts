@@ -6,5 +6,6 @@ import { access } from "@aihot/access/module";
 import { channels } from "@aihot/channels/module";
 import { policy } from "@aihot/policy/module";
 import { research } from "@aihot/research/module";
+import { usage } from "@aihot/usage/module";
 
-export const MODULES: readonly ModuleDeclaration[] = [access, channels, policy, research];
+export const MODULES: readonly ModuleDeclaration[] = [access, channels, policy, research, usage];

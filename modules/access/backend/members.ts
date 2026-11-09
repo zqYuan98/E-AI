@@ -3,7 +3,7 @@ import type { AccessPrincipal } from "@aihot/contracts/access";
 import { MEMBER_COOKIE } from "@aihot/contracts/access";
 import { parseCookies, sessionPrincipal, type AdminPrincipal } from "@aihot/backend/admin/auth";
 import { audit } from "@aihot/backend/audit";
-import { sql } from "@aihot/backend/db";
+import { sql, type Db } from "@aihot/backend/db";
 import { sha256 } from "@aihot/backend/lib/ids";
 import type { CreateMember, Member } from "../types.ts";
 import { hashPassword, normalizeUsername, validPassword, verifyPassword } from "./password.ts";
@@ -98,11 +98,45 @@ export async function loginMember(username: unknown, password: unknown, requestI
   return sql.begin(async (tx) => {
     const [current] = await tx<CredentialRow[]>`SELECT * FROM access_members WHERE id = ${snapshot.id} FOR UPDATE`;
     if (!current || current.disabled || current.credential_version !== snapshot.credential_version || current.password_hash !== snapshot.password_hash) throw rejected();
-    const token = randomBytes(32).toString("base64url");
-    await tx`INSERT INTO access_sessions (id_hash, member_id, credential_version, csrf_token, expires_at)
-      VALUES (${sha256(token)}, ${current.id}, ${current.credential_version}, ${randomBytes(24).toString("base64url")}, ${new Date(Date.now() + SESSION_SECONDS * 1000)})`;
-    await audit(`member:${current.id}`, "access.login", `member:${current.id}`, null, null, null, { db: tx, requestId });
-    return token;
+    return openSession(tx, current, null, requestId);
+  }) as Promise<string>;
+}
+
+/** A new session of a member whose row the caller holds locked; returns its token. */
+async function openSession(tx: Db, member: CredentialRow, via: "dingtalk" | null, requestId?: string): Promise<string> {
+  const token = randomBytes(32).toString("base64url");
+  await tx`INSERT INTO access_sessions (id_hash, member_id, credential_version, csrf_token, expires_at)
+    VALUES (${sha256(token)}, ${member.id}, ${member.credential_version}, ${randomBytes(24).toString("base64url")}, ${new Date(Date.now() + SESSION_SECONDS * 1000)})`;
+  await audit(`member:${member.id}`, "access.login", `member:${member.id}`, null, null, via ? { via } : null, { db: tx, requestId });
+  return token;
+}
+
+/** Stored as the password of an account made by DingTalk sign-in: no password matches it until an admin sets one. */
+const NO_PASSWORD = "dingtalk-only";
+
+/**
+ * Sign-in from the DingTalk workbench: the member the DingTalk userid opened its first time, made now if new
+ * (anyone DingTalk vouches for is in the company). The name follows DingTalk's; a disabled member stays out.
+ */
+export async function loginDingtalk(user: { userId: string; name: string }, requestId?: string): Promise<string> {
+  const name = user.name.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 120) || "钉钉成员";
+  return sql.begin(async (tx) => {
+    // Two first sign-ins of one person at once make one member.
+    await tx`SELECT pg_advisory_xact_lock(hashtext(${`access.dingtalk:${user.userId}`}))`;
+    const [link] = await tx<{ member_id: number }[]>`SELECT member_id FROM access_dingtalk_users WHERE userid = ${user.userId}`;
+    let id = link?.member_id;
+    if (id === undefined) {
+      const [row] = await tx<MemberRow[]>`
+        INSERT INTO access_members (username, display_name, password_hash) VALUES (${`dingtalk-${sha256(user.userId).slice(0, 12)}`}, ${name}, ${NO_PASSWORD})
+        RETURNING id, username, display_name, disabled, created_at, updated_at`;
+      id = row!.id;
+      await tx`INSERT INTO access_dingtalk_users (userid, member_id) VALUES (${user.userId}, ${id})`;
+      await audit(`member:${id}`, "access.member.dingtalk", `member:${id}`, null, null, publicMember(row!), { db: tx, requestId });
+    }
+    const [member] = await tx<CredentialRow[]>`SELECT * FROM access_members WHERE id = ${id} FOR UPDATE`;
+    if (!member || member.disabled) throw new AccessError(403, "forbidden", "这个账号已停用，请联系站点管理员。");
+    if (member.display_name !== name) await tx`UPDATE access_members SET display_name = ${name}, updated_at = now() WHERE id = ${id}`;
+    return openSession(tx, member, "dingtalk", requestId);
   }) as Promise<string>;
 }
 

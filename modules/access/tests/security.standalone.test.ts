@@ -70,7 +70,7 @@ test("module paths and redirects follow the shared access contract", () => {
 test("new access migrations each contain one online-safe statement", () => {
   const dir = new URL("../migrations/", import.meta.url);
   for (const file of readdirSync(dir)) {
-    assert.match(file, /^011[0-3]_.*\.sql$/);
+    assert.match(file, /^011\d_.*\.sql$/);
     const plan = migrationPlan(readFileSync(new URL(file, dir), "utf8"));
     assert.ok(plan);
   }

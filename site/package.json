@@ -7,6 +7,7 @@
     "@aihot/access": "*",
     "@aihot/policy": "*",
     "@aihot/research": "*",
+    "@aihot/usage": "*",
     "@aihot/wechat": "*"
   },
   "exports": {
