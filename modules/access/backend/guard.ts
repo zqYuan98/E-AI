@@ -43,6 +43,9 @@ export function registerAccessGuard(app: FastifyInstance): void {
     // A missing route is private too. No database query or release information in anonymous health.
     if (read && route === "/api/health") return reply.send({ ok: true });
     if (read && route && OPEN_READS.has(route)) return;
+    // Only these machine routes use the tenders module's bearer-token check; no prefix-wide exemption.
+    if ((read && (route === "/api/internal/tenders/feed" || route === "/api/internal/tenders/status"))
+      || (req.method === "PUT" && route === "/api/internal/tenders/watch")) return;
     if (req.method === "POST" && route && LOGIN_POSTS.has(route)) {
       if (!originAllowed(req.headers.origin, allowedOrigins())) {
         return sendProblem(req, reply, { status: 403, code: "forbidden", detail: "A same-origin request is required." });

@@ -171,6 +171,16 @@ docker compose run --rm setup && docker compose up -d
 
 下面按时间从新到旧列出每次更新要注意的事。
 
+#### 本站：天枢招采供数
+
+新增 `modules/tenders`，仅给独立的天枢应用提供带令牌的内部接口；原有“招标商机”频道保留。迁移 `0140`–`0143` 新建招采登记表、索引和输入快照字段，不删除已有数据；已有采集正文和模型凭据继续由原平台管理。
+
+- 设置 `TENDERS_FEED_TOKEN`（至少 32 位随机值），天枢的 `AIHOT_FEED_TOKEN` 使用同一值。未设置时接口不开放、该模块的定时任务不运行。
+- 可选 `TENDERS_MODEL`；模型调用仍走原有回执和预算熔断，不能单独绕过 `MODEL_CALLS_ENABLED`。只把产品关注词推给原平台，不传公司资质和业绩。
+- 新模块只使用线上已配置的招采信源，不自动启用停用信源。首次登记最近 30 天发现的资料，正文晚到及修订会生成新的同步版本。
+- 供数接口只在容器网络内部使用，不把内部路由添加到网站公开代理中。access 守卫仅允许三个精确路由交给模块验证 Bearer 令牌，普通成员或管理员 Cookie 不能代替令牌。
+- 部署前备份数据库和配置，按上面的更新流程执行；回退应用版本时保留新增表，不删除迁移账本。详细协议见 [招采模块](../modules/tenders/README.md)。
+
 #### 本站：访问统计与钉钉工作台免登
 
 新迁移 4 个：`modules/usage` 的 `usage_visits`、它的索引和 `usage_daily`，`modules/access` 的 `access_dingtalk_users`，按上面的顺序等 setup 跑完即可。镜像构建要拉新模块 `modules/usage` 的依赖，`Dockerfile` 已加上对应的一行。

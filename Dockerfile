@@ -25,6 +25,7 @@ COPY modules/access/package.json modules/access/
 COPY modules/channels/package.json modules/channels/
 COPY modules/policy/package.json modules/policy/
 COPY modules/research/package.json modules/research/
+COPY modules/tenders/package.json modules/tenders/
 COPY modules/usage/package.json modules/usage/
 COPY modules/wechat/package.json modules/wechat/
 RUN npm ci --no-audit --no-fund ${NPM_REGISTRY:+--registry=$NPM_REGISTRY}
