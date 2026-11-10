@@ -118,6 +118,12 @@ MCP 默认接受 `SITE_URL` 的主机以及 `localhost`、`127.0.0.1`、`[::1]`�
    - 发布应用并设置可见范围。本企业的人第一次打开时自动开一个成员账号（只能从钉钉登录，没有密码），名字跟着钉钉；后台“成员管理”里可以停用。离开企业以后拿不到钉钉的免登授权，也就进不来，已经登录的会话最长 7 天后失效。
    - 登录失败时看 api 的日志：`dingtalk sign-in refused` 一行带着钉钉给的错误码和原因。
 
+7. 项目商机（国网附件自动解析与钉钉推送，说明见 `modules/opportunities/README.md`）：
+   - `.env` 填 `OPPORTUNITIES_FETCHER_URL=http://sgcc-fetcher:8000` 和 `OPPORTUNITIES_FETCHER_TOKEN`（`openssl rand -hex 24`）；国内服务器再填 `APT_MIRROR`、`PIP_INDEX_URL` 指向镜像。`$C build` 会一起构建采集服务镜像（系统 Chromium，约 600 MB），`$C up -d` 启动 `sgcc-fetcher` 容器，只在内网。
+   - 在钉钉群里添加“自定义机器人”，安全设置选“加签”，把 Webhook 和密钥填进 `DINGTALK_ROBOT_WEBHOOK`、`DINGTALK_ROBOT_SECRET`，确认后把 `DINGTALK_PUSH_ENABLED` 改成 `true`。后台“商机 → 项目商机”可以发测试推送。
+   - 后台“模型与评测”给“项目商机筛选”一步选模型（和其他步骤一样）；没选时用 `.env` 的默认模型。
+   - 第一次采集时列表上已有的公告只入库、不推送；之后每 20 分钟看一次列表，新公告约 5 到 10 分钟后推送。
+
 ### 更换大模型服务商
 
 一个服务商额度用完或要换一家时，不需要改代码，也不需要登录服务器：
@@ -180,6 +186,14 @@ docker compose run --rm setup && docker compose up -d
 - 新模块只使用线上已配置的招采信源，不自动启用停用信源。首次登记最近 30 天发现的资料，正文晚到及修订会生成新的同步版本。
 - 供数接口只在容器网络内部使用，不把内部路由添加到网站公开代理中。access 守卫仅允许三个精确路由交给模块验证 Bearer 令牌，普通成员或管理员 Cookie 不能代替令牌。
 - 部署前备份数据库和配置，按上面的更新流程执行；回退应用版本时保留新增表，不删除迁移账本。详细协议见 [招采模块](../modules/tenders/README.md)。
+
+#### 本站：项目商机（国网附件解析、业务筛选、钉钉推送）
+
+新迁移 5 个（`modules/opportunities` 的 `opp_notices`、`opp_items`、`opp_pushes` 和两个索引），按上面的顺序等 setup 跑完即可。内网部署的 compose 多了一个 `sgcc-fetcher` 服务，必须在 `.env` 填 `OPPORTUNITIES_FETCHER_TOKEN` 才能启动（配置步骤见上文“内网部署”第 7 步）。
+
+- 手机底栏的“商机”改为指向项目商机 `/opportunities`；“招标商机”频道仍在侧栏“频道”里。
+- `industry/sources.json` 删掉了 4 个国网电子商务平台的 `json_list` 示范信源：门户的接口带页面脚本生成的动态参数，直接调用拿不到数据，改由采集服务用浏览器访问。已部署的库里这 4 个信源保持停用，不受影响。
+- 推送默认关闭（`DINGTALK_PUSH_ENABLED=false`）。
 
 #### 本站：访问统计与钉钉工作台免登
 

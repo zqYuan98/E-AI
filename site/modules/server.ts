@@ -2,10 +2,11 @@
 import type { ServerModule } from "@aihot/backend/modules";
 import { access } from "@aihot/access/server";
 import { channels } from "@aihot/channels/server";
+import { opportunities } from "@aihot/opportunities/server";
 import { policy } from "@aihot/policy/server";
 import { research } from "@aihot/research/server";
 import { tenders } from "@aihot/tenders/server";
 import { usage } from "@aihot/usage/server";
 import { wechat } from "@aihot/wechat/server";
 
-export const SERVER_MODULES: readonly ServerModule[] = [access, channels, policy, research, tenders, usage, wechat];
+export const SERVER_MODULES: readonly ServerModule[] = [access, opportunities, channels, policy, research, tenders, usage, wechat];

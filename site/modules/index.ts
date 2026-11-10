@@ -4,8 +4,9 @@
 import type { ModuleDeclaration } from "@aihot/contracts/modules";
 import { access } from "@aihot/access/module";
 import { channels } from "@aihot/channels/module";
+import { opportunities } from "@aihot/opportunities/module";
 import { policy } from "@aihot/policy/module";
 import { research } from "@aihot/research/module";
 import { usage } from "@aihot/usage/module";
 
-export const MODULES: readonly ModuleDeclaration[] = [access, channels, policy, research, usage];
+export const MODULES: readonly ModuleDeclaration[] = [access, opportunities, channels, policy, research, usage];

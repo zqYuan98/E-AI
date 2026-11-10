@@ -23,6 +23,7 @@ COPY industry/package.json industry/
 COPY site/package.json site/
 COPY modules/access/package.json modules/access/
 COPY modules/channels/package.json modules/channels/
+COPY modules/opportunities/package.json modules/opportunities/
 COPY modules/policy/package.json modules/policy/
 COPY modules/research/package.json modules/research/
 COPY modules/tenders/package.json modules/tenders/

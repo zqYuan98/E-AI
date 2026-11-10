@@ -2,8 +2,9 @@
 import type { WebModule } from "@aihot/web/modules";
 import { accessWeb } from "@aihot/access/web";
 import { channelsWeb } from "@aihot/channels/web";
+import { opportunitiesWeb } from "@aihot/opportunities/web";
 import { policyWeb } from "@aihot/policy/web";
 import { researchWeb } from "@aihot/research/web";
 import { usageWeb } from "@aihot/usage/web";
 
-export const WEB_MODULES: readonly WebModule[] = [accessWeb, channelsWeb, policyWeb, researchWeb, usageWeb];
+export const WEB_MODULES: readonly WebModule[] = [accessWeb, opportunitiesWeb, channelsWeb, policyWeb, researchWeb, usageWeb];

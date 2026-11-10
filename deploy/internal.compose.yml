@@ -53,6 +53,24 @@ services:
       retries: 3
       start_period: 30s
 
+  # 项目商机的国网采集服务（modules/opportunities/fetcher）：用真实浏览器打开国网公告、下载公告文件并解析里面的 Excel。
+  # 只在内网给 worker 调用，不映射端口；一次只开一个浏览器。令牌和 worker 用的 OPPORTUNITIES_FETCHER_TOKEN 是同一个。
+  # 国内服务器构建时把 APT_MIRROR、PIP_INDEX_URL 指到镜像（.env.example 里有腾讯云的例子）。
+  sgcc-fetcher:
+    build:
+      context: modules/opportunities/fetcher
+      args:
+        APT_MIRROR: ${APT_MIRROR:-deb.debian.org}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+    image: powerai-ai-sgcc-fetcher
+    <<: *logging
+    restart: unless-stopped
+    init: true
+    environment:
+      FETCHER_TOKEN: ${OPPORTUNITIES_FETCHER_TOKEN:?OPPORTUNITIES_FETCHER_TOKEN 必须在 .env 里填}
+    mem_limit: 1g
+    shm_size: 256m
+
   # HTTPS on a port of its own (docs/deploy.md). Its data holds the internal CA whose root certificate
   # colleagues install: kept on the data disk, so recreating the container does not change it.
   caddy:

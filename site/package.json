@@ -5,6 +5,7 @@
   "sideEffects": false,
   "dependencies": {
     "@aihot/access": "*",
+    "@aihot/opportunities": "*",
     "@aihot/policy": "*",
     "@aihot/research": "*",
     "@aihot/tenders": "*",
