@@ -272,11 +272,21 @@ async def discover(source: str, category: str = 'procurement', limit: int = 10) 
             count = value.get('count')
             if not isinstance(records, list) or type(count) is not int or count < 0:
                 raise _error('unknown_layout', '栏目列表结构已改变。')
+            # 列表里混着变更、中标等其他类型的公告：跳过，只收采购/招标公告。一整页都认不出来才算格式变了。
+            first_error = None
             for record in records:
-                notice = _list_notice(source, category, record)
+                if not isinstance(record, dict) or record.get('doctype') != 'doci-bid':
+                    continue
+                try:
+                    notice = _list_notice(source, category, record)
+                except CollectorError as error:
+                    first_error = first_error or error
+                    continue
                 found.setdefault(notice.external_id, notice)
                 if len(found) == limit:
                     return list(found.values())
+            if first_error is not None and not found:
+                raise first_error
             if not records or len(found) >= count:
                 return list(found.values())
             if page_number == _MAX_PAGES:

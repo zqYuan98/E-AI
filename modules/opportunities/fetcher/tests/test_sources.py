@@ -278,6 +278,33 @@ def test_discovery_rejects_invalid_inputs_before_browser(arguments):
         run(sources.discover(*arguments))
 
 
+def test_discovery_skips_other_notice_types_in_the_list(monkeypatch):
+    # 真实列表里混着变更、中标等公告；只收采购/招标公告，不能因为它们把整页判成格式变化。
+    change = {**listing_record(identifier=200001), 'doctype': 'doci-change'}
+    winner = {**listing_record(identifier=200002), 'doctype': 'doci-win'}
+    monkeypatch.setattr(sources, '_session', fake_session(SimpleNamespace()))
+
+    async def navigate(*args):
+        return {'noteList': [change, listing_record(), winner, listing_record(identifier=123457)], 'count': 4}
+
+    monkeypatch.setattr(sources, '_navigate_response', navigate)
+    notices = run(sources.discover('ecp', 'procurement', 2))
+    assert [n.external_id.split('_')[0] for n in notices] == ['123456', '123457']
+
+
+def test_discovery_fails_when_no_bid_record_can_be_read(monkeypatch):
+    broken = {**listing_record(), 'noticeId': 'not-a-number', 'id': None}
+    monkeypatch.setattr(sources, '_session', fake_session(SimpleNamespace()))
+
+    async def navigate(*args):
+        return {'noteList': [broken], 'count': 1}
+
+    monkeypatch.setattr(sources, '_navigate_response', navigate)
+    with pytest.raises(CollectorError) as error:
+        run(sources.discover('ecp', 'procurement', 20))
+    assert error.value.code == 'unknown_layout'
+
+
 class DetailPage:
     def get_by_text(self, *args, **kwargs):
         return self
