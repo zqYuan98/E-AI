@@ -133,4 +133,6 @@ export interface FetcherResult {
   complete: boolean;
   warnings: string[];
   items: FetcherItem[];
+  /** Word 公告正文的开头（附件里没有需求表时用）。 */
+  text?: string;
 }

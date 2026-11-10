@@ -40,6 +40,8 @@ const ITEMS = [
 // 采集服务替身：/discover 返回 listed，/fetch 按 failures 失败或返回附件解析结果。
 let listed: FetcherNotice[] = [];
 const failures = new Map<string, { status: number; code: string }>();
+/** 附件里只有 Word 公告、没有需求表的公告。 */
+const wordOnly = new Set<string>();
 const fetched: string[] = [];
 const fetcher = createServer((req, res) => {
   let body = "";
@@ -54,8 +56,9 @@ const fetcher = createServer((req, res) => {
     if (fail) { res.statusCode = fail.status; return res.end(JSON.stringify({ error: { code: fail.code, message: "替身失败", retryable: fail.status >= 500 } })); }
     const n = listed.find((x) => x.url === url)!;
     // 采购内容带上批次号：不同公告的项目文字不同（相同的文字会复用已有的模型结果，不再调用）。
-    const items = ITEMS.map((i) => ({ ...i, scope: `${i.scope}（${n.batch}）` }));
-    const result: FetcherResult = { notice: { ...n, title: `${n.title}（详情）` }, sha256: "a".repeat(64), complete: true, warnings: [], items };
+    const items = wordOnly.has(url) ? [] : ITEMS.map((i) => ({ ...i, scope: `${i.scope}（${n.batch}）` }));
+    const result: FetcherResult = { notice: { ...n, title: `${n.title}（详情）` }, sha256: "a".repeat(64), complete: true, warnings: [], items,
+      text: "视觉及环境采集系统框架采购，含图像识别算法与视频分析平台部署" };
     res.end(JSON.stringify(result));
   });
 });
@@ -175,6 +178,19 @@ test("a keyword only in the procurement content is not enough without the model"
   const m = matchKeywords(p, { project_name: "供电所弱电布线及设备间环境治理", package_name: "", scope: "更换交换机" });
   assert.equal(m.lines.length, 1);
   assert.equal(m.nameLines.length, 0);
+});
+
+test("a notice whose attachment has no demand sheet is judged as one project from its Word text", async () => {
+  wordOnly.add(URL_OF("6001"));
+  listed = [notice("6001", "视觉及环境采集系统框架"), ...listed];
+  await discoverCycle();
+  const items = await sql<{ project_name: string; scope: string; package: string }[]>`SELECT project_name, scope, package FROM opp_items WHERE notice_id = 'ecp-6001_2018032900295987'`;
+  assert.equal(items.length, 1);
+  assert.equal(items[0]!.project_name, "视觉及环境采集系统框架（详情）");
+  assert.match(items[0]!.scope, /图像识别算法/);
+  const [n] = await sql<{ item_count: number; warnings: string[] }[]>`SELECT item_count, warnings FROM opp_notices WHERE id = 'ecp-6001_2018032900295987'`;
+  assert.equal(n!.item_count, 1);
+  assert.equal(n!.warnings[0], "附件里没有需求表，按整份公告判断");
 });
 
 test("attachment failures are classified: no public file is not retried, a network failure is retried later", async () => {

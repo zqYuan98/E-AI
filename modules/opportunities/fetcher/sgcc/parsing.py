@@ -458,7 +458,7 @@ _ALIASES = {
     'ceiling': ('最高限价', '最高投标限价', '控制价'),
     'budget': ('采购估算金额', '估算金额', '预算金额', '采购预算'),
     'pricing': ('报价方式', '计价方式'),
-    'request_id': ('采购申请标识', '采购申请号', '采购申请编号', '网省采购申请号', '需求编号'),
+    'request_id': ('采购申请标识', '采购申请号', '采购申请编号', '网省采购申请号', '网省采购申请行号', '需求编号'),
     'technical_id': ('技术规范书id', '技术规范书编号', '技术规范编码', '技术规范书编码'),
     'consortium': ('是否接受联合体应答', '是否接受联合体投标', '是否接受联合体', '联合体要求'),
 }
@@ -484,6 +484,9 @@ def _schema(row: dict[int, _Cell]) -> tuple[str, dict[str, int]] | None:
                 key = 'package'
             if key not in mapping or (goods and _normal(cell.text) in ('需求单位', '网省采购申请号')):
                 mapping[key] = col
+    # 有的网省模板没有“项目名称”列，项目名写在“包名称”里（如国网四川“项目概况与资质业绩要求”）。
+    if not goods and 'project_name' not in mapping and 'package_name' in mapping:
+        mapping['project_name'] = mapping['package_name']
     required = {'section', 'package', 'project_name'}
     if required <= mapping.keys() and any(k in mapping for k in ('scope', 'qualifications', 'request_id', 'ceiling')):
         return ('goods' if goods else 'demand'), mapping
@@ -615,9 +618,21 @@ def _table(grid: dict[int, dict[int, _Cell]], hidden: dict[int, bool], merge_lis
         context.warn(f'{parsed.name} / {name}: {summary["error"]}')
         return summary, []
     view, mapping = schema
+    # 两行表头：上一行是“响应供应商专用资格要求”这样的分组名，下一行才是“资质要求”“业绩要求”。
+    # 下一行只有认得出的列名、没有数据时，按它细化列，数据从它下面开始。
+    top_row = header_row
+    below = sorted(r for r in grid if r > header_row)[:1]
+    if below:
+        sub = {c: cell.text for c, cell in grid[below[0]].items() if cell.text.strip()}
+        keys = {c: _label_key(text) for c, text in sub.items()}
+        if sub and all(keys.values()):
+            mapping = {**mapping, **{key: c for c, key in keys.items()}}
+            header_row = below[0]
     summary.update(schema=view, header_row=header_row, status='parsed',
                    missing_fields=[key for key in _ALIASES if key not in mapping])
-    headers = {_column(c): cell.text for c, cell in grid[header_row].items()}
+    # 两行表头时，单位（“最高限价(万元)”）在上一行：两行的列名合起来，下一行有字的列以下一行为准。
+    headers = {_column(c): cell.text for c, cell in grid[top_row].items()}
+    headers.update({_column(c): cell.text for c, cell in grid[header_row].items() if cell.text.strip()})
     rows: list[_Candidate] = []
     for rownum in sorted(grid):
         if rownum <= header_row:

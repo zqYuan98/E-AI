@@ -8,7 +8,7 @@ import time
 import pytest
 
 from sgcc import server
-from sgcc.contracts import (CollectorError, DownloadedNotice, Evidence, Notice, ParseResult, ProjectRow)
+from sgcc.contracts import (CollectorError, DownloadedNotice, Evidence, Notice, ParsedFile, ParseResult, ProjectRow)
 
 TOKEN = 'test-token-0123456789abcdefXYZ'
 ECP = 'https://ecp.sgcc.com.cn/ecp2.0/portal/#/doc/doci-bid/123456_2018032900295987'
@@ -159,7 +159,7 @@ def test_discover_returns_fetcher_notices(base, fakes):
 def test_fetch_maps_rows_slims_evidence_and_removes_temp_dir(base, fakes):
     status, payload = call(base, 'POST', '/fetch', {'url': ECP})
     assert status == 200
-    assert set(payload) == {'notice', 'sha256', 'complete', 'warnings', 'items'}
+    assert set(payload) == {'notice', 'sha256', 'complete', 'warnings', 'items', 'text'}
     assert payload['sha256'] == 'f' * 64 and payload['complete'] is True and payload['warnings'] == ['w'] * 3
     assert 'deadline' not in payload['notice']
     assert payload['notice']['metadata']['procurement_file_deadline'] == '2031-01-05 12:00:00'
@@ -173,6 +173,20 @@ def test_fetch_maps_rows_slims_evidence_and_removes_temp_dir(base, fakes):
     # The parser sees a readable display name, never the remote one.
     assert fakes.calls[-1] == ('parse', 'ecp-' + 'a' * 32 + '.zip', '公告文件.zip')
     assert not fakes.directories[0].exists()
+
+
+def test_word_text_excerpt_is_returned_for_notices_without_a_demand_sheet(base, fakes):
+    # 附件里只有 Word 公告、没有需求表时，平台靠这段正文把整份公告当一个项目判断。
+    fakes.rows = []
+    word = ParsedFile('公告文件.zip!/采购公告.docx', 'a' * 64, 'docx', 'parsed', 10, text='视觉及环境采集系统\n\n框架采购  ' + '说明' * 2000)
+    original = fakes.parse
+    fakes.parse = lambda path, filename: ParseResult(rows=[], files=[word], complete=True)
+    service = server.Service(discover=fakes.discover, download=fakes.download, parse=fakes.parse, lock_wait=0.2)
+    payload = service.fetch({'url': ECP})
+    fakes.parse = original
+    assert payload['items'] == []
+    assert payload['text'].startswith('视觉及环境采集系统 框架采购 说明')
+    assert len(payload['text']) == server.TEXT_CHARS
 
 
 def test_warnings_are_capped(base, fakes):

@@ -70,8 +70,19 @@ export async function pendingNotices(limit: number): Promise<NoticeRow[]> {
     ORDER BY discovered_at DESC LIMIT ${limit}`;
 }
 
+/** 附件里没有需求表（只有 Word 公告）时，把整份公告当一个项目：名称用公告标题，采购内容用公告正文的开头。 */
+function wholeNotice(result: FetcherResult): FetcherResult["items"] {
+  const n = result.notice;
+  return [{
+    batch: n.batch, section: "", section_name: "", package: "", subpackage: "", package_name: "", project_name: n.title, buyer: n.buyer,
+    location: "", scope: (result.text ?? "").slice(0, 1500), qualifications: "", personnel: "", performance: "", ceiling: "", ceiling_kind: "unknown",
+    budget: "", pricing: "", warnings: ["附件里没有需求表，按整份公告判断"], evidence: [],
+  }];
+}
+
 /** 附件解析结果落库：公告字段以详情为准，项目整批替换（重新抓取时以最新附件为准），等待筛选。 */
-export async function saveFetched(id: string, result: FetcherResult): Promise<number> {
+export async function saveFetched(id: string, fetched: FetcherResult): Promise<number> {
+  const result = fetched.items.length > 0 ? fetched : { ...fetched, items: wholeNotice(fetched), warnings: ["附件里没有需求表，按整份公告判断", ...fetched.warnings] };
   const n = result.notice;
   const meta = n.metadata ?? {};
   const packages = new Set(result.items.map((i) => `${i.section}\u0001${i.package}`)).size;

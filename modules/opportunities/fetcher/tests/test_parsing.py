@@ -260,6 +260,23 @@ class ParsingTests(unittest.TestCase):
                 self.assertEqual(row.evidence[0].cells['scope'], 'I2')
                 self.assertEqual(row.evidence[0].raw['cells']['I2']['source_format'], 'BIFF8')
 
+    def test_province_template_package_name_as_project_and_two_row_header(self):
+        # 国网四川“项目概况与资质业绩要求”：没有“项目名称”列，项目名在“包名称”；资格要求是两行表头。
+        headers = ['序号', '采购编号', '分标编号', '分标名称', '包号', '包名称', '子项目名称', '网省采购申请行号',
+                   '最高限价(万元)（含税）', '报价方式', '需求单位', '项目概况', '响应供应商专用资格要求', '']
+        sub = ['', '', '', '', '', '', '', '', '', '', '', '', '资质要求', '业绩要求']
+        record = ['1', 'S-100', 'S-100', '业务运营服务', '包1', '泸州供电公司2026年RPA支撑服务', '/', '3400213830',
+                  '26.5', '固定总价', '泸州供电公司', '部署RPA流程机器人', '/', '具有软件开发业绩']
+        result = self.parse(xls_workbook([['项目概况与资质业绩要求'], headers, sub, record]), 'sichuan.xls')
+        self.assertEqual(len(result.rows), 1, result.warnings)
+        row = result.rows[0]
+        self.assertEqual(row.project_name, '泸州供电公司2026年RPA支撑服务')
+        self.assertEqual(row.scope, '部署RPA流程机器人')
+        self.assertEqual((row.qualifications, row.performance), ('/', '具有软件开发业绩'))
+        self.assertEqual((row.ceiling, row.ceiling_kind), ('26.5', 'amount_wan'))
+        self.assertEqual(row.request_id, '3400213830')
+        self.assertFalse(any('无法识别为项目' in w for w in result.warnings), result.warnings)
+
     def test_etp_header_yuan_amounts_and_missing_ids_not_invented(self):
         headers = ['标段 ', '分包', '采购人', '采购项目编号', '采购项目名称', '分标名称',
                    '分包名称', '物料（服务）名称', '最高限价（元）', '交货期', '交货地点',

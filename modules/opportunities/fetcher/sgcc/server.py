@@ -67,6 +67,16 @@ def capped(warnings):
     return list(warnings[:MAX_WARNINGS - 1]) + [f'另有 {rest} 条警告未列出。']
 
 
+TEXT_CHARS = 1500
+
+
+def notice_text(files):
+    """Word 公告正文的开头：附件里没有需求表时，平台据此把整份公告当一个项目判断。"""
+    text = ' '.join(f.text for f in files if getattr(f, 'text', ''))
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text[:TEXT_CHARS]
+
+
 def display_name(filename):
     # Evidence shows this name; the saved file name is a random local name.
     suffix = Path(filename).suffix.lower()
@@ -141,6 +151,7 @@ class Service:
                 'notice': notice_json(downloaded.notice), 'sha256': downloaded.sha256,
                 'complete': bool(result.complete), 'warnings': capped(result.warnings),
                 'items': [item_json(row) for row in result.rows],
+                'text': notice_text(result.files),
             }
         finally:
             shutil.rmtree(directory, ignore_errors=True)
