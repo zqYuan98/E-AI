@@ -1,5 +1,6 @@
-// 项目商机：国网电子商务平台、电工交易专区的采购/招标公告，自动下载公告文件、把批次拆成具体项目，按后台“业务口径”
-// 筛出与公司业务对得上的，推到钉钉群，并在 /opportunities 列出。浏览器采集在同一 compose 的内部采集服务里（fetcher/）。
+// 投标商机：国网电子商务平台、电工交易专区的采购/招标公告（自动下载公告文件、把批次拆成具体项目），加上其他招采平台
+// （信源里打了“招标”“招标计划”标签的资料），按后台“业务口径”筛出与公司业务对得上的，从公告正文抽出预算、时间、资质业绩要求，
+// 推到钉钉群，并在 /opportunities 列出。国网的浏览器采集在同一 compose 的内部采集服务里（fetcher/）。
 import type { ServerModule } from "@aihot/backend/modules";
 import { actorOf } from "@aihot/backend/admin/auth";
 import { modelCallsOn, collectionOn } from "@aihot/backend/operations/switches";
@@ -15,10 +16,10 @@ const bodyOf = (req: { body: unknown }) => (req.body && typeof req.body === "obj
 
 export const opportunities: ServerModule = {
   name: "opportunities",
-  models: { opportunities: { label: "项目商机筛选（国网附件里的具体项目是否与公司业务对得上）", env: "OPPORTUNITIES_MODEL", purposes: ["opportunity_screen"] } },
+  models: { opportunities: { label: "投标商机（筛出与公司业务对得上的项目，抽公告要素）", env: "OPPORTUNITIES_MODEL", purposes: ["opportunity_screen", "opportunity_details"] } },
   schedules: [
     { name: "opportunities.discover", cron: "4,24,44 * * * *", run: discoverCycle, missed: "skip", when: () => fetcherUrl() !== null },
-    { name: "opportunities.process", cron: "*/5 * * * *", run: processCycle, missed: "skip", when: () => fetcherUrl() !== null },
+    { name: "opportunities.process", cron: "*/5 * * * *", run: processCycle, missed: "skip" },
     { name: "opportunities.digest", cron: "30 8 * * *", run: () => pushDigest(), missed: "skip" },
   ],
   retention: () => retention(),

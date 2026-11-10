@@ -1,18 +1,44 @@
-// 项目商机的数据约定：后端接口给页面的形状，以及采集服务（fetcher/）返回的形状。
+// 投标商机的数据约定：后端接口给页面的形状，以及采集服务（fetcher/）返回的形状。
 // 页面只读这里的类型；字段的值都是来源原文（时间、金额照抄），没有的就是空串，不推测。
 
 export type Verdict = "relevant" | "maybe" | "irrelevant" | "pending";
 export type CeilingKind = "amount_wan" | "amount_yuan" | "percent" | "unknown";
-export type SourceKey = "ecp" | "etp";
+/** 国网的两个平台由采集服务取附件；web 是其他招采平台（信源里打了“招标”“招标计划”标签的），一条资料一个项目。 */
+export type SourceKey = "ecp" | "etp" | "web";
 
-export const SOURCE_NAMES: Record<SourceKey, string> = { ecp: "国网电子商务平台", etp: "国网电工交易专区" };
+export const SOURCE_NAMES: Record<SourceKey, string> = { ecp: "国网电子商务平台", etp: "国网电工交易专区", web: "其他招采平台" };
 export const VERDICT_LABELS: Record<Verdict, string> = { relevant: "相关", maybe: "待确认", irrelevant: "无关", pending: "待筛选" };
+
+export type RequirementKind = "qualification" | "performance" | "personnel" | "authorization" | "financial" | "credit" | "other";
+
+/**
+ * 模型从公告正文抽出的要素，每项的原话都在正文里核对过（核对不上的已去掉）。
+ * 项目自己的表格没写资质、业绩、限价时，页面和推送用这些补上，标“公告通用要求”。没写的是空串。
+ */
+export interface NoticeDetails {
+  projectName: string;
+  buyer: string;
+  /** “120 万元”。 */
+  budget: string;
+  agency: string;
+  region: string;
+  /** “接受联合体”“不接受联合体”或空。 */
+  consortium: string;
+  /** 公告原样的当地时间（YYYY-MM-DD HH:mm）。 */
+  times: { docObtainEnd: string; signupDeadline: string; bidDeadline: string; opening: string };
+  lots: Array<{ no: string; name: string; scope: string; budget: string }>;
+  requirements: Array<{ kind: RequirementKind; text: string; quote: string; lots: string[] }>;
+  /** 公告写了资格或技术要求“详见招标文件”，而那部分不在公开的正文里。 */
+  detailsInDocuments: boolean;
+}
 
 /** 列表上的一条：一个具体项目（需求行），带它所属的批次和包。 */
 export interface OpportunityCard {
   id: string;
   noticeId: string;
   source: SourceKey;
+  /** 国网两个平台的名称，或其他招采平台的信源名。 */
+  sourceName: string;
   noticeTitle: string;
   batch: string;
   projectName: string;
@@ -30,10 +56,14 @@ export interface OpportunityCard {
   /** 命中的业务方向（后台业务口径里的行名）。 */
   line: string;
   reason: string;
-  /** 采购文件获取截止、开标（开启应答文件）时间，来源原文。 */
+  /** 采购文件获取截止、开标（开启应答文件）时间，来源原文；来源没写的用公告正文里抽出的。 */
   fileDeadline: string;
   openingTime: string;
-  /** 文件获取截止已过（按北京时间比较）。 */
+  /** 投标（响应）文件递交截止，从公告正文抽出。 */
+  bidDeadline: string;
+  /** 公告的预算（“120 万元”），项目自己没写限价时参考。 */
+  noticeBudget: string;
+  /** 获取截止（没有时看投标截止）已过，按北京时间比较。 */
   expired: boolean;
   discoveredAt: string;
   noticeUrl: string;
@@ -62,6 +92,7 @@ export interface OpportunityListResponse {
 export interface OpportunityNotice {
   id: string;
   source: SourceKey;
+  sourceName: string;
   title: string;
   batch: string;
   buyer: string;
@@ -71,6 +102,8 @@ export interface OpportunityNotice {
   url: string;
   /** pending 待取附件 · parsed 已解析 · partial 部分解析 · no_file 没有公开附件 · failed 取附件失败 · blocked 需要人工 */
   status: string;
+  /** 从公告正文抽出的要素；还没抽或公告没有正文时为 null。 */
+  details: NoticeDetails | null;
   warnings: string[];
   itemCount: number;
   packageCount: number;
@@ -107,7 +140,7 @@ export interface OpportunityAdmin {
 
 /** 采集服务 POST /discover 返回的一条公告。 */
 export interface FetcherNotice {
-  source: SourceKey;
+  source: "ecp" | "etp";
   external_id: string;
   url: string;
   title: string;
@@ -133,6 +166,6 @@ export interface FetcherResult {
   complete: boolean;
   warnings: string[];
   items: FetcherItem[];
-  /** Word 公告正文的开头（附件里没有需求表时用）。 */
+  /** Word 公告的正文（最多 3 万字）：抽通用要求和时间；附件里没有需求表时也按它判断。 */
   text?: string;
 }

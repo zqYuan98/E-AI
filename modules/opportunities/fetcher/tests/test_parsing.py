@@ -583,7 +583,7 @@ class ParsingTests(unittest.TestCase):
         self.assertEqual([len(r.evidence) for r in result.rows], [2, 2])
         self.assertEqual(result.rows[0].evidence[1].row, 3)
         self.assertEqual(result.rows[1].evidence[1].row, 2)
-        self.assertIn('物料甲', result.rows[0].evidence[1].raw['extra'].values())
+        self.assertEqual(result.rows[0].evidence[1].cells['scope'], 'G3')  # 物资名称
         self.assertEqual(result.rows[0].deadline, '')
 
     def test_ambiguous_and_unmatched_join_are_not_silently_complete(self):

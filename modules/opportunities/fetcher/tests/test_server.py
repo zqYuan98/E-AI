@@ -175,10 +175,11 @@ def test_fetch_maps_rows_slims_evidence_and_removes_temp_dir(base, fakes):
     assert not fakes.directories[0].exists()
 
 
-def test_word_text_excerpt_is_returned_for_notices_without_a_demand_sheet(base, fakes):
-    # 附件里只有 Word 公告、没有需求表时，平台靠这段正文把整份公告当一个项目判断。
+def test_word_text_is_returned_without_part_markers(base, fakes):
+    # 平台从 Word 正文里抽通用资格、业绩和时间；附件里只有 Word 公告时也靠它把整份公告当一个项目判断。
     fakes.rows = []
-    word = ParsedFile('公告文件.zip!/采购公告.docx', 'a' * 64, 'docx', 'parsed', 10, text='视觉及环境采集系统\n\n框架采购  ' + '说明' * 2000)
+    word = ParsedFile('公告文件.zip!/采购公告.docx', 'a' * 64, 'docx', 'parsed', 10,
+                      text='[word/document.xml]\n视觉及环境采集系统\n\n框架采购  ' + '说明' * 20000)
     original = fakes.parse
     fakes.parse = lambda path, filename: ParseResult(rows=[], files=[word], complete=True)
     service = server.Service(discover=fakes.discover, download=fakes.download, parse=fakes.parse, lock_wait=0.2)
@@ -187,6 +188,29 @@ def test_word_text_excerpt_is_returned_for_notices_without_a_demand_sheet(base, 
     assert payload['items'] == []
     assert payload['text'].startswith('视觉及环境采集系统 框架采购 说明')
     assert len(payload['text']) == server.TEXT_CHARS
+
+
+def goods_row(sheet, row, section, package, name, buyer='国网山东省电力公司本部'):
+    return ProjectRow(
+        batch='', section=section, section_name='', package=package, subpackage='100', package_name='',
+        project_name='某公司2026年第三次物资框架协议公开招标采购', buyer=buyer, scope=name, qualifications='', personnel='',
+        performance='', location='买方指定仓库', deadline='', ceiling='', ceiling_kind='unknown', budget='', pricing='',
+        request_id=f'R{row}', technical_id='T', consortium='',
+        evidence=[Evidence('公告文件.zip!/货物清单.xlsx', sheet, row, {}, {'view': 'goods'})])
+
+
+def test_goods_list_rows_become_one_item_per_section_and_package(base, fakes):
+    # 物资框架招标的货物清单一行一种物资（几千行）；投标按分标+包，合成一包一条，需求表的行照旧。
+    cables = [goods_row('110kV电力电缆', n, 'S1', '包01', f'电力电缆,AC110kV,截面{n}') for n in range(2, 22)]
+    generic = goods_row('货物清单', 3, 'S3', '包01', '水泥杆,非预应力,12m')
+    fakes.rows = [project_row(), *cables, goods_row('10kV避雷器', 2, 'S2', '包01', '避雷器,AC10kV', buyer='国网济南供电公司'), generic]
+    items = call(base, 'POST', '/fetch', {'url': ECP})[1]['items']
+    assert [i['project_name'] for i in items] == ['视频监控运维', '110kV电力电缆', '10kV避雷器', '水泥杆,非预应力,12m']
+    cable = items[1]
+    assert cable['section'] == 'S1' and cable['package'] == '包01' and cable['subpackage'] == ''
+    assert cable['scope'].startswith('物资：电力电缆,AC110kV,截面2；') and '等 20 种' in cable['scope'] and '货物清单 20 行' in cable['scope']
+    assert cable['buyer'] == '国网山东省电力公司本部' and cable['location'] == '买方指定仓库'
+    assert len(cable['evidence']) == 4 and cable['evidence'][0] == {'file': '公告文件.zip!/货物清单.xlsx', 'sheet': '110kV电力电缆', 'row': 2}
 
 
 def test_warnings_are_capped(base, fakes):

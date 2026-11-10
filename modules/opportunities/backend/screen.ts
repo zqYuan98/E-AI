@@ -1,6 +1,7 @@
 // 筛选：一份公告拆出的项目，先按业务口径的排除词去掉一定无关的，其余分批交给模型判断相关 / 待确认 / 无关。
 // 模型临时出错（中转站高峰期 503、限流、预算到顶）时这份公告先不推，下一轮再筛；已经答过的批次复用回执，不重复花钱。
 // 取到附件 6 小时后模型还是不行，或者模型调用被关掉，就按关键词兜底：项目名或包名命中方向关键词的记“待确认”，其余无关。
+// 其他招采平台的资料一条一个项目，不按公告逐份调用，攒成一批（每批 60 条）交给模型。
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { sql } from "@aihot/backend/db";
@@ -41,7 +42,8 @@ function systemPrompt(profile: BusinessProfile): string {
 
 function itemText(n: number, i: ItemRow): string {
   const scope = i.scope.length > SCOPE_CHARS ? `${i.scope.slice(0, SCOPE_CHARS)}…` : i.scope;
-  return [`#${n} 项目：${i.project_name}`, `分标/包：${[i.section_name, i.package, i.package_name].filter(Boolean).join(" / ")}`,
+  const pkg = [i.section_name, i.package, i.package_name].filter(Boolean).join(" / ");
+  return [`#${n} 项目：${i.project_name}`, pkg ? `分标/包：${pkg}` : null,
     scope ? `采购内容：${scope}` : null].filter(Boolean).join("\n");
 }
 
@@ -54,12 +56,12 @@ function byKeywords(profile: BusinessProfile, i: ItemRow): Decision {
   return { verdict: "maybe", line: first.name, reason: `关键词命中：${first.words.slice(0, 3).join("、")}（未经模型判断）`, matched_by: "keyword" };
 }
 
-async function askModel(noticeId: string, chunk: ItemRow[], index: number, profile: BusinessProfile, model: string): Promise<Map<string, Decision>> {
+async function askModel(subject: string, chunk: ItemRow[], profile: BusinessProfile, model: string): Promise<Map<string, Decision>> {
   const user = chunk.map((i, k) => itemText(k + 1, i)).join("\n\n");
   const res = await chatJson({
     model,
     purpose: "opportunity_screen",
-    subject: `opportunity:${noticeId}:${index}`,
+    subject,
     attemptTag: createHash("sha256").update(`${JSON.stringify(profile)}\n${user}`).digest("hex").slice(0, 16),
     promptVersion: promptVersion("opportunity-screen"),
     system: systemPrompt(profile),
@@ -97,7 +99,7 @@ export async function screenNotice(noticeId: string, now = new Date()): Promise<
     for (let start = 0, index = 0; start < toModel.length; start += CHUNK, index += 1) {
       const chunk = toModel.slice(start, start + CHUNK);
       try {
-        for (const [id, d] of await askModel(noticeId, chunk, index, profile, model)) decisions.set(id, d);
+        for (const [id, d] of await askModel(`opportunity:${noticeId}:${index}`, chunk, profile, model)) decisions.set(id, d);
         usedModel = true;
       } catch (error) {
         const [n] = await sql<{ fetched_at: Date | null }[]>`
@@ -122,4 +124,52 @@ export async function screenNotice(noticeId: string, now = new Date()): Promise<
     await tx`UPDATE opp_notices SET screened = true WHERE id = ${noticeId}`;
   });
   return { ...tally, model: usedModel };
+}
+
+/** 其他招采平台的资料：一次最多筛 4 批。模型临时出错时，取到不满 6 小时的留到下一轮，满了的按关键词兜底。 */
+export async function screenWebItems(now = new Date()): Promise<{ screened: number; relevant: number; deferred: number }> {
+  const items = await sql<(ItemRow & { fetched_at: Date })[]>`
+    SELECT i.*, i.id::text AS id, n.fetched_at FROM opp_items i JOIN opp_notices n ON n.id = i.notice_id
+    WHERE n.source = 'web' AND NOT n.screened ORDER BY n.discovered_at DESC LIMIT ${CHUNK * 4}`;
+  if (items.length === 0) return { screened: 0, relevant: 0, deferred: 0 };
+  const profile = await loadProfile();
+  const decisions = new Map<string, Decision>();
+  const toModel: Array<ItemRow & { fetched_at: Date }> = [];
+  for (const i of items) {
+    const k = byKeywords(profile, i);
+    if (k.matched_by === "exclude") decisions.set(i.id, k);
+    else toModel.push(i);
+  }
+  let modelFailed = false;
+  if (toModel.length > 0 && (await modelCallsOn())) {
+    const model = await modelFor("opportunities");
+    for (let start = 0; start < toModel.length; start += CHUNK) {
+      const chunk = toModel.slice(start, start + CHUNK);
+      const batch = createHash("sha256").update(chunk.map((i) => i.id).join(",")).digest("hex").slice(0, 16);
+      try {
+        for (const [id, d] of await askModel(`opportunity:web:${batch}`, chunk, profile, model)) decisions.set(id, d);
+      } catch (error) {
+        console.error(JSON.stringify({ level: "warn", msg: "opportunity web screen model failed", items: chunk.length, err: logError(error) }));
+        modelFailed = true;
+        break;
+      }
+    }
+  }
+  const result = { screened: 0, relevant: 0, deferred: 0 };
+  await sql.begin(async (tx) => {
+    for (const i of items) {
+      let d = decisions.get(i.id);
+      if (!d && modelFailed && now.getTime() - i.fetched_at.getTime() < WAIT_FOR_MODEL_MS) {
+        result.deferred += 1;
+        continue;
+      }
+      d ??= byKeywords(profile, i);
+      result.screened += 1;
+      if (d.verdict === "relevant") result.relevant += 1;
+      await tx`UPDATE opp_items SET verdict = ${d.verdict}, line = ${d.line}, reason = ${d.reason.slice(0, 200)}, matched_by = ${d.matched_by}
+        WHERE id = ${i.id}::bigint`;
+      await tx`UPDATE opp_notices SET screened = true WHERE id = ${i.notice_id}`;
+    }
+  });
+  return result;
 }

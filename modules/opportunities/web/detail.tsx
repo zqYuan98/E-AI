@@ -1,5 +1,5 @@
-// 一条国网招采公告（一个批次）：公告信息、解析情况，筛出的相关和待确认项目逐个写全（锚点 item-<id>，列表点进来定位到这里），
-// 其余项目只列名称和包。
+// 一份招采公告：公告信息、解析情况、从公告正文抽出的要素（预算、时间、通用资格业绩要求），筛出的相关和待确认项目逐个写全
+// （锚点 item-<id>，列表点进来定位到这里），其余项目只列名称和包。
 import { useLoaderData } from "react-router";
 import { cachedPage, loadOr404 } from "@aihot/web/lib/api.server";
 import { pageMeta } from "@aihot/web/lib/seo";
@@ -8,7 +8,7 @@ import { AsideCard, ReadingLayout } from "@aihot/web/components/ui/Page";
 import { PhoneBar } from "@aihot/web/components/shell/PhoneBar";
 import type { Screen } from "@aihot/web/components/shell/screens";
 import { IconExternal } from "@aihot/web/components/icons";
-import { SOURCE_NAMES, VERDICT_LABELS, type OpportunityItem, type OpportunityNoticeDetail } from "../types.ts";
+import { VERDICT_LABELS, type NoticeDetails, type OpportunityItem, type OpportunityNoticeDetail, type RequirementKind } from "../types.ts";
 import { ExpiredTag, MAYBE_HINT, NOTICE_STATUS_NOTES, VerdictTag, ceilingText } from "./parts.tsx";
 
 export const handle: Screen = { tab: "opportunities" };
@@ -19,7 +19,7 @@ export async function loader({ request, params }: { request: Request; params: { 
 }
 
 export function meta({ loaderData }: { loaderData?: OpportunityNoticeDetail }) {
-  if (!loaderData) return pageMeta({ title: "项目商机", path: "/opportunities" });
+  if (!loaderData) return pageMeta({ title: "投标商机", path: "/opportunities" });
   const n = loaderData.notice;
   return pageMeta({ title: n.title, description: [n.buyer, n.batch, `${n.itemCount} 个项目`].filter(Boolean).join(" · "), path: `/opportunities/${n.id}` });
 }
@@ -50,6 +50,66 @@ function Block({ title, text }: { title: string; text: string }) {
   );
 }
 
+const REQUIREMENT_LABELS: Record<RequirementKind, string> = {
+  qualification: "资质", performance: "业绩", personnel: "人员", authorization: "授权", financial: "财务", credit: "信用", other: "其他",
+};
+
+/** 公告正文抽出的要素：各包都适用的预算、时间和通用要求；每条要求可展开看原文。 */
+function NoticeFacts({ d }: { d: NoticeDetails }) {
+  const groups = (Object.keys(REQUIREMENT_LABELS) as RequirementKind[])
+    .map((kind) => [kind, d.requirements.filter((r) => r.kind === kind)] as const).filter(([, rs]) => rs.length > 0);
+  return (
+    <section className="card mt-6 px-5 py-4">
+      <h2 className="text-[16px] font-bold text-ink">公告要素</h2>
+      <p className="mt-1 text-[12px] leading-5 text-ink-4">系统从公告正文抽出，每条都核对过原文。这里是各包都适用的通用要求，单个项目自己的要求见下面的项目。</p>
+      <div className="mt-3">
+        <Facts rows={[
+          ["预算", d.budget],
+          ["获取截止", d.times.docObtainEnd],
+          ["报名截止", d.times.signupDeadline],
+          ["投标截止", d.times.bidDeadline],
+          ["开标时间", d.times.opening],
+          ["联合体", d.consortium],
+          ["地区", d.region],
+          ["代理机构", d.agency],
+        ]} />
+      </div>
+      {d.lots.length > 0 && (
+        <div className="mt-4">
+          <h4 className="text-[13px] font-semibold text-ink">标包</h4>
+          <ul className="mt-1 space-y-1 text-[13.5px] leading-[1.7] text-ink-2">
+            {d.lots.map((l, i) => (
+              <li key={i} className="break-words">
+                {[l.no, l.name].filter(Boolean).join(" ")}
+                {l.scope && <span className="text-ink-3">：{l.scope}</span>}
+                {l.budget && <span className="num text-ink-3">（预算 {l.budget}）</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {groups.map(([kind, rs]) => (
+        <div key={kind} className="mt-4">
+          <h4 className="text-[13px] font-semibold text-ink">{REQUIREMENT_LABELS[kind]}要求</h4>
+          <ul className="mt-1 space-y-1.5 text-[13.5px] leading-[1.7] text-ink-2">
+            {rs.map((r, i) => (
+              <li key={i} className="break-words">
+                {r.text}
+                {r.lots.length > 0 && <span className="text-ink-4">（{r.lots.join("、")}）</span>}
+                <details className="text-[12px] text-ink-4">
+                  <summary className="cursor-pointer">原文</summary>
+                  <p className="mt-0.5 whitespace-pre-line break-words">{r.quote}</p>
+                </details>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+      {d.detailsInDocuments && <p className="mt-3 text-[12.5px] text-amber-ink">资格和技术要求另见招标文件，公告里没有写全。</p>}
+    </section>
+  );
+}
+
 function Item({ o }: { o: OpportunityItem }) {
   const pkg = [o.packageLabel, o.packageName].filter(Boolean).join(" · ");
   return (
@@ -76,7 +136,8 @@ function Item({ o }: { o: OpportunityItem }) {
           ["预算", o.budget],
           ["报价方式", o.pricing],
           ["采购文件获取截止", o.fileDeadline],
-          ["开标（开启应答文件）时间", o.openingTime],
+          ["投标截止", o.bidDeadline],
+          ["开标时间", o.openingTime !== o.bidDeadline ? o.openingTime : ""],
         ]} />
       </div>
       <Block title="采购内容" text={o.scope} />
@@ -99,7 +160,7 @@ export default function OpportunityDetail() {
   const note = NOTICE_STATUS_NOTES[n.status];
   const official = n.url && (
     <a href={n.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[13px] text-accent hover:underline">
-      打开国网原公告 <IconExternal size={13} />
+      打开原公告 <IconExternal size={13} />
     </a>
   );
   return (
@@ -109,23 +170,24 @@ export default function OpportunityDetail() {
         aside={
           <AsideCard title="公告信息">
             <Facts rows={[
-              ["来源", SOURCE_NAMES[n.source]],
+              ["来源", n.sourceName],
               ["采购单位", n.buyer],
               ["批次", n.batch],
               ["发布时间", n.published],
               ["采购文件获取截止", n.fileDeadline],
-              ["开标（开启应答文件）时间", n.openingTime],
+              ["投标截止", n.details?.times.bidDeadline ?? ""],
+              ["开标时间", n.openingTime],
               ["项目数", n.itemCount ? `${n.itemCount} 个${n.packageCount ? `，${n.packageCount} 个包` : ""}` : ""],
             ]} />
             {official && <div className="mt-4">{official}</div>}
-            <p className="mt-3 text-[11.5px] leading-5 text-ink-4">项目明细由系统从公告附件自动解析，时间、金额照原文；报名和投标以国网原公告为准。</p>
+            <p className="mt-3 text-[11.5px] leading-5 text-ink-4">{n.source === "web" ? "要素由系统从公告正文自动抽取并核对原文" : "项目明细由系统从公告附件自动解析"}，时间、金额照原文；报名和投标以原公告为准。</p>
           </AsideCard>
         }
       >
         <article className="pt-3 lg:pt-1">
-          <IntentLink to="/opportunities" className="text-[12.5px] text-ink-4 hover:text-accent">← 项目商机</IntentLink>
+          <IntentLink to="/opportunities" className="text-[12.5px] text-ink-4 hover:text-accent">← 投标商机</IntentLink>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[11.5px] text-ink-4">
-            <span className="rounded-mark bg-bg-sunk px-1.5 py-0.5 text-ink-3">{SOURCE_NAMES[n.source]}</span>
+            <span className="rounded-mark bg-bg-sunk px-1.5 py-0.5 text-ink-3">{n.sourceName}</span>
             {n.published && <span className="num">{n.published}</span>}
           </div>
           <h1 data-page-title="" className="mt-2 break-words text-[22px] font-semibold leading-[1.45] text-ink">{n.title}</h1>
@@ -142,13 +204,14 @@ export default function OpportunityDetail() {
             </div>
           )}
           <div className="mt-4 lg:hidden">{official}</div>
+          {n.details && <NoticeFacts d={n.details} />}
 
           <section className="mt-6">
             <h2 className="text-[16px] font-bold text-ink">筛出的项目{items.length > 0 && <span className="num ml-1.5 text-[13px] font-normal text-ink-4">{items.length} 个</span>}</h2>
             {items.length > 0 ? (
               <ol className="mt-3 space-y-3">{items.map((o) => <li key={o.id}><Item o={o} /></li>)}</ol>
             ) : (
-              <p className="mt-3 text-[13px] leading-relaxed text-ink-3">这个批次没有对得上业务口径的项目{n.status === "parsed" || n.status === "partial" ? "" : "，或附件还没解析出来"}。</p>
+              <p className="mt-3 text-[13px] leading-relaxed text-ink-3">这份公告没有对得上业务口径的项目{n.status === "parsed" || n.status === "partial" ? "" : "，或附件还没解析出来"}。</p>
             )}
           </section>
 

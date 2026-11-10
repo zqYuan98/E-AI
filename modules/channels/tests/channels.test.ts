@@ -53,26 +53,26 @@ test("a channel reads several categories at once, and the API refuses a category
 
 test("automatic topics rank last week's use plus its rise, within the channel's categories only", async () => {
   const topics = await readTrendingTags({ categories: CHANNELS.trends.categories, tags: [rising, steady, rare, tenderOnly], limit: 8 }, now);
-  // rising: 3 last week, none before (3 + 3); steady: 4 and 4 (4 + 0); rare: under two uses; tenders are another channel's.
+  // rising: 3 last week, none before (3 + 3); steady: 4 and 4 (4 + 0); rare: under two uses; procurement items are outside the channel's categories.
   assert.deepEqual(topics.map((t) => [t.tag, t.recent, t.before]), [[rising, 3, 0], [steady, 4, 4]]);
 });
 
 test("the defaults are valid, and the admin's changes are checked, audited and can be undone", async () => {
   for (const key of CHANNEL_KEYS) assert.equal(invalidText(CHANNELS[key].defaults), null, key);
-  const text = { title: "招标与商机", lead: "改过的介绍", rows: [{ label: "地区", chips: [{ label: "云南", q: "云南" }, { label: "边缘计算", tag: "边缘计算" }] }] };
-  await assert.rejects(saveChannel("tenders", { ...text, rows: [{ label: "x", chips: [{ label: "y", tag: "不存在的标签" }] }] }, "试", "test"), ChannelError);
-  await assert.rejects(saveChannel("tenders", { ...text, rows: [{ label: "x", chips: [{ label: "y", tag: "智能体", q: "智能体" }] }] }, "试", "test"), ChannelError);
-  await assert.rejects(saveChannel("tenders", text, " ", "test"), /原因/);
+  const text = { title: "政策与标准", lead: "改过的介绍", rows: [{ label: "地区", chips: [{ label: "云南", q: "云南" }, { label: "边缘计算", tag: "边缘计算" }] }] };
+  await assert.rejects(saveChannel("policy-news", { ...text, rows: [{ label: "x", chips: [{ label: "y", tag: "不存在的标签" }] }] }, "试", "test"), ChannelError);
+  await assert.rejects(saveChannel("policy-news", { ...text, rows: [{ label: "x", chips: [{ label: "y", tag: "智能体", q: "智能体" }] }] }, "试", "test"), ChannelError);
+  await assert.rejects(saveChannel("policy-news", text, " ", "test"), /原因/);
 
-  await saveChannel("tenders", text, "按地区看", "test");
-  const view = await channelView("tenders");
+  await saveChannel("policy-news", text, "按地区看", "test");
+  const view = await channelView("policy-news");
   assert.deepEqual([view.title, view.lead, view.rows], [text.title, text.lead, text.rows]);
   assert.deepEqual(view.topics, [], "only 行业热点 has automatic topics");
-  const [entry] = await sql<{ action: string; reason: string }[]>`SELECT action, reason FROM audit_log WHERE subject = 'channel:tenders' ORDER BY id DESC LIMIT 1`;
+  const [entry] = await sql<{ action: string; reason: string }[]>`SELECT action, reason FROM audit_log WHERE subject = 'channel:policy-news' ORDER BY id DESC LIMIT 1`;
   assert.deepEqual([entry!.action, entry!.reason], ["channels.save", "按地区看"]);
 
-  await resetChannel("tenders", "恢复", "test");
-  assert.deepEqual((await channelView("tenders")).title, CHANNELS.tenders.defaults.title);
+  await resetChannel("policy-news", "恢复", "test");
+  assert.deepEqual((await channelView("policy-news")).title, CHANNELS["policy-news"].defaults.title);
 });
 
 test("a topic pinned in a row is not offered again among the automatic ones", async () => {

@@ -1,4 +1,4 @@
-// 频道：招标商机、政策动态、行业热点。页面读引擎的“全部动态”接口；这里只给出每个频道现在的标题、介绍、筛选项和自动话题，
+// 频道：政策动态、行业热点。页面读引擎的“全部动态”接口；这里只给出每个频道现在的标题、介绍、筛选项和自动话题，
 // 以及后台“频道设置”改这些的接口。
 import type { ServerModule } from "@aihot/backend/modules";
 import { actorOf } from "@aihot/backend/admin/auth";

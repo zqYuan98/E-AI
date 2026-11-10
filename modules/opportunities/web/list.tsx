@@ -1,5 +1,5 @@
-// 项目商机列表：国网公告的附件自动拆成的具体项目（需求行），按后台“项目商机”里的业务口径筛过，
-// 默认看相关和待确认的。可按来源、业务方向和搜索词筛选；点开到所在批次的详情，定位到这一项。
+// 投标商机列表：国网公告的附件自动拆成的具体项目（需求行），加上其他招采平台的公告（一条一个项目），按后台“投标商机”里的
+// 业务口径筛过，默认看相关和待确认的。可按来源、业务方向和搜索词筛选；点开到所在批次的详情，定位到这一项。
 import { useLoaderData, useNavigation } from "react-router";
 import { apiGet, cachedPage } from "@aihot/web/lib/api.server";
 import { pageMeta } from "@aihot/web/lib/seo";
@@ -59,7 +59,7 @@ export async function loader({ request }: { request: Request }) {
 }
 
 export function meta() {
-  return pageMeta({ title: "项目商机", description: "国网公开招采公告里，按公司业务口径筛出来的具体项目：买什么、谁买、限价、时间和资格要求。", path: "/opportunities" });
+  return pageMeta({ title: "投标商机", description: "国网、南网等公开招采公告里，按公司业务口径筛出来的具体项目：买什么、谁买、限价或预算、时间和资格业绩要求。", path: "/opportunities" });
 }
 
 function Chip({ to, active, children }: { to: string; active: boolean; children: React.ReactNode }) {
@@ -82,7 +82,7 @@ function Card({ o }: { o: OpportunityCard }) {
         <VerdictTag verdict={o.verdict} />
         {o.expired && <ExpiredTag />}
         {o.line && <span className="text-accent">#{o.line}</span>}
-        <span>{SOURCE_NAMES[o.source]}</span>
+        <span>{o.sourceName}</span>
       </div>
       <h3 className="mt-2 break-words text-[15.5px] font-semibold leading-[1.5] text-ink">{o.projectName || o.packageName || o.noticeTitle}</h3>
       {pkg && <p className="mt-0.5 break-words text-[12.5px] text-ink-3">{pkg}</p>}
@@ -99,7 +99,9 @@ function Card({ o }: { o: OpportunityCard }) {
         </dl>
       )}
       {o.reason && <p className="mt-2 line-clamp-2 break-words text-[12px] leading-[1.6] text-ink-4">推荐理由：{o.reason}</p>}
-      <p className="mt-2 line-clamp-1 break-all text-[11.5px] text-ink-4" title={o.noticeTitle}>{[o.batch, o.noticeTitle].filter(Boolean).join(" · ")}</p>
+      {o.noticeTitle !== o.projectName && (
+        <p className="mt-2 line-clamp-1 break-all text-[11.5px] text-ink-4" title={o.noticeTitle}>{[o.batch, o.noticeTitle].filter(Boolean).join(" · ")}</p>
+      )}
     </IntentLink>
   );
 }
@@ -113,12 +115,13 @@ export default function OpportunityList() {
 
   return (
     <div className="mx-auto max-w-[var(--page-max-reading)] pb-14">
-      <PhoneBar title="项目商机" />
+      <PhoneBar title="投标商机" />
       <header className="pb-2 pt-3 lg:pt-1">
-        <h1 data-page-title="" className="text-[24px] font-semibold leading-[1.3] text-ink">项目商机</h1>
+        <h1 data-page-title="" className="text-[24px] font-semibold leading-[1.3] text-ink">投标商机</h1>
         <p className="mt-1.5 text-[13px] leading-relaxed text-ink-3">
-          系统自动抓取国网的招采公告，下载附件拆成具体项目和包，再按公司的业务口径筛选：“相关”是对得上业务的，“待确认”是{MAYBE_HINT}。
-          业务口径由管理员在后台“项目商机”里维护。时间、金额照原文，投标前请以原公告为准。
+          系统自动抓取国网的招采公告并下载附件拆成具体项目和包，同时收录南网、三峡等其他招采平台的公告，按公司的业务口径筛选：
+          “相关”是对得上业务的，“待确认”是{MAYBE_HINT}。预算、截止时间和资格业绩要求从公告正文抽出并核对原文。
+          业务口径由管理员在后台“投标商机”里维护。时间、金额照原文，投标前请以原公告为准。
         </p>
       </header>
 
@@ -159,7 +162,7 @@ export default function OpportunityList() {
           <EmptyState title={filtered ? "没有符合条件的项目" : "暂时还没有筛出的项目"}>
             {filtered
               ? "换一个关键词或筛选试试。"
-              : "系统会定时抓取国网新发布的招采公告，自动解析附件、按业务口径筛选；有对得上的项目会出现在这里，并推送到钉钉。"}
+              : "系统会定时抓取新发布的招采公告，自动解析、按业务口径筛选；有对得上的项目会出现在这里，并推送到钉钉。"}
           </EmptyState>
         ) : (
           <>

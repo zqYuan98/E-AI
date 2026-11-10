@@ -7,6 +7,7 @@ keeps one browser at a time. Responses follow FetcherNotice / FetcherResult in
 
 import asyncio
 from contextlib import contextmanager
+from dataclasses import replace
 import hmac
 import json
 import os
@@ -67,14 +68,58 @@ def capped(warnings):
     return list(warnings[:MAX_WARNINGS - 1]) + [f'另有 {rest} 条警告未列出。']
 
 
-TEXT_CHARS = 1500
+TEXT_CHARS = 30000
+GOODS_NAMES = 12
 
 
 def notice_text(files):
-    """Word 公告正文的开头：附件里没有需求表时，平台据此把整份公告当一个项目判断。"""
+    """Word 公告的正文：平台从里面抽通用资格、业绩要求和时间；附件里没有需求表时也靠它把整份公告当一个项目判断。"""
     text = ' '.join(f.text for f in files if getattr(f, 'text', ''))
+    text = re.sub(r'\[word/[^\]\s]+\.xml\]', ' ', text)
     text = re.sub(r'\s+', ' ', text).strip()
     return text[:TEXT_CHARS]
+
+
+def _distinct(values, limit):
+    seen = list(dict.fromkeys(v.strip() for v in values if v and v.strip() not in ('', '/')))
+    return seen[:limit], len(seen)
+
+
+def _goods_unit(rows):
+    first = rows[0]
+    sheets, _ = _distinct([r.evidence[0].sheet for r in rows], 3)
+    names, total = _distinct([r.scope for r in rows], GOODS_NAMES)
+    buyers, buyer_count = _distinct([r.buyer for r in rows], 3)
+    places, place_count = _distinct([r.location for r in rows], 3)
+    generic = not sheets or any(re.search(r'清单|^sheet\d*$', s, re.I) for s in sheets)
+    if generic and names:
+        name = names[0] + (f' 等 {total} 种物资' if total > 1 else '')
+    else:
+        name = '、'.join(sheets) or first.project_name
+    scope = ('物资：' + '；'.join(names) + (f' 等 {total} 种' if total > len(names) else '') if names else '') + f'（货物清单 {len(rows)} 行）'
+    ceilings = {(r.ceiling, r.ceiling_kind) for r in rows}
+    ceiling, kind = ceilings.pop() if len(ceilings) == 1 else ('', 'unknown')
+    warnings = list(dict.fromkeys(w for r in rows for w in r.warnings))[:5]
+    return replace(first, subpackage='', project_name=name, scope=scope, ceiling=ceiling, ceiling_kind=kind,
+                   buyer='、'.join(buyers) + ('等' if buyer_count > 3 else ''),
+                   location='、'.join(places) + ('等' if place_count > 3 else ''),
+                   request_id='', technical_id='', evidence=[r.evidence[0] for r in rows[:4]], warnings=warnings)
+
+
+def bid_units(rows):
+    """货物清单（物资框架、批次物资招标）一行是一种物资，一份公告几千行；投标按分标+包投，合成一包一条：
+    名称用工作表名（物资类别），采购内容列出物资名称。和需求表对上的货物行已经并进需求行，不在这里。"""
+    order, groups = [], {}
+    for row in rows:
+        if not row.evidence or (row.evidence[0].raw or {}).get('view') != 'goods':
+            order.append(row)
+            continue
+        key = (row.section, row.package)
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(row)
+    return [_goods_unit(groups[x]) if isinstance(x, tuple) else x for x in order]
 
 
 def display_name(filename):
@@ -150,7 +195,7 @@ class Service:
             return {
                 'notice': notice_json(downloaded.notice), 'sha256': downloaded.sha256,
                 'complete': bool(result.complete), 'warnings': capped(result.warnings),
-                'items': [item_json(row) for row in result.rows],
+                'items': [item_json(row) for row in bid_units(result.rows)],
                 'text': notice_text(result.files),
             }
         finally:

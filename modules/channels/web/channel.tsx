@@ -1,6 +1,6 @@
-// 频道页（招标商机、政策动态、行业热点）共用的页面：“全部动态”里这几类的条目，按分类、标签或搜索词筛选、翻页。
+// 频道页（政策动态、行业热点）共用的页面：“全部动态”里这几类的条目，按分类、标签或搜索词筛选、翻页。
 // 数据就是引擎的 /api/site/pool，和“全部动态”同一个读取层；频道只决定收哪几类、给哪些筛选（后台可改）和自动话题。
-// 每个频道一个路由文件（tenders.tsx 等），声明它在手机底栏属于哪个标签，loader 在 channel.server.ts。
+// 每个频道一个路由文件（trends.tsx 等），声明它在手机底栏属于哪个标签，loader 在 channel.server.ts。
 import { Link, useLoaderData, useNavigation } from "react-router";
 import type { PoolResponse } from "@aihot/contracts/site";
 import { pageMeta } from "@aihot/web/lib/seo";

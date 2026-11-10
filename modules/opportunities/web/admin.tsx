@@ -1,4 +1,4 @@
-// 后台“项目商机”：采集和推送的运行状态，业务口径（每行一个方向“方向名：词、词、词”，加排除词），最近抓到的公告。
+// 后台“投标商机”：采集和推送的运行状态，业务口径（每行一个方向“方向名：词、词、词”，加排除词），最近抓到的公告。
 // 业务口径决定哪些项目算相关或待确认；保存后从下一轮筛选起生效。
 import { useState } from "react";
 import { Link, useLoaderData, type LoaderFunctionArgs } from "react-router";
@@ -10,7 +10,7 @@ import { SOURCE_NAMES, type BusinessProfile, type OpportunityAdmin } from "../ty
 export async function loader({ request }: LoaderFunctionArgs) {
   return adminGet<OpportunityAdmin>(request, "/api/admin/opportunities");
 }
-export const meta = () => [{ title: "项目商机" }, { name: "robots", content: "noindex, nofollow" }];
+export const meta = () => [{ title: "投标商机" }, { name: "robots", content: "noindex, nofollow" }];
 
 type Notice = OpportunityAdmin["notices"][number];
 type Tone = "ok" | "warn" | "bad" | "muted";
@@ -23,7 +23,7 @@ const STATUS: Record<string, { label: string; tone: Tone }> = {
   failed: { label: "取附件失败", tone: "bad" },
   blocked: { label: "需要人工", tone: "bad" },
 };
-const RETRYABLE = new Set(["failed", "blocked", "no_file"]);
+const RETRYABLE = new Set(["failed", "blocked", "no_file", "partial", "parsed"]);
 
 const splitWords = (text: string) => text.split(/[、,，;；\n]/).map((w) => w.trim()).filter(Boolean);
 
@@ -85,8 +85,8 @@ export default function OpportunitiesAdmin() {
 
   return (
     <AdminPage
-      title="项目商机"
-      subtitle="自动抓取国网电子商务平台和电工交易专区的招采公告，下载附件拆成具体项目，按下面的业务口径筛出相关和待确认的，推送到钉钉。"
+      title="投标商机"
+      subtitle="自动抓取国网电子商务平台和电工交易专区的招采公告（下载附件拆成具体项目），并收录信源里打了“招标”“招标计划”标签的其他招采平台公告，按下面的业务口径筛出相关和待确认的，抽出预算、时间和资格业绩要求，推送到钉钉。"
       actions={
         <>
           <Button size="sm" busy={pending === "push-test"} disabled={!status.pushConfigured} title={status.pushConfigured ? undefined : "推送还没配置"}
@@ -129,7 +129,7 @@ export default function OpportunitiesAdmin() {
         </div>
       </Card>
 
-      <Card title={`最近公告（${notices.length}）`} pad={false}>
+      <Card title={`最近的国网公告（${notices.length}）`} pad={false}>
         {notices.length ? (
           <DataTable
             dense

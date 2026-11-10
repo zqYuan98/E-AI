@@ -1,6 +1,6 @@
 # 采集服务（fetcher）
 
-项目商机模块的内部采集服务。它用无头 Chromium 打开国网电子商务平台（ECP）和电工交易专区（ETP）的公开页面，列出采购/招标公告，下载单个公告的“公告文件”并解析其中的需求表，按 `../types.ts` 里的 `FetcherNotice` / `FetcherResult` 返回 JSON。worker 通过内部网络调用它，不对外发布端口。
+投标商机模块的内部采集服务。它用无头 Chromium 打开国网电子商务平台（ECP）和电工交易专区（ETP）的公开页面，列出采购/招标公告，下载单个公告的“公告文件”并解析其中的需求表，按 `../types.ts` 里的 `FetcherNotice` / `FetcherResult` 返回 JSON。worker 通过内部网络调用它，不对外发布端口。
 
 代码：`sgcc/sources.py`（浏览器访问）、`sgcc/parsing.py`（附件解析，ZIP / XLSX / XLS / DOCX）、`sgcc/server.py`（HTTP 服务）。
 
@@ -14,7 +14,9 @@
 | `POST /discover` | `{"source": "ecp"\|"etp", "category": "procurement"\|"tender", "limit": 1..20}`（`limit` 默认 10） | `{"notices": [FetcherNotice]}` |
 | `POST /fetch` | `{"url": 公告详情链接}` | `FetcherResult` |
 
-`/fetch` 只接受两个来源的公告详情链接（`/discover` 返回的 `url`）。返回里 `items` 的 `evidence` 只有 `{file, sheet, row}`；`notice.metadata` 保留 `procurement_file_deadline`、`opening_time`、`batch_name` 等原文字段；`complete` 表示附件全部解析成功；`warnings` 最多 50 条。
+`/fetch` 只接受两个来源的公告详情链接（`/discover` 返回的 `url`）。返回里 `items` 的 `evidence` 只有 `{file, sheet, row}`；`notice.metadata` 保留 `procurement_file_deadline`、`opening_time`、`batch_name` 等原文字段；`complete` 表示附件全部解析成功；`warnings` 最多 50 条；`text` 是附件里 Word 公告的正文（去掉分段标记，最多 3 万字），平台从里面抽通用资格、业绩和时间。
+
+物资招标的货物清单一行一种物资（一份公告几千行），没有和需求表对上的货物行按分标+包合成一个 `item`：名称用工作表名（物资类别；工作表名是“货物清单”这类通用名时用第一种物资名），`scope` 列出前 12 种物资名称和总行数，`evidence` 留前 4 行的位置。
 
 出错时返回 `{"error": {"code", "message", "retryable"}}`：
 

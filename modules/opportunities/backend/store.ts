@@ -1,8 +1,9 @@
 // 项目商机的存取：采集服务发现的公告、附件拆出的项目、页面和后台读的形状。时间、金额照抄来源原文。
 import { sql } from "@aihot/backend/db";
 import { beijingAt } from "@aihot/contracts/time";
+import { SOURCE_NAMES } from "../types.ts";
 import type {
-  CeilingKind, FetcherNotice, FetcherResult, OpportunityCard, OpportunityItem, OpportunityListResponse,
+  CeilingKind, FetcherNotice, FetcherResult, NoticeDetails, OpportunityCard, OpportunityItem, OpportunityListResponse,
   OpportunityNotice, OpportunityNoticeDetail, SourceKey, Verdict,
 } from "../types.ts";
 
@@ -16,7 +17,15 @@ interface NoticeRow {
   id: string; source: SourceKey; category: string; url: string; title: string; batch: string; buyer: string; published: string;
   file_deadline: string; opening_time: string; status: string; error: string; attempts: number; item_count: number;
   package_count: number; warnings: string[]; screened: boolean; backfill: boolean; discovered_at: Date; pushed_at: Date | null;
+  source_name: string; details: NoticeDetails | null;
 }
+
+/** 国网两个平台用代码里的名称，其他招采平台用信源名。 */
+export const sourceName = (n: { source: SourceKey; source_name: string }) => n.source_name || SOURCE_NAMES[n.source] || n.source;
+
+/** 截止看采购文件获取截止；来源没写时看公告正文里抽出的投标（响应）截止。 */
+export const deadlineOf = (n: { file_deadline: string; details: NoticeDetails | null }) =>
+  n.file_deadline || n.details?.times.bidDeadline || n.details?.times.signupDeadline || "";
 
 export interface ItemRow {
   id: string; notice_id: string; ordinal: number; section: string; section_name: string; package: string; subpackage: string;
@@ -80,7 +89,7 @@ function wholeNotice(result: FetcherResult): FetcherResult["items"] {
   }];
 }
 
-/** 附件解析结果落库：公告字段以详情为准，项目整批替换（重新抓取时以最新附件为准），等待筛选。 */
+/** 附件解析结果落库：公告字段以详情为准，项目整批替换（重新抓取时以最新附件为准），等待筛选；公告正文留着抽要素。 */
 export async function saveFetched(id: string, fetched: FetcherResult): Promise<number> {
   const result = fetched.items.length > 0 ? fetched : { ...fetched, items: wholeNotice(fetched), warnings: ["附件里没有需求表，按整份公告判断", ...fetched.warnings] };
   const n = result.notice;
@@ -91,7 +100,7 @@ export async function saveFetched(id: string, fetched: FetcherResult): Promise<n
         file_deadline = ${meta.procurement_file_deadline ?? ""}, opening_time = ${meta.opening_time ?? ""},
         status = ${result.complete ? "parsed" : "partial"}, error = '', file_sha256 = ${result.sha256},
         item_count = ${result.items.length}, package_count = ${packages}, warnings = ${tx.json(result.warnings.slice(0, 50) as never)},
-        screened = false, fetched_at = now()
+        doc_text = ${result.text ?? ""}, details = NULL, details_failures = 0, screened = false, fetched_at = now()
       WHERE id = ${id}`;
     await tx`DELETE FROM opp_items WHERE notice_id = ${id}`;
     for (const [ordinal, i] of result.items.entries()) {
@@ -116,12 +125,12 @@ export async function markFailed(id: string, code: string, message: string): Pro
 
 export async function retryNotice(id: string): Promise<boolean> {
   const rows = await sql`UPDATE opp_notices SET status = 'pending', attempts = 0, error = '', next_attempt_at = now()
-    WHERE id = ${id} AND status IN ('failed', 'blocked', 'no_file', 'partial') RETURNING id`;
+    WHERE id = ${id} AND source <> 'web' AND status IN ('failed', 'blocked', 'no_file', 'partial', 'parsed') RETURNING id`;
   return rows.length > 0;
 }
 
 export async function unscreenedNotices(limit: number): Promise<string[]> {
-  const rows = await sql<{ id: string }[]>`SELECT id FROM opp_notices WHERE status IN ('parsed', 'partial') AND NOT screened
+  const rows = await sql<{ id: string }[]>`SELECT id FROM opp_notices WHERE source <> 'web' AND status IN ('parsed', 'partial') AND NOT screened
     ORDER BY discovered_at DESC LIMIT ${limit}`;
   return rows.map((r) => r.id);
 }
@@ -135,14 +144,25 @@ export async function loadNotice(id: string): Promise<NoticeRow | null> {
   return row ?? null;
 }
 
-function card(i: ItemRow & { notice_title: string; notice_url: string; source: SourceKey; batch: string; file_deadline: string;
-  opening_time: string; discovered_at: Date; notice_buyer: string }, now: Date): OpportunityCard {
+type CardRow = ItemRow & { notice_title: string; notice_url: string; source: SourceKey; source_name: string; batch: string; file_deadline: string;
+  opening_time: string; discovered_at: Date; notice_buyer: string; details: NoticeDetails | null };
+
+/** 采购内容：项目自己写的；其他平台的资料没有需求表，有标包的用标包范围。 */
+function scopeOf(i: CardRow): string {
+  const lots = (i.details?.lots ?? []).map((l) => [l.name, l.scope].filter(Boolean).join("：")).filter(Boolean);
+  return i.source === "web" && lots.length ? lots.join("；") : i.scope;
+}
+
+function card(i: CardRow, now: Date): OpportunityCard {
+  const scope = scopeOf(i);
   return {
-    id: i.id, noticeId: i.notice_id, source: i.source, noticeTitle: i.notice_title, batch: i.batch, projectName: i.project_name,
-    packageLabel: packageLabel(i), packageName: i.package_name, buyer: i.buyer || i.notice_buyer, location: i.location,
-    scopeExcerpt: i.scope.length > 160 ? `${i.scope.slice(0, 160)}…` : i.scope, ceiling: i.ceiling, ceilingKind: i.ceiling_kind as CeilingKind,
+    id: i.id, noticeId: i.notice_id, source: i.source, sourceName: sourceName(i), noticeTitle: i.notice_title, batch: i.batch,
+    projectName: i.project_name, packageLabel: packageLabel(i), packageName: i.package_name, buyer: i.buyer || i.notice_buyer,
+    location: i.location || i.details?.region || "",
+    scopeExcerpt: scope.length > 160 ? `${scope.slice(0, 160)}…` : scope, ceiling: i.ceiling, ceilingKind: i.ceiling_kind as CeilingKind,
     verdict: i.verdict, line: i.line, reason: i.reason, fileDeadline: i.file_deadline, openingTime: i.opening_time,
-    expired: isExpired(i.file_deadline, now), discoveredAt: i.discovered_at.toISOString(), noticeUrl: i.notice_url,
+    bidDeadline: i.details?.times.bidDeadline ?? "", noticeBudget: i.details?.budget ?? "",
+    expired: isExpired(deadlineOf(i), now), discoveredAt: i.discovered_at.toISOString(), noticeUrl: i.notice_url,
   };
 }
 
@@ -150,18 +170,18 @@ const VIEWS: Record<string, Verdict[]> = { focus: ["relevant", "maybe"], relevan
 
 export async function listOpportunities(q: { view?: string; source?: string; line?: string; q?: string; page?: number }, lines: string[], now = new Date()): Promise<OpportunityListResponse> {
   const verdicts = VIEWS[q.view ?? "focus"] ?? VIEWS.focus!;
-  const source = q.source === "ecp" || q.source === "etp" ? q.source : null;
+  const source = q.source === "ecp" || q.source === "etp" || q.source === "web" ? q.source : null;
   const line = q.line && lines.includes(q.line) ? q.line : null;
   const search = (q.q ?? "").trim().slice(0, 40);
   const like = `%${search.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
   const page = Math.max(1, Math.min(Number.isInteger(q.page) ? q.page! : 1, 1000));
   const where = sql`i.verdict = ANY(${verdicts}) AND (${source}::text IS NULL OR n.source = ${source})
     AND (${line}::text IS NULL OR i.line = ${line})
-    AND (${search} = '' OR i.project_name ILIKE ${like} OR i.package_name ILIKE ${like} OR i.scope ILIKE ${like} OR i.buyer ILIKE ${like} OR n.title ILIKE ${like})`;
+    AND (${search} = '' OR i.project_name ILIKE ${like} OR i.package_name ILIKE ${like} OR i.scope ILIKE ${like} OR i.buyer ILIKE ${like} OR n.buyer ILIKE ${like} OR n.title ILIKE ${like} OR n.source_name ILIKE ${like})`;
   const [count] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM opp_items i JOIN opp_notices n ON n.id = i.notice_id WHERE ${where}`;
   const rows = await sql<Parameters<typeof card>[0][]>`
-    SELECT i.*, i.id::text AS id, n.title AS notice_title, n.url AS notice_url, n.source, n.batch, n.file_deadline, n.opening_time,
-      n.discovered_at, n.buyer AS notice_buyer
+    SELECT i.*, i.id::text AS id, n.title AS notice_title, n.url AS notice_url, n.source, n.source_name, n.batch, n.file_deadline, n.opening_time,
+      n.discovered_at, n.buyer AS notice_buyer, n.details
     FROM opp_items i JOIN opp_notices n ON n.id = i.notice_id WHERE ${where}
     ORDER BY n.discovered_at DESC, i.ordinal LIMIT ${PAGE} OFFSET ${(page - 1) * PAGE}`;
   const total = count?.n ?? 0;
@@ -170,9 +190,9 @@ export async function listOpportunities(q: { view?: string; source?: string; lin
 
 function publicNotice(n: NoticeRow): OpportunityNotice {
   return {
-    id: n.id, source: n.source, title: n.title, batch: n.batch, buyer: n.buyer, published: n.published, fileDeadline: n.file_deadline,
+    id: n.id, source: n.source, sourceName: sourceName(n), title: n.title, batch: n.batch, buyer: n.buyer, published: n.published, fileDeadline: n.file_deadline,
     openingTime: n.opening_time, url: n.url, status: n.status, warnings: n.warnings.slice(0, 20), itemCount: n.item_count,
-    packageCount: n.package_count, discoveredAt: n.discovered_at.toISOString(),
+    packageCount: n.package_count, discoveredAt: n.discovered_at.toISOString(), details: n.details,
   };
 }
 
@@ -181,8 +201,8 @@ export async function noticeDetail(id: string, now = new Date()): Promise<Opport
   if (!n) return null;
   const items = await noticeItems(id);
   const full = (i: ItemRow): OpportunityItem => ({
-    ...card({ ...i, notice_title: n.title, notice_url: n.url, source: n.source, batch: n.batch, file_deadline: n.file_deadline,
-      opening_time: n.opening_time, discovered_at: n.discovered_at, notice_buyer: n.buyer }, now),
+    ...card({ ...i, notice_title: n.title, notice_url: n.url, source: n.source, source_name: n.source_name, batch: n.batch,
+      file_deadline: n.file_deadline, opening_time: n.opening_time, discovered_at: n.discovered_at, notice_buyer: n.buyer, details: n.details }, now),
     scope: i.scope, qualifications: i.qualifications, personnel: i.personnel, performance: i.performance, budget: i.budget,
     pricing: i.pricing, evidence: i.evidence,
   });
@@ -198,6 +218,7 @@ export async function recentNotices(limit = 50) {
   const rows = await sql<(NoticeRow & { relevant: number; maybe: number })[]>`
     SELECT n.*, count(*) FILTER (WHERE i.verdict = 'relevant')::int AS relevant, count(*) FILTER (WHERE i.verdict = 'maybe')::int AS maybe
     FROM opp_notices n LEFT JOIN opp_items i ON i.notice_id = n.id
+    WHERE n.source <> 'web'
     GROUP BY n.id ORDER BY n.discovered_at DESC LIMIT ${limit}`;
   return rows.map((n) => ({
     id: n.id, source: n.source, title: n.title, status: n.status, error: n.error, url: n.url, itemCount: n.item_count,

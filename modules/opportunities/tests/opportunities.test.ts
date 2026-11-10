@@ -1,11 +1,13 @@
-// 项目商机：采集服务发现的公告第一轮只入库不推送；之后的新公告取附件、拆项目、按业务口径筛（排除词直接无关，
-// 其余交给模型；模型出错时按关键词记待确认），对得上的推到钉钉群一次且只一次，每日汇总列 3 天内截止的。
+// 投标商机：采集服务发现的公告第一轮只入库不推送；之后的新公告取附件、拆项目、按业务口径筛（排除词直接无关，
+// 其余交给模型；模型出错时按关键词记待确认），从公告正文抽出预算、时间和资格业绩要求（原话核对不上的去掉），
+// 对得上的推到钉钉群一次且只一次，每日汇总列 3 天内截止的。其他招采平台的资料一条一个项目，结果类公告不收。
 // 采集服务、模型和钉钉都是本地替身，不访问外部服务。
 import { pointModels, Reply, stub } from "../../../tests/setup.ts";
 import { createServer } from "node:http";
 import assert from "node:assert/strict";
 import { after, before, beforeEach, test } from "node:test";
 import { config } from "@aihot/backend/config";
+import { upsertMaterial } from "@aihot/backend/content/materials";
 import { closeDb, sql } from "@aihot/backend/db";
 import { installModules } from "@aihot/backend/modules";
 import { stopBoss } from "@aihot/backend/jobs/queue";
@@ -16,6 +18,7 @@ import { opportunities } from "../server.ts";
 import { discoverCycle, processCycle } from "../backend/run.ts";
 import { formatCeiling, pushDigest } from "../backend/push.ts";
 import { deadlineAt, isExpired, packageLabel } from "../backend/store.ts";
+import { verified } from "../backend/details.ts";
 import { DEFAULT_PROFILE, matchKeywords, validateProfile } from "../backend/profile.ts";
 import type { FetcherItem, FetcherNotice, FetcherResult } from "../types.ts";
 
@@ -30,6 +33,31 @@ const item = (pkg: string, project_name: string, scope: string, extra: Partial<F
   buyer: "国网示例供电公司", location: "示例市", scope, qualifications: "/", personnel: "/", performance: "具有同类服务业绩", ceiling: "29.7",
   ceiling_kind: "amount_wan", budget: "", pricing: "总价报价", warnings: [], evidence: [{ file: "需求一览表.xlsx", sheet: "零星项目-服务", row: 4 }], ...extra,
 });
+/** 公告正文：要素抽取的原话都要在这里面找得到。 */
+const TEXT = "视觉及环境采集系统框架采购，含图像识别算法与视频分析平台部署。本次招标预算金额为人民币120万元。"
+  + "投标人须具备电子与智能化工程专业承包二级及以上资质。投标人近三年具有不少于2个视频监控系统运维业绩。"
+  + "投标文件递交截止时间为2099年1月8日9时30分。本次招标不接受联合体投标。";
+const q = <T,>(value: T, quote: string) => ({ value, quote });
+const requirement = (kind: string, text: string, quote: string) => ({ kind, text, quote, lots: null, qualification: null, performance: null });
+/** 抽要素的模型回答：报名截止的原话是开标那句（日期对不上），项目经理那条原话是编的，两项都该去掉。 */
+const DETAILS = {
+  kind: "招标公告", projectName: null, projectCode: null, buyer: null, agency: null, region: null,
+  budgetWan: q(120, "本次招标预算金额为人民币120万元"),
+  allowsConsortium: q(false, "本次招标不接受联合体投标"),
+  times: {
+    docObtainStart: null, docObtainEnd: null,
+    signupDeadline: q("2099-01-07 17:00", "投标文件递交截止时间为2099年1月8日9时30分"),
+    bidDeadline: q("2099-01-08 09:30", "投标文件递交截止时间为2099年1月8日9时30分"),
+    opening: null,
+  },
+  lots: [],
+  requirements: [
+    requirement("qualification", "电子与智能化工程专业承包二级及以上资质", "投标人须具备电子与智能化工程专业承包二级及以上资质"),
+    requirement("performance", "近三年不少于2个视频监控系统运维业绩", "投标人近三年具有不少于2个视频监控系统运维业绩"),
+    requirement("personnel", "项目经理须具备一级建造师证书", "项目经理须具备一级建造师证书"),
+  ],
+  detailsInDocuments: false,
+};
 const ITEMS = [
   item("包1", "示例供电公司营业厅视频监控系统设备运维服务", "负责营业厅视频监控系统设备运维"),
   item("包2", "示例供电公司食堂餐饮服务", "职工食堂餐饮"),
@@ -58,19 +86,21 @@ const fetcher = createServer((req, res) => {
     // 采购内容带上批次号：不同公告的项目文字不同（相同的文字会复用已有的模型结果，不再调用）。
     const items = wordOnly.has(url) ? [] : ITEMS.map((i) => ({ ...i, scope: `${i.scope}（${n.batch}）` }));
     const result: FetcherResult = { notice: { ...n, title: `${n.title}（详情）` }, sha256: "a".repeat(64), complete: true, warnings: [], items,
-      text: "视觉及环境采集系统框架采购，含图像识别算法与视频分析平台部署" };
+      text: TEXT };
     res.end(JSON.stringify(result));
   });
 });
 await new Promise<void>((resolve) => fetcher.listen(0, "127.0.0.1", resolve));
 
-// 模型替身：数据分析平台“待确认”、视频监控“相关”、其余“无关”；modelDown 时返回 503。
+// 模型替身：筛选时数据分析平台“待确认”、视频监控“相关”、其余“无关”；抽要素时给出 DETAILS（其中两条原话编造或对不上）。
+// modelDown 时返回 503。
 let modelDown = false;
 const prompts: string[] = [];
 const model = await stub(async (_hit, req) => {
   if (modelDown) return new Reply(503, { error: { message: "down" } });
   const user = JSON.parse(req.body).messages.at(-1).content as string;
   prompts.push(user);
+  if (user.includes("【公告】")) return { id: "stub", choices: [{ message: { content: JSON.stringify(DETAILS) } }], usage: { prompt_tokens: 1, completion_tokens: 1 } };
   const items = [...user.matchAll(/#(\d+) 项目：(.+)/g)].map(([, n, name]) => ({
     n: Number(n),
     verdict: name!.includes("视频监控") ? "相关" : name!.includes("数据分析") ? "待确认" : "无关",
@@ -142,11 +172,13 @@ test("the first round is stored and screened but never pushed; later notices are
   assert.equal(sent.length, 1);
   const msg = sent[0]!;
   assert.match(msg.url, /&timestamp=\d+&sign=/);
-  assert.match(msg.title, /^国网商机｜示例供电公司营业厅视频监控系统设备运维服务等 2 项$/);
-  for (const fact of ["1 个相关项目，1 个待确认", "新批次（详情）", "采购文件获取截止：**2099-01-05 09:00:00**", "开标：2099-01-10 09:00:00",
-    "限价 29.7 万元", "折扣率 98%", "（待确认）", "智能运检与监测：主体是视频监控系统运维", "业绩要求：具有同类服务业绩",
-    "https://inside.invalid/opportunities/ecp-1002_2018032900295987"]) assert.ok(msg.text.includes(fact), fact);
+  assert.match(msg.title, /^投标商机｜示例供电公司营业厅视频监控系统设备运维服务等 2 项$/);
+  for (const fact of ["1 个相关项目，1 个待确认", "新批次（详情）", "国网电子商务平台", "获取截止：**2099-01-05 09:00:00**", "投标截止：**2099-01-08 09:30**",
+    "开标：2099-01-10 09:00:00", "预算 120 万元", "不接受联合体", "限价 29.7 万元", "折扣率 98%", "（待确认）", "采购内容：负责营业厅视频监控系统设备运维",
+    "智能运检与监测：主体是视频监控系统运维", "业绩要求：具有同类服务业绩", "**公告通用要求**", "资质：电子与智能化工程专业承包二级及以上资质",
+    "业绩：近三年不少于2个视频监控系统运维业绩", "https://inside.invalid/opportunities/ecp-1002_2018032900295987"]) assert.ok(msg.text.includes(fact), fact);
   assert.ok(!msg.text.includes("食堂") && !msg.text.includes("导线"), "irrelevant projects are not pushed");
+  assert.ok(!msg.text.includes("项目经理") && !msg.text.includes("报名截止"), "details whose quote is not in the notice are dropped");
 
   await discoverCycle();
   await processCycle();
@@ -233,14 +265,67 @@ test("a rejected push is retried, a push of unknown outcome is not", async () =>
   assert.equal(sent.length, before, "an outcome we cannot know is not resent");
 });
 
+test("tender notices from other platforms join as one project each: results are skipped, screened in a batch and pushed with their details", async () => {
+  await sql`INSERT INTO sources (id, name, kind, tier, participation_mode, tags, next_fetch_at) VALUES
+    ('opp-csg-tender', '南方电网供应链·招标公告', 'rss', 'T1', 'editorial', ${["招标", "南网"]}, '2100-01-01'),
+    ('opp-csg-result', '南方电网供应链·中标候选人公示', 'rss', 'T1', 'editorial', ${["中标", "南网"]}, '2100-01-01')`;
+  const add = async (sourceId: string, n: string, title: string, bodyText: string) =>
+    (await upsertMaterial({ sourceId, url: `https://example.com/opp-${n}`, title, bodyText, bodyStatus: "ok", via: "fetch", publishedAt: new Date() })).articleId;
+  const backlog = await add("opp-csg-tender", "0", "示例供电局存量视频监控项目招标公告", TEXT);
+  await processCycle();
+  const [first] = await sql<{ backfill: boolean; screened: boolean }[]>`SELECT backfill, screened FROM opp_notices WHERE id = ${`web-${backlog}`}`;
+  assert.deepEqual(first, { backfill: true, screened: true }, "what is already there the first time is stored, not pushed");
+
+  const before = sent.length;
+  const prompted = prompts.length;
+  const ids = {
+    hit: await add("opp-csg-tender", "1", "示例供电局视频监控平台采购项目招标公告", TEXT),
+    maybe: await add("opp-csg-tender", "2", "示例供电局数据分析平台采购公告", "采购数据分析平台一套。"),
+    excluded: await add("opp-csg-tender", "3", "示例供电局办公楼保洁服务招标公告", "保洁服务。"),
+    result: await add("opp-csg-tender", "4", "示例供电局视频监控平台采购项目中标结果公告", "中标人：某公司。"),
+    candidates: await add("opp-csg-result", "5", "示例视频监控项目中标候选人公示", "第一中标候选人：某公司。"),
+  };
+  await processCycle();
+  const rows = await sql<{ id: string; verdict: string; matched_by: string }[]>`
+    SELECT n.id, i.verdict, i.matched_by FROM opp_notices n JOIN opp_items i ON i.notice_id = n.id WHERE n.source = 'web' AND NOT n.backfill`;
+  assert.deepEqual(Object.fromEntries(rows.map((r) => [r.id, `${r.verdict}/${r.matched_by}`])), {
+    [`web-${ids.hit}`]: "relevant/model", [`web-${ids.maybe}`]: "maybe/model", [`web-${ids.excluded}`]: "irrelevant/exclude",
+  }, "results and candidate lists are not opportunities");
+  assert.equal(prompts.slice(prompted).filter((p) => p.includes("#2 项目：")).length, 1, "the platform's items are screened in one batch");
+
+  assert.equal(sent.length, before + 1, "only the relevant one is pushed; 待确认 from other platforms waits for the list and digest");
+  const msg = sent.at(-1)!;
+  assert.equal(msg.title, "投标商机｜示例供电局视频监控平台采购项目招标公告");
+  for (const fact of ["南方电网供应链·招标公告", "投标截止：**2099-01-08 09:30**", "预算 120 万元", "资质：电子与智能化工程专业承包二级及以上资质",
+    `[原文](https://example.com/opp-1)`, `/opportunities/web-${ids.hit}`]) assert.ok(msg.text.includes(fact), fact);
+
+  const list = (await app.inject({ url: "/api/site/opportunities?source=web", headers: { cookie: adminCookie } })).json();
+  const card = list.items.find((i: { noticeId: string }) => i.noticeId === `web-${ids.hit}`);
+  assert.deepEqual([card.sourceName, card.bidDeadline, card.noticeBudget], ["南方电网供应链·招标公告", "2099-01-08 09:30", "120 万元"]);
+  const [n] = await sql<{ file_deadline: string }[]>`SELECT file_deadline FROM opp_notices WHERE id = ${`web-${ids.hit}`}`;
+  assert.equal(n!.file_deadline, "", "a deadline the notice does not state is not invented");
+});
+
+test("only details whose quote is in the notice survive; dates and amounts must appear in their quote", () => {
+  const out = structuredClone(DETAILS) as unknown as Parameters<typeof verified>[0];
+  out.budgetWan = q(150, "本次招标预算金额为人民币120万元");
+  const d = verified(out, `${TEXT}\n第二页`);
+  assert.equal(d.budget, "", "150 is not the amount in the quote");
+  assert.equal(d.times.bidDeadline, "2099-01-08 09:30");
+  assert.equal(d.times.signupDeadline, "");
+  assert.deepEqual(d.requirements.map((r) => r.kind), ["qualification", "performance"]);
+  const yuan = verified({ ...out, budgetWan: q(120, "预算金额为人民币1,200,000元整") }, "本项目预算金额为人民币1,200,000元整。");
+  assert.equal(yuan.budget, "120 万元");
+});
+
 test("the daily digest lists projects whose file deadline is within 3 days, once a day", async () => {
   const id = "ecp-1002_2018032900295987";
   const now = new Date("2099-01-03T00:00:00Z");
   const result = await pushDigest(now);
   assert.equal(result, "sent");
   const msg = sent.at(-1)!;
-  assert.match(msg.title, /^国网商机日报 2099-01-03$/);
-  assert.ok(msg.text.includes("3 天内采购文件获取截止"));
+  assert.match(msg.title, /^投标商机日报 2099-01-03$/);
+  assert.ok(msg.text.includes("3 天内截止"));
   assert.ok(msg.text.includes(`/opportunities/${id}#item-`));
   assert.equal(await pushDigest(now), "skipped", "one digest a day");
 });
@@ -252,9 +337,12 @@ test("site and admin APIs: members read the list and details, only admins change
   assert.ok(body.items.length > 0);
   assert.ok(body.items.every((i: { verdict: string }) => i.verdict === "relevant" || i.verdict === "maybe"));
   assert.deepEqual(body.lines, DEFAULT_PROFILE.lines.map((l) => l.name));
-  const card = body.items.find((i: { projectName: string }) => i.projectName.includes("视频监控"));
+  const card = body.items.find((i: { projectName: string; source: string }) => i.source === "ecp" && i.projectName.includes("视频监控"));
   assert.equal(card.ceilingKind, "amount_wan");
   assert.equal(card.fileDeadline, "2099-01-05 09:00:00");
+  assert.equal(card.bidDeadline, "2099-01-08 09:30");
+  assert.equal(card.noticeBudget, "120 万元");
+  assert.equal(card.sourceName, "国网电子商务平台");
   assert.equal(card.expired, false);
 
   const detail = await app.inject({ url: `/api/site/opportunities/${card.noticeId}`, headers: { cookie: adminCookie } });
@@ -262,6 +350,9 @@ test("site and admin APIs: members read the list and details, only admins change
   assert.equal(detail.json().items.length, 2);
   assert.equal(detail.json().others.length, 2);
   assert.deepEqual(detail.json().items[0].evidence, [{ file: "需求一览表.xlsx", sheet: "零星项目-服务", row: 4 }]);
+  const details = detail.json().notice.details;
+  assert.deepEqual([details.budget, details.consortium, details.times.bidDeadline, details.times.signupDeadline], ["120 万元", "不接受联合体", "2099-01-08 09:30", ""]);
+  assert.deepEqual(details.requirements.map((r: { kind: string }) => r.kind), ["qualification", "performance"]);
   assert.equal((await app.inject({ url: "/api/site/opportunities/ecp-missing", headers: { cookie: adminCookie } })).statusCode, 404);
   assert.equal((await app.inject({ url: "/api/site/opportunities" })).statusCode, 401, "the site is internal");
 

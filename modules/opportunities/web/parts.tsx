@@ -31,15 +31,18 @@ export function VerdictTag({ verdict }: { verdict: Verdict }) {
 }
 
 export function ExpiredTag() {
-  return <span className="inline-flex shrink-0 items-center rounded-full bg-bg-sunk px-2 py-0.5 text-[11.5px] text-ink-4">文件获取已截止</span>;
+  return <span className="inline-flex shrink-0 items-center rounded-full bg-bg-sunk px-2 py-0.5 text-[11.5px] text-ink-4">已截止</span>;
 }
 
-/** 限价和两个时间：没有的不写。 */
-export function keyFacts(o: Pick<OpportunityCard, "ceiling" | "ceilingKind" | "fileDeadline" | "openingTime">): Array<[string, string]> {
+/** 限价（项目没写时看公告预算）和几个时间：没有的不写。 */
+export function keyFacts(o: Pick<OpportunityCard, "ceiling" | "ceilingKind" | "noticeBudget" | "fileDeadline" | "bidDeadline" | "openingTime">): Array<[string, string]> {
+  const ceiling = ceilingText(o.ceiling, o.ceilingKind);
   return ([
-    ["最高限价", ceilingText(o.ceiling, o.ceilingKind)],
+    ["最高限价", ceiling],
+    ["公告预算", ceiling ? "" : o.noticeBudget],
     ["采购文件获取截止", o.fileDeadline],
-    ["开标（开启应答文件）时间", o.openingTime],
+    ["投标截止", o.bidDeadline],
+    ["开标时间", o.openingTime !== o.bidDeadline ? o.openingTime : ""],
   ] as Array<[string, string]>).filter(([, v]) => v);
 }
 

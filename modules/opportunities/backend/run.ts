@@ -1,4 +1,4 @@
-// 一轮工作：发现新公告 → 取附件并解析 → 筛选 → 推送。定时任务和后台“立即采集一轮”都走这里；
+// 一轮工作：发现国网新公告 → 取附件并解析；登记其他招采平台的新资料 → 筛选 → 抽要素 → 推送。定时任务和后台“立即采集一轮”都走这里；
 // worker 是单进程，同一时间只跑一轮，后到的这一轮直接跳过（下一个点会再来）。
 import { sql } from "@aihot/backend/db";
 import { audit } from "@aihot/backend/audit";
@@ -6,8 +6,10 @@ import { logError } from "@aihot/backend/lib/log-error";
 import { collectionOn } from "@aihot/backend/operations/switches";
 import type { SourceKey } from "../types.ts";
 import { discover, fetcherUrl, fetchNotice, FetcherError } from "./fetcher.ts";
+import { trackArticles } from "./articles.ts";
+import { extractDetails, MAX_DETAIL_FAILURES } from "./details.ts";
 import { pushNotice } from "./push.ts";
-import { screenNotice } from "./screen.ts";
+import { screenNotice, screenWebItems } from "./screen.ts";
 import { hasNotices, markFailed, pendingNotices, saveFetched, unscreenedNotices, upsertDiscovered } from "./store.ts";
 
 const SOURCES: SourceKey[] = ["ecp", "etp"];
@@ -60,10 +62,16 @@ async function fetchPending(): Promise<{ fetched: number; failed: number }> {
   return { fetched, failed };
 }
 
-/** 筛完的公告推送；之前推送明确失败、还在新鲜期的也再试（防重复记录挡住已发出和结果不明的）。 */
-async function screenAndPush(): Promise<{ screened: number; pushed: number }> {
+/** 筛选、抽要素，然后推送。推送等要素抽完；模型不行时最多等到取到附件 6 小时，不让推送一直等。 */
+async function screenAndPush(): Promise<Record<string, unknown>> {
   let screened = 0;
   let pushed = 0;
+  let tracked = 0;
+  try {
+    tracked = await trackArticles();
+  } catch (error) {
+    warn("opportunity article tracking failed", { err: logError(error) });
+  }
   for (const id of await unscreenedNotices(10)) {
     try {
       if (!("deferred" in (await screenNotice(id)))) screened += 1;
@@ -71,8 +79,23 @@ async function screenAndPush(): Promise<{ screened: number; pushed: number }> {
       warn("opportunity screen failed", { noticeId: id, err: logError(error) });
     }
   }
+  let web = { screened: 0, relevant: 0, deferred: 0 };
+  try {
+    web = await screenWebItems();
+  } catch (error) {
+    warn("opportunity web screen failed", { err: logError(error) });
+  }
+  let details = { extracted: 0, failed: 0 };
+  try {
+    details = await extractDetails();
+  } catch (error) {
+    warn("opportunity details failed", { err: logError(error) });
+  }
   const due = await sql<{ id: string }[]>`
-    SELECT id FROM opp_notices WHERE screened AND NOT backfill AND pushed_at IS NULL AND discovered_at > now() - interval '48 hours'
+    SELECT id FROM opp_notices n
+    WHERE screened AND NOT backfill AND pushed_at IS NULL AND discovered_at > now() - interval '48 hours'
+      AND EXISTS (SELECT 1 FROM opp_items i WHERE i.notice_id = n.id AND (i.verdict = 'relevant' OR (i.verdict = 'maybe' AND n.source <> 'web')))
+      AND (details IS NOT NULL OR doc_text = '' OR details_failures >= ${MAX_DETAIL_FAILURES} OR fetched_at < now() - interval '6 hours')
     ORDER BY discovered_at LIMIT 20`;
   for (const { id } of due) {
     try {
@@ -81,7 +104,7 @@ async function screenAndPush(): Promise<{ screened: number; pushed: number }> {
       warn("opportunity push failed", { noticeId: id, err: logError(error) });
     }
   }
-  return { screened, pushed };
+  return { tracked, screened, webScreened: web.screened, webRelevant: web.relevant, webDeferred: web.deferred, ...details, pushed };
 }
 
 async function once<T>(work: () => Promise<T>): Promise<T | { skipped: string }> {
@@ -94,7 +117,7 @@ async function once<T>(work: () => Promise<T>): Promise<T | { skipped: string }>
   }
 }
 
-/** 定时（每 20 分钟）：看列表发现新公告，再处理一批。 */
+/** 定时（每 20 分钟）：看国网列表发现新公告，再处理一批。 */
 export async function discoverCycle() {
   if (!fetcherUrl()) return { skipped: "fetcher not configured" };
   return once(async () => {
@@ -103,11 +126,15 @@ export async function discoverCycle() {
   });
 }
 
-/** 定时（每 5 分钟）：取下一批附件、筛选、推送；后台要求过“立即采集一轮”的先看一遍列表。 */
+/**
+ * 定时（每 5 分钟）：取下一批国网附件，登记其他招采平台的新资料，筛选、抽要素、推送。
+ * 后台要求过“立即采集一轮”的先看一遍国网列表。没配采集服务时只处理其他平台的资料。
+ */
 export async function processCycle() {
-  if (!fetcherUrl()) return { skipped: "fetcher not configured" };
   return once(async () => {
-    if (!(await collectionOn())) return { ...(await screenAndPush()), skipped: "collection paused" };
+    if (!fetcherUrl() || !(await collectionOn())) {
+      return { ...(await screenAndPush()), skipped: fetcherUrl() ? "collection paused" : "fetcher not configured" };
+    }
     const [asked] = await sql`DELETE FROM settings WHERE key = ${RUN_KEY} RETURNING key`;
     return { ...(asked ? await discoverAll() : {}), ...(await fetchPending()), ...(await screenAndPush()) };
   });

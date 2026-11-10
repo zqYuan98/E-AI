@@ -1,4 +1,4 @@
-// 三个频道：收哪几类（代码里定），标题、介绍和筛选项（这里是默认值，管理员可以在后台“频道设置”里改）。
+// 两个频道：收哪几类（代码里定），标题、介绍和筛选项（这里是默认值，管理员可以在后台“频道设置”里改）。
 // 筛选项是标签或搜索词；标签必须是 industry/taxonomy.ts 词表里的词，改词表时一起看这里的默认值。
 import { CATEGORIES, CATEGORY_TAGS, ENTITY_TAGS, OFF_TOPIC_TAGS, TOPIC_TAGS } from "@aihot/industry/taxonomy";
 
@@ -28,21 +28,6 @@ export interface ChannelDefinition {
 const tags = (...names: string[]): Chip[] => names.map((tag) => ({ label: tag, tag }));
 
 export const CHANNELS = {
-  tenders: {
-    path: "/tenders",
-    tab: "tenders",
-    categories: ["procurement"],
-    searchHint: "搜地区、单位或设备，例如 云南、布控球",
-    defaults: {
-      title: "招标商机",
-      lead: "招标公告、中标结果、采购意向、项目前期和申报通知，收录全部相关条目，不只精选。按阶段、业务线或 AI 方向筛选，搜地区、单位或设备名。",
-      rows: [
-        { label: "阶段", chips: tags("招标/中标", "项目前期", "申报通知", "试点示范") },
-        { label: "业务线", chips: tags("视频监控", "近电预警", "边缘计算", "智慧工地", "质量管控", "安全生产") },
-        { label: "AI", chips: tags("智能体", "AI视觉", "知识库/RAG") },
-      ],
-    },
-  },
   "policy-news": {
     path: "/policy-news",
     categories: ["policy"],
@@ -86,7 +71,7 @@ export interface ChannelView extends ChannelText {
   topics: Array<{ tag: string; recent: number; before: number }>;
 }
 
-/** 地址对应的频道（/tenders → tenders）。 */
+/** 地址对应的频道（/trends → trends）。 */
 export function channelAt(pathname: string): ChannelKey | null {
   const key = pathname.replace(/^\/|\/$/g, "");
   return key in CHANNELS ? (key as ChannelKey) : null;

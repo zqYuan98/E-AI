@@ -1,14 +1,13 @@
 // 频道在网页上的入口：侧栏“频道”一节，手机底栏的“热点”，“我的”页一行政策动态，后台“内容”里的频道设置。
-// 手机底栏的“商机”是项目商机（modules/opportunities）。
+// 招标商机已并进投标商机（modules/opportunities），手机底栏的“商机”指向那里。
 import { defineWebModule } from "@aihot/web/modules";
-import { IconChart, IconInfo, IconTrendUp } from "@aihot/web/components/icons";
+import { IconInfo, IconTrendUp } from "@aihot/web/components/icons";
 
 export const channelsWeb = defineWebModule({
   name: "channels",
   sidebar: {
     section: "频道",
     items: [
-      { to: "/tenders", label: "招标商机", icon: IconChart },
       { to: "/policy-news", label: "政策动态", icon: IconInfo },
       { to: "/trends", label: "行业热点", icon: IconTrendUp },
     ],

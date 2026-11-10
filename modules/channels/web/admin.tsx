@@ -1,4 +1,4 @@
-// 后台“频道设置”：招标商机、政策动态、行业热点的标题、介绍和筛选项。筛选项每行一组，写成“行名：项、项、项”，
+// 后台“频道设置”：政策动态、行业热点的标题、介绍和筛选项。筛选项每行一组，写成“行名：项、项、项”，
 // 一项是词表里的标签，或者“显示名=标签”“显示名=搜:关键词”。行业热点的热门话题是自动的，这里不用写。
 import { useState } from "react";
 import { useLoaderData, type LoaderFunctionArgs } from "react-router";
@@ -62,7 +62,7 @@ export default function ChannelsAdmin() {
   const [action, setAction] = useState<{ key: ChannelKey; text: ChannelText | null } | null>(null);
 
   return (
-    <AdminPage title="频道设置" subtitle="招标商机、政策动态、行业热点三个频道的标题、介绍和筛选项。保存后一分钟内生效。">
+    <AdminPage title="频道设置" subtitle="政策动态、行业热点两个频道的标题、介绍和筛选项。保存后一分钟内生效。">
       {channels.map((c) => (
         <ChannelForm key={`${c.key}:${c.customized}:${JSON.stringify(c.current)}`} c={c}
           onSave={(text) => setAction({ key: c.key, text })} onReset={() => setAction({ key: c.key, text: null })} />

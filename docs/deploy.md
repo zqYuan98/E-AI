@@ -118,10 +118,10 @@ MCP 默认接受 `SITE_URL` 的主机以及 `localhost`、`127.0.0.1`、`[::1]`�
    - 发布应用并设置可见范围。本企业的人第一次打开时自动开一个成员账号（只能从钉钉登录，没有密码），名字跟着钉钉；后台“成员管理”里可以停用。离开企业以后拿不到钉钉的免登授权，也就进不来，已经登录的会话最长 7 天后失效。
    - 登录失败时看 api 的日志：`dingtalk sign-in refused` 一行带着钉钉给的错误码和原因。
 
-7. 项目商机（国网附件自动解析与钉钉推送，说明见 `modules/opportunities/README.md`）：
+7. 投标商机（国网附件自动解析、其他招采平台公告、要素抽取与钉钉推送，说明见 `modules/opportunities/README.md`）：
    - `.env` 填 `OPPORTUNITIES_FETCHER_URL=http://sgcc-fetcher:8000` 和 `OPPORTUNITIES_FETCHER_TOKEN`（`openssl rand -hex 24`）；国内服务器再填 `APT_MIRROR`、`PIP_INDEX_URL` 指向镜像。`$C build` 会一起构建采集服务镜像（系统 Chromium，约 600 MB），`$C up -d` 启动 `sgcc-fetcher` 容器，只在内网。
-   - 在钉钉群里添加“自定义机器人”，安全设置选“加签”，把 Webhook 和密钥填进 `DINGTALK_ROBOT_WEBHOOK`、`DINGTALK_ROBOT_SECRET`，确认后把 `DINGTALK_PUSH_ENABLED` 改成 `true`。后台“商机 → 项目商机”可以发测试推送。
-   - 后台“模型与评测”给“项目商机筛选”一步选模型（和其他步骤一样）；没选时用 `.env` 的默认模型。
+   - 在钉钉群里添加“自定义机器人”，安全设置选“加签”，把 Webhook 和密钥填进 `DINGTALK_ROBOT_WEBHOOK`、`DINGTALK_ROBOT_SECRET`，确认后把 `DINGTALK_PUSH_ENABLED` 改成 `true`。后台“商机 → 投标商机”可以发测试推送。
+   - 后台“模型与评测”给“投标商机”一步选模型（筛选和抽要素都用它）；没选时用 `.env` 的默认模型。
    - 第一次采集时列表上已有的公告只入库、不推送；之后每 20 分钟看一次列表，新公告约 5 到 10 分钟后推送。
 
 ### 更换大模型服务商
@@ -177,6 +177,14 @@ docker compose run --rm setup && docker compose up -d
 
 下面按时间从新到旧列出每次更新要注意的事。
 
+#### 本站：投标商机（合并招标商机，补全限价、资质、业绩和时间）
+
+新迁移 4 个（`modules/opportunities` 的 `0155`–`0158`：`opp_notices` 加公告正文、抽出的要素、抽取失败次数和来源名称四列，都带常量默认值，不改已有数据），按上面的顺序等 setup 跑完即可。采集服务镜像要重新构建（`$C build`）。
+
+- 项目商机改名“投标商机”，原来的“招标商机”频道并进来：信源里打了“招标”“招标计划”标签的资料一条当一个项目，和国网的项目一起筛选、推送；中标、成交、候选人公示、更正、终止这类不收。侧栏少了“招标商机”一项，旧地址 `/tenders` 永久跳到 `/opportunities`；后台“频道设置”里不再有它，以前在那里改过的招标商机文字不再读取。
+- 有相关或待确认项目的公告会多一次模型调用，从公告正文抽预算、截止时间、资质业绩要求（原话核对不上的去掉），推送和页面据此补全。其他平台的资料按每批 60 条筛选，第一次运行时最近 7 天的资料只入库不推送。
+- 国网物资招标的货物清单不再一行一个项目，按分标+包合成一条。已经解析过的国网公告要用新规则重新解析时，在后台对它点“重新抓取”。
+
 #### 本站：天枢招采供数
 
 新增 `modules/tenders`，仅给独立的天枢应用提供带令牌的内部接口；原有“招标商机”频道保留。迁移 `0140`–`0143` 新建招采登记表、索引和输入快照字段，不删除已有数据；已有采集正文和模型凭据继续由原平台管理。
@@ -191,7 +199,7 @@ docker compose run --rm setup && docker compose up -d
 
 新迁移 5 个（`modules/opportunities` 的 `opp_notices`、`opp_items`、`opp_pushes` 和两个索引），按上面的顺序等 setup 跑完即可。内网部署的 compose 多了一个 `sgcc-fetcher` 服务，必须在 `.env` 填 `OPPORTUNITIES_FETCHER_TOKEN` 才能启动（配置步骤见上文“内网部署”第 7 步）。
 
-- 手机底栏的“商机”改为指向项目商机 `/opportunities`；“招标商机”频道仍在侧栏“频道”里。
+- 手机底栏的“商机”改为指向项目商机 `/opportunities`；“招标商机”频道仍在侧栏“频道”里（后来并进了投标商机，见上）。
 - `industry/sources.json` 删掉了 4 个国网电子商务平台的 `json_list` 示范信源：门户的接口带页面脚本生成的动态参数，直接调用拿不到数据，改由采集服务用浏览器访问。已部署的库里这 4 个信源保持停用，不受影响。
 - 推送默认关闭（`DINGTALK_PUSH_ENABLED=false`）。
 
