@@ -8,7 +8,7 @@ import type { SourceKey } from "../types.ts";
 import { discover, fetcherUrl, fetchNotice, FetcherError } from "./fetcher.ts";
 import { trackArticles } from "./articles.ts";
 import { extractDetails, MAX_DETAIL_FAILURES } from "./details.ts";
-import { pushNotice } from "./push.ts";
+import { MAX_PUSH_ATTEMPTS, pushNotice } from "./push.ts";
 import { screenNotice, screenWebItems } from "./screen.ts";
 import { hasNotices, markFailed, pendingNotices, saveFetched, unscreenedNotices, upsertDiscovered } from "./store.ts";
 
@@ -91,9 +91,12 @@ async function screenAndPush(): Promise<Record<string, unknown>> {
   } catch (error) {
     warn("opportunity details failed", { err: logError(error) });
   }
+  // 还没推完的，或者有群明确失败、还能再试的。
   const due = await sql<{ id: string }[]>`
     SELECT id FROM opp_notices n
-    WHERE screened AND NOT backfill AND pushed_at IS NULL AND discovered_at > now() - interval '48 hours'
+    WHERE screened AND NOT backfill AND discovered_at > now() - interval '48 hours'
+      AND (pushed_at IS NULL OR EXISTS (SELECT 1 FROM opp_pushes p JOIN opp_push_groups g ON p.key = 'g' || g.id || ':notice:' || n.id
+        WHERE p.status = 'failed' AND p.attempts < ${MAX_PUSH_ATTEMPTS}))
       AND EXISTS (SELECT 1 FROM opp_items i WHERE i.notice_id = n.id AND (i.verdict = 'relevant' OR (i.verdict = 'maybe' AND n.source <> 'web')))
       AND (details IS NOT NULL OR doc_text = '' OR details_failures >= ${MAX_DETAIL_FAILURES} OR fetched_at < now() - interval '6 hours')
     ORDER BY discovered_at LIMIT 20`;

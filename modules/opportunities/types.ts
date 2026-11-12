@@ -121,19 +121,55 @@ export interface OpportunityNoticeDetail {
 export interface BusinessLine { name: string; keywords: string[] }
 export interface BusinessProfile { lines: BusinessLine[]; exclude: string[] }
 
+/** 提醒人：消息里有他关注方向的项目时 @ 他（钉钉按手机号认人，他要在这个群里）。lines 为空表示所有方向。 */
+export interface PushMention { name: string; mobile: string; lines: string[] }
+
+/** 后台提交的推送群。修改时 webhook、secret 留空表示不改。 */
+export interface PushGroupInput {
+  name: string;
+  webhook: string;
+  secret: string;
+  enabled: boolean;
+  /** 只推这些业务方向的项目；空表示全部方向。 */
+  lines: string[];
+  /** 只推这些来源；空表示全部来源。 */
+  sources: SourceKey[];
+  /** 推不推待确认的项目（其他招采平台的待确认一律不实时推）。 */
+  includeMaybe: boolean;
+  realtime: boolean;
+  digest: boolean;
+  mentions: PushMention[];
+}
+
+/** 后台看到的推送群：Webhook 只给末尾几位，密钥不给。 */
+export interface PushGroup extends Omit<PushGroupInput, "webhook" | "secret"> {
+  id: number;
+  webhookHint: string;
+  enabledAt: string;
+  sent: number;
+  lastSentAt: string | null;
+  /** 最近 7 天失败或结果不明的消息数，和最后一次的原因。 */
+  problems: number;
+  lastError: string;
+}
+
 export interface OpportunityAdmin {
   profile: BusinessProfile;
   defaults: BusinessProfile;
   status: {
     fetcherConfigured: boolean;
-    pushConfigured: boolean;
     pushEnabled: boolean;
     collectOn: boolean;
     modelOn: boolean;
   };
+  groups: PushGroup[];
   notices: Array<{
     id: string; source: SourceKey; title: string; status: string; error: string; url: string;
-    itemCount: number; relevant: number; maybe: number; discoveredAt: string; pushedAt: string | null; backfill: boolean;
+    itemCount: number; relevant: number; maybe: number; discoveredAt: string; backfill: boolean;
+    /** 推送处理完的时间（每个群推过了，或者没有群要这条）。 */
+    pushedAt: string | null;
+    /** 推到了哪些群。 */
+    pushedGroups: string[];
   }>;
   counts: { pending: number; failed: number; relevant: number; maybe: number };
 }

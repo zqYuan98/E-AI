@@ -215,14 +215,17 @@ export async function noticeDetail(id: string, now = new Date()): Promise<Opport
 }
 
 export async function recentNotices(limit = 50) {
-  const rows = await sql<(NoticeRow & { relevant: number; maybe: number })[]>`
-    SELECT n.*, count(*) FILTER (WHERE i.verdict = 'relevant')::int AS relevant, count(*) FILTER (WHERE i.verdict = 'maybe')::int AS maybe
+  const rows = await sql<(NoticeRow & { relevant: number; maybe: number; pushed_groups: string[] })[]>`
+    SELECT n.*, count(*) FILTER (WHERE i.verdict = 'relevant')::int AS relevant, count(*) FILTER (WHERE i.verdict = 'maybe')::int AS maybe,
+      (SELECT coalesce(array_agg(g.name ORDER BY g.id), '{}') FROM opp_pushes p JOIN opp_push_groups g ON p.key = 'g' || g.id || ':notice:' || n.id
+        WHERE p.status = 'sent') AS pushed_groups
     FROM opp_notices n LEFT JOIN opp_items i ON i.notice_id = n.id
     WHERE n.source <> 'web'
     GROUP BY n.id ORDER BY n.discovered_at DESC LIMIT ${limit}`;
   return rows.map((n) => ({
     id: n.id, source: n.source, title: n.title, status: n.status, error: n.error, url: n.url, itemCount: n.item_count,
-    relevant: n.relevant, maybe: n.maybe, discoveredAt: n.discovered_at.toISOString(), pushedAt: n.pushed_at?.toISOString() ?? null, backfill: n.backfill,
+    relevant: n.relevant, maybe: n.maybe, discoveredAt: n.discovered_at.toISOString(), pushedAt: n.pushed_at?.toISOString() ?? null,
+    pushedGroups: n.pushed_groups, backfill: n.backfill,
   }));
 }
 

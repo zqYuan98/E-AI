@@ -120,7 +120,7 @@ MCP 默认接受 `SITE_URL` 的主机以及 `localhost`、`127.0.0.1`、`[::1]`�
 
 7. 投标商机（国网附件自动解析、其他招采平台公告、要素抽取与钉钉推送，说明见 `modules/opportunities/README.md`）：
    - `.env` 填 `OPPORTUNITIES_FETCHER_URL=http://sgcc-fetcher:8000` 和 `OPPORTUNITIES_FETCHER_TOKEN`（`openssl rand -hex 24`）；国内服务器再填 `APT_MIRROR`、`PIP_INDEX_URL` 指向镜像。`$C build` 会一起构建采集服务镜像（系统 Chromium，约 600 MB），`$C up -d` 启动 `sgcc-fetcher` 容器，只在内网。
-   - 在钉钉群里添加“自定义机器人”，安全设置选“加签”，把 Webhook 和密钥填进 `DINGTALK_ROBOT_WEBHOOK`、`DINGTALK_ROBOT_SECRET`，确认后把 `DINGTALK_PUSH_ENABLED` 改成 `true`。后台“商机 → 投标商机”可以发测试推送。
+   - `DINGTALK_PUSH_ENABLED` 改成 `true`，然后在后台“商机 → 投标商机 → 推送群”添加钉钉群：在群里添加“自定义机器人”，安全设置选“加签”，把 Webhook 和密钥填进去，选这个群要的业务方向、来源和提醒人，保存后点“测试”。可以加多个群。
    - 后台“模型与评测”给“投标商机”一步选模型（筛选和抽要素都用它）；没选时用 `.env` 的默认模型。
    - 第一次采集时列表上已有的公告只入库、不推送；之后每 20 分钟看一次列表，新公告约 5 到 10 分钟后推送。
 
@@ -176,6 +176,15 @@ docker compose run --rm setup && docker compose up -d
 新迁移遇到长期占锁会报出文件名和等待超时，先处理占锁事务，再重跑 setup，不要跳过迁移或改写迁移账本。并发索引创建中断可能留下无效索引：核实报错中的对象后，用 `DROP INDEX CONCURRENTLY <索引名>` 清理该失败索引再重跑；有效但定义不同的同名索引须先核对差异。这些保护不改变上述 Docker 更新顺序，跨旧版本升级仍可能执行历史上的破坏性迁移。
 
 下面按时间从新到旧列出每次更新要注意的事。
+
+#### 本站：投标商机推送群（多个钉钉群、按方向和来源选配、@ 提醒人）
+
+新迁移 1 个（`modules/opportunities` 的 `0159`：新建 `opp_push_groups`，不改已有数据），按上面的顺序等 setup 跑完即可。
+
+- 钉钉群机器人不再写在 `.env` 里，改到后台“商机 → 投标商机 → 推送群”添加：每个群自己选推哪些业务方向和来源、要不要待确认、实时推送和每日汇总，以及提醒人（姓名、手机号、关注的方向，消息里有这些方向的项目时 @ 他）。
+- **升级后原来的群收不到推送，直到在后台把它加回来**：把原来 `.env` 里 `DINGTALK_ROBOT_WEBHOOK`、`DINGTALK_ROBOT_SECRET` 的值填进“添加推送群”，保存后点“测试”，然后从 `.env` 删掉这两项。新加的群只实时推加上之后发现的公告，之前的不补发，每日汇总照常列出 3 天内截止的。
+- 安全阀照旧是 `DINGTALK_PUSH_ENABLED=true`。
+- 提醒人的手机号存在库里，只有管理员在后台看得到；上线前请运营方确认隐私说明里是否要写明。
 
 #### 本站：投标商机（合并招标商机，补全限价、资质、业绩和时间）
 

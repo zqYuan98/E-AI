@@ -1,6 +1,7 @@
 // 投标商机：采集服务发现的公告第一轮只入库不推送；之后的新公告取附件、拆项目、按业务口径筛（排除词直接无关，
 // 其余交给模型；模型出错时按关键词记待确认），从公告正文抽出预算、时间和资格业绩要求（原话核对不上的去掉），
-// 对得上的推到钉钉群一次且只一次，每日汇总列 3 天内截止的。其他招采平台的资料一条一个项目，结果类公告不收。
+// 对得上的推到每个要它的钉钉群一次且只一次（各群按自己选的方向和来源，@ 关注这些方向的提醒人），每日汇总列 3 天内截止的。
+// 其他招采平台的资料一条一个项目，结果类公告不收。
 // 采集服务、模型和钉钉都是本地替身，不访问外部服务。
 import { pointModels, Reply, stub } from "../../../tests/setup.ts";
 import { createServer } from "node:http";
@@ -16,7 +17,7 @@ import { buildApp } from "../../../apps/api/src/app.ts";
 import { access } from "../../access/server.ts";
 import { opportunities } from "../server.ts";
 import { discoverCycle, processCycle } from "../backend/run.ts";
-import { formatCeiling, pushDigest } from "../backend/push.ts";
+import { formatCeiling, pushDigest, sitePage } from "../backend/push.ts";
 import { deadlineAt, isExpired, packageLabel } from "../backend/store.ts";
 import { verified } from "../backend/details.ts";
 import { DEFAULT_PROFILE, matchKeywords, validateProfile } from "../backend/profile.ts";
@@ -113,20 +114,20 @@ pointModels(model.url, ["deepseek-flash"]);
 process.env.OPPORTUNITIES_MODEL = "deepseek-flash";
 process.env.OPPORTUNITIES_FETCHER_URL = `http://127.0.0.1:${(fetcher.address() as { port: number }).port}`;
 process.env.OPPORTUNITIES_FETCHER_TOKEN = TOKEN;
-process.env.DINGTALK_ROBOT_WEBHOOK = "https://oapi.dingtalk.com/robot/send?access_token=abcdef0123456789abcdef0123";
-process.env.DINGTALK_ROBOT_SECRET = "SEC-test-secret";
 process.env.DINGTALK_PUSH_ENABLED = "true";
+const ROBOT = (token: string) => `https://oapi.dingtalk.com/robot/send?access_token=${token}`;
+const MAIN_TOKEN = "abcdef0123456789abcdef0123";
 
 // 钉钉替身：截下发往 oapi.dingtalk.com 的请求，其余照常。
-const sent: Array<{ url: string; title: string; text: string }> = [];
+const sent: Array<{ url: string; title: string; text: string; at: string[] }> = [];
 let dingtalk: "ok" | "reject" | "offline" = "ok";
 const realFetch = globalThis.fetch;
 globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
   const url = String(input instanceof Request ? input.url : input);
   if (!url.startsWith("https://oapi.dingtalk.com/")) return realFetch(input, init);
   if (dingtalk === "offline") throw new TypeError("fetch failed");
-  const body = JSON.parse(String(init?.body)) as { markdown: { title: string; text: string } };
-  sent.push({ url, title: body.markdown.title, text: body.markdown.text });
+  const body = JSON.parse(String(init?.body)) as { markdown: { title: string; text: string }; at: { atMobiles: string[] } };
+  sent.push({ url, title: body.markdown.title, text: body.markdown.text, at: body.at.atMobiles });
   return Response.json(dingtalk === "ok" ? { errcode: 0, errmsg: "ok" } : { errcode: 310000, errmsg: "sign not match" });
 }) as typeof fetch;
 
@@ -136,11 +137,19 @@ installModules([access, opportunities]);
 const app = await buildApp();
 let adminCookie = "";
 let adminCsrf = "";
+const adminHeaders = () => ({ cookie: adminCookie, origin: config.siteUrl, "x-csrf-token": adminCsrf });
+/** 一开始就有的推送群（所有方向、所有来源、含待确认）的推送记录前缀。 */
+let main = "";
 
 before(async () => {
   const { token } = await passwordLogin(config.adminPassword!, "/admin", undefined);
   adminCookie = `aihot_admin=${token}`;
   adminCsrf = (await sessionPrincipal(adminCookie))!.csrf;
+  const created = await app.inject({ method: "POST", url: "/api/admin/opportunities/groups", headers: adminHeaders(),
+    payload: { name: "商务部投标群", webhook: ROBOT(MAIN_TOKEN), secret: "SEC-test-secret", reason: "测试" } });
+  assert.equal(created.statusCode, 200, created.body);
+  const [g] = await sql<{ id: number }[]>`SELECT id FROM opp_push_groups WHERE name = '商务部投标群'`;
+  main = `g${g!.id}`;
 });
 beforeEach(() => { modelDown = false; dingtalk = "ok"; });
 after(async () => {
@@ -176,7 +185,7 @@ test("the first round is stored and screened but never pushed; later notices are
   for (const fact of ["1 个相关项目，1 个待确认", "新批次（详情）", "国网电子商务平台", "获取截止：**2099-01-05 09:00:00**", "投标截止：**2099-01-08 09:30**",
     "开标：2099-01-10 09:00:00", "预算 120 万元", "不接受联合体", "限价 29.7 万元", "折扣率 98%", "（待确认）", "采购内容：负责营业厅视频监控系统设备运维",
     "智能运检与监测：主体是视频监控系统运维", "业绩要求：具有同类服务业绩", "**公告通用要求**", "资质：电子与智能化工程专业承包二级及以上资质",
-    "业绩：近三年不少于2个视频监控系统运维业绩", "https://inside.invalid/opportunities/ecp-1002_2018032900295987"]) assert.ok(msg.text.includes(fact), fact);
+    "业绩：近三年不少于2个视频监控系统运维业绩", "dingtalk://dingtalkclient/page/link?url=https%3A%2F%2Finside.invalid%2Fopportunities%2Fecp-1002_2018032900295987&pc_slide=true"]) assert.ok(msg.text.includes(fact), fact);
   assert.ok(!msg.text.includes("食堂") && !msg.text.includes("导线"), "irrelevant projects are not pushed");
   assert.ok(!msg.text.includes("项目经理") && !msg.text.includes("报名截止"), "details whose quote is not in the notice are dropped");
 
@@ -247,11 +256,11 @@ test("a rejected push is retried, a push of unknown outcome is not", async () =>
   dingtalk = "reject";
   listed = [notice("4001", "推送被拒"), ...listed];
   await discoverCycle();
-  const [rejected] = await sql<{ status: string; attempts: number }[]>`SELECT status, attempts FROM opp_pushes WHERE key = 'notice:ecp-4001_2018032900295987'`;
+  const [rejected] = await sql<{ status: string; attempts: number }[]>`SELECT status, attempts FROM opp_pushes WHERE key = ${`${main}:notice:ecp-4001_2018032900295987`}`;
   assert.deepEqual(rejected, { status: "failed", attempts: 1 });
   dingtalk = "ok";
   await processCycle();
-  const [retried] = await sql<{ status: string; attempts: number }[]>`SELECT status, attempts FROM opp_pushes WHERE key = 'notice:ecp-4001_2018032900295987'`;
+  const [retried] = await sql<{ status: string; attempts: number }[]>`SELECT status, attempts FROM opp_pushes WHERE key = ${`${main}:notice:ecp-4001_2018032900295987`}`;
   assert.deepEqual(retried, { status: "sent", attempts: 2 });
 
   dingtalk = "offline";
@@ -260,7 +269,7 @@ test("a rejected push is retried, a push of unknown outcome is not", async () =>
   dingtalk = "ok";
   const before = sent.length;
   await processCycle();
-  const [unknown] = await sql<{ status: string }[]>`SELECT status FROM opp_pushes WHERE key = 'notice:ecp-4002_2018032900295987'`;
+  const [unknown] = await sql<{ status: string }[]>`SELECT status FROM opp_pushes WHERE key = ${`${main}:notice:ecp-4002_2018032900295987`}`;
   assert.equal(unknown!.status, "unknown");
   assert.equal(sent.length, before, "an outcome we cannot know is not resent");
 });
@@ -297,7 +306,7 @@ test("tender notices from other platforms join as one project each: results are 
   const msg = sent.at(-1)!;
   assert.equal(msg.title, "投标商机｜示例供电局视频监控平台采购项目招标公告");
   for (const fact of ["南方电网供应链·招标公告", "投标截止：**2099-01-08 09:30**", "预算 120 万元", "资质：电子与智能化工程专业承包二级及以上资质",
-    `[原文](https://example.com/opp-1)`, `/opportunities/web-${ids.hit}`]) assert.ok(msg.text.includes(fact), fact);
+    `[原文](https://example.com/opp-1)`, sitePage(`/opportunities/web-${ids.hit}`)]) assert.ok(msg.text.includes(fact), fact);
 
   const list = (await app.inject({ url: "/api/site/opportunities?source=web", headers: { cookie: adminCookie } })).json();
   const card = list.items.find((i: { noticeId: string }) => i.noticeId === `web-${ids.hit}`);
@@ -318,16 +327,63 @@ test("only details whose quote is in the notice survive; dates and amounts must 
   assert.equal(yuan.budget, "120 万元");
 });
 
+test("each group gets only the directions and sources it chose, from when it was added, and @s the people who follow them", async () => {
+  const headers = adminHeaders();
+  const payload = {
+    name: "运检方向群", webhook: ROBOT("0123456789abcdef0123456789"), secret: "SEC-second", includeMaybe: false, digest: false,
+    lines: ["智能运检与监测"], sources: ["ecp"],
+    mentions: [{ name: "张三", mobile: "13800000001", lines: ["智能运检与监测"] }, { name: "李四", mobile: "13800000002", lines: ["数字化与信息系统"] },
+      { name: "王五", mobile: "13800000003", lines: [] }],
+  };
+  const create = (body: Record<string, unknown>) => app.inject({ method: "POST", url: "/api/admin/opportunities/groups", headers, payload: body });
+  assert.equal((await create({ ...payload, webhook: "https://example.com/hook" })).statusCode, 400);
+  assert.equal((await create({ ...payload, mentions: [{ name: "张三", mobile: "123" }] })).statusCode, 400);
+  assert.equal((await create({ ...payload, reason: "测试" })).statusCode, 200);
+  const [g] = await sql<{ id: number }[]>`SELECT id FROM opp_push_groups WHERE name = '运检方向群'`;
+  const second = `g${g!.id}`;
+
+  const before = sent.length;
+  listed = [notice("7001", "分群推送批次"), ...listed];
+  await discoverCycle();
+  const mine = sent.slice(before);
+  assert.equal(mine.length, 2, "one message per group that wants the notice");
+  const toMain = mine.find((m) => m.url.includes(MAIN_TOKEN))!;
+  const toSecond = mine.find((m) => !m.url.includes(MAIN_TOKEN))!;
+  assert.match(toMain.text, /1 个相关项目，1 个待确认/);
+  assert.deepEqual(toMain.at, [], "a group without people @s nobody");
+  assert.match(toSecond.text, /#### 投标商机：1 个相关项目\n/);
+  assert.ok(toSecond.text.includes("视频监控") && !toSecond.text.includes("数据分析"), "only the chosen direction, no 待确认");
+  assert.deepEqual(toSecond.at, ["13800000001", "13800000003"], "people following that direction, and those following all");
+  assert.ok(toSecond.text.endsWith("提醒：@13800000001 @13800000003"));
+  const pushed = await sql<{ key: string }[]>`SELECT key FROM opp_pushes WHERE key LIKE '%:notice:ecp-7001%' AND status = 'sent'`;
+  assert.deepEqual(pushed.map((p) => p.key).sort(), [`${main}:notice:ecp-7001_2018032900295987`, `${second}:notice:ecp-7001_2018032900295987`].sort());
+  assert.equal((await sql`SELECT 1 FROM opp_pushes WHERE key LIKE ${`${second}:notice:ecp-1002%`}`).length, 0,
+    "notices found before the group was added are not sent to it");
+
+  const admin = await app.inject({ url: "/api/admin/opportunities", headers: { cookie: adminCookie } });
+  assert.ok(!admin.body.includes("SEC-second") && !admin.body.includes("0123456789abcdef0123456789"), "webhook and secret stay in the backend");
+  const shown = admin.json().groups.find((x: { name: string }) => x.name === "运检方向群");
+  assert.deepEqual([shown.sent, shown.webhookHint], [1, "…456789"]);
+  assert.deepEqual(admin.json().notices.find((n: { id: string }) => n.id === "ecp-7001_2018032900295987").pushedGroups, ["商务部投标群", "运检方向群"]);
+
+  // 修改时 Webhook 和密钥留空沿用原来的；删掉群连同它的推送记录。
+  assert.equal((await app.inject({ method: "POST", url: `/api/admin/opportunities/groups/${g!.id}`, headers,
+    payload: { ...payload, name: "运检群", webhook: "", secret: "", reason: "改名" } })).statusCode, 200);
+  const [kept] = await sql<{ name: string; secret: string }[]>`SELECT name, secret FROM opp_push_groups WHERE id = ${g!.id}`;
+  assert.deepEqual({ ...kept }, { name: "运检群", secret: "SEC-second" });
+  assert.equal((await app.inject({ method: "POST", url: `/api/admin/opportunities/groups/${g!.id}/delete`, headers, payload: { reason: "测试完" } })).statusCode, 200);
+  assert.equal((await sql`SELECT 1 FROM opp_pushes WHERE key LIKE ${`${second}:%`}`).length, 0);
+});
+
 test("the daily digest lists projects whose file deadline is within 3 days, once a day", async () => {
   const id = "ecp-1002_2018032900295987";
   const now = new Date("2099-01-03T00:00:00Z");
-  const result = await pushDigest(now);
-  assert.equal(result, "sent");
+  assert.deepEqual(await pushDigest(now), { [main]: "sent" });
   const msg = sent.at(-1)!;
   assert.match(msg.title, /^投标商机日报 2099-01-03$/);
   assert.ok(msg.text.includes("3 天内截止"));
-  assert.ok(msg.text.includes(`/opportunities/${id}#item-`));
-  assert.equal(await pushDigest(now), "skipped", "one digest a day");
+  assert.ok(msg.text.includes(sitePage(`/opportunities/${id}#item-`).replace(/&pc_slide=true$/, "")), "links open inside DingTalk");
+  assert.deepEqual(await pushDigest(now), { [main]: "skipped" }, "one digest a day");
 });
 
 test("site and admin APIs: members read the list and details, only admins change the business profile", async () => {
@@ -356,7 +412,7 @@ test("site and admin APIs: members read the list and details, only admins change
   assert.equal((await app.inject({ url: "/api/site/opportunities/ecp-missing", headers: { cookie: adminCookie } })).statusCode, 404);
   assert.equal((await app.inject({ url: "/api/site/opportunities" })).statusCode, 401, "the site is internal");
 
-  const headers = { cookie: adminCookie, origin: config.siteUrl, "x-csrf-token": adminCsrf };
+  const headers = adminHeaders();
   const bad = await app.inject({ method: "POST", url: "/api/admin/opportunities/profile", headers, payload: { lines: [{ name: "空方向", keywords: [] }], exclude: [] } });
   assert.equal(bad.statusCode, 400);
   const saved = await app.inject({ method: "POST", url: "/api/admin/opportunities/profile", headers,
