@@ -1,7 +1,8 @@
 // 投标商机：采集服务发现的公告第一轮只入库不推送；之后的新公告取附件、拆项目、按业务口径筛（排除词直接无关，
 // 其余交给模型；模型出错时按关键词记待确认），从公告正文抽出预算、时间和资格业绩要求（原话核对不上的去掉），
-// 对得上的推到每个要它的钉钉群一次且只一次（各群按自己选的方向和来源，@ 关注这些方向的提醒人），每日汇总列 3 天内截止的。
-// 其他招采平台的资料一条一个项目，结果类公告不收。
+// 每个项目的资质、业绩、人员要求和后台“我司资质”逐条比对出匹配度；早晚两期信息表把每个群还没收到过的项目推一次且只一次
+// （各群按自己选的方向和平台，@ 关注这些方向的提醒人），并提醒 48 小时内截止的。
+// 其他招采平台的资料一条一个项目、按平台分开，结果类公告不收。
 // 采集服务、模型和钉钉都是本地替身，不访问外部服务。
 import { pointModels, Reply, stub } from "../../../tests/setup.ts";
 import { createServer } from "node:http";
@@ -17,8 +18,9 @@ import { buildApp } from "../../../apps/api/src/app.ts";
 import { access } from "../../access/server.ts";
 import { opportunities } from "../server.ts";
 import { discoverCycle, processCycle } from "../backend/run.ts";
-import { formatCeiling, pushDigest, sitePage } from "../backend/push.ts";
-import { deadlineAt, isExpired, packageLabel } from "../backend/store.ts";
+import { formatCeiling, pushSheet, sheetSlot, sitePage } from "../backend/push.ts";
+import { appliesTo, itemRequirements, splitCombined } from "../backend/requirements.ts";
+import { deadlineAt, isExpired, packageLabel, platformOf } from "../backend/store.ts";
 import { verified } from "../backend/details.ts";
 import { DEFAULT_PROFILE, matchKeywords, validateProfile } from "../backend/profile.ts";
 import type { FetcherItem, FetcherNotice, FetcherResult } from "../types.ts";
@@ -93,22 +95,34 @@ const fetcher = createServer((req, res) => {
 });
 await new Promise<void>((resolve) => fetcher.listen(0, "127.0.0.1", resolve));
 
-// 模型替身：筛选时数据分析平台“待确认”、视频监控“相关”、其余“无关”；抽要素时给出 DETAILS（其中两条原话编造或对不上）。
-// modelDown 时返回 503。
+// 模型替身：筛选时数据分析平台“待确认”、视频监控“相关”、其余“无关”；抽要素时给出 DETAILS（其中两条原话编造或对不上）；
+// 比对资质时资质“满足”、业绩“需核实”、人员“不满足”。modelDown 时返回 503。
 let modelDown = false;
 const prompts: string[] = [];
+const answer = (content: unknown) => ({ id: "stub", choices: [{ message: { content: JSON.stringify(content) } }], usage: { prompt_tokens: 1, completion_tokens: 1 } });
 const model = await stub(async (_hit, req) => {
   if (modelDown) return new Reply(503, { error: { message: "down" } });
   const user = JSON.parse(req.body).messages.at(-1).content as string;
   prompts.push(user);
-  if (user.includes("【公告】")) return { id: "stub", choices: [{ message: { content: JSON.stringify(DETAILS) } }], usage: { prompt_tokens: 1, completion_tokens: 1 } };
+  if (user.includes("【公告】")) return answer(DETAILS);
+  if (user.includes("【我司资质】")) {
+    const [ours, projects] = user.split("【项目】\n") as [string, string];
+    const entities = ours.split(/\n\n(?=主体\d+：)/).slice(1).map((b) => ({ n: Number(/^主体(\d+)：/.exec(b)![1]), text: b }));
+    const having = (word: string) => entities.filter((e) => e.text.includes(word)).map((e) => e.n);
+    return answer({ items: projects.split(/\n\n(?=#\d+ 项目：)/).map((b) => ({
+      n: Number(/^#(\d+)/.exec(b)![1]),
+      checks: [...b.matchAll(/^(\d+)\. \[(资质|业绩|人员)\]/gm)].map(([, r, kind]) => kind === "资质"
+        ? { r: Number(r), met: having("专业承包一级"), unmet: having("专业承包二级"), note: "博创有电子与智能化一级" }
+        : { r: Number(r), met: [], unmet: [], note: "清单未列同类业绩" }),
+    })) });
+  }
   const items = [...user.matchAll(/#(\d+) 项目：(.+)/g)].map(([, n, name]) => ({
     n: Number(n),
     verdict: name!.includes("视频监控") ? "相关" : name!.includes("数据分析") ? "待确认" : "无关",
     line: name!.includes("视频监控") ? "智能运检与监测" : name!.includes("数据分析") ? "数字化与信息系统" : "",
     why: name!.includes("视频监控") ? "主体是视频监控系统运维" : "主体不是业务方向",
   }));
-  return { id: "stub", choices: [{ message: { content: JSON.stringify({ items }) } }], usage: { prompt_tokens: 1, completion_tokens: 1 } };
+  return answer({ items });
 });
 pointModels(model.url, ["deepseek-flash"]);
 process.env.OPPORTUNITIES_MODEL = "deepseek-flash";
@@ -118,12 +132,35 @@ process.env.DINGTALK_PUSH_ENABLED = "true";
 const ROBOT = (token: string) => `https://oapi.dingtalk.com/robot/send?access_token=${token}`;
 const MAIN_TOKEN = "abcdef0123456789abcdef0123";
 
+const ms = (d: string) => new Date(`${d}T00:00:00+08:00`).getTime();
+const YIDA_RECORDS = [
+  { formInstanceId: "FINST-1", formData: { selectField_kind: "资质", textField_name: "电子与智能化工程专业承包一级", selectField_company: "安徽博创信息科技有限公司", cascadeDateField_valid: [ms("2025-01-01"), ms("2099-12-31")] } },
+  { formInstanceId: "FINST-2", formData: { selectField_kind: "资质", textField_name: "电子与智能化工程专业承包二级", selectField_company: "安徽博诺思信息科技有限公司", cascadeDateField_valid: [ms("2025-01-01"), ms("2099-12-31")] } },
+  { formInstanceId: "FINST-3", formData: { selectField_kind: "资质", textField_name: "CMMI3级", selectField_company: "安徽博创信息科技有限公司", cascadeDateField_valid: [ms("2017-01-01"), ms("2020-01-01")] } },
+  { formInstanceId: "FINST-4", formData: { selectField_kind: "荣誉", textField_name: "高新技术企业", selectField_company: "安徽博诺思信息科技有限公司" } },
+];
+const yidaCalls: string[] = [];
+function yida(url: string, init?: RequestInit): Response {
+  const path = new URL(url).pathname;
+  yidaCalls.push(path);
+  if (path === "/v1.0/oauth2/accessToken") return Response.json({ accessToken: "yida-test-token", expireIn: 7200 });
+  if ((init?.headers as Record<string, string>)["x-acs-dingtalk-access-token"] !== "yida-test-token") return Response.json({ code: "InvalidAuthentication" }, { status: 401 });
+  if (path === "/v1.0/yida/forms/formFields") {
+    return Response.json({ result: [{ fieldId: "selectField_kind", label: { zh_CN: "类型" } }, { fieldId: "textField_name", label: "资质/荣誉名称" },
+      { fieldId: "selectField_company", label: "所属公司" }, { fieldId: "cascadeDateField_valid", label: JSON.stringify({ zh_CN: "有效期", type: "i18n" }) }] });
+  }
+  const body = JSON.parse(String(init?.body)) as { systemToken: string; formUuid: string; currentPage: number };
+  assert.deepEqual([body.systemToken, body.formUuid], ["yida-system-token", "FORM-TEST"]);
+  return Response.json({ totalCount: YIDA_RECORDS.length, currentPage: body.currentPage, data: body.currentPage === 1 ? YIDA_RECORDS : [] });
+}
+
 // 钉钉替身：截下发往 oapi.dingtalk.com 的请求，其余照常。
 const sent: Array<{ url: string; title: string; text: string; at: string[] }> = [];
 let dingtalk: "ok" | "reject" | "offline" = "ok";
 const realFetch = globalThis.fetch;
 globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
   const url = String(input instanceof Request ? input.url : input);
+  if (url.startsWith("https://api.dingtalk.com/")) return yida(url, init);
   if (!url.startsWith("https://oapi.dingtalk.com/")) return realFetch(input, init);
   if (dingtalk === "offline") throw new TypeError("fetch failed");
   const body = JSON.parse(String(init?.body)) as { markdown: { title: string; text: string }; at: { atMobiles: string[] } };
@@ -140,6 +177,9 @@ let adminCsrf = "";
 const adminHeaders = () => ({ cookie: adminCookie, origin: config.siteUrl, "x-csrf-token": adminCsrf });
 /** 一开始就有的推送群（所有方向、所有来源、含待确认）的推送记录前缀。 */
 let main = "";
+/** 每次推信息表用不同的一期（2090 年起每天早间一期），各期的防重复记录互不干扰。 */
+let day = 0;
+const nextSlot = () => new Date(Date.UTC(2090, 0, 1 + day++, 1, 0));
 
 before(async () => {
   const { token } = await passwordLogin(config.adminPassword!, "/admin", undefined);
@@ -165,12 +205,11 @@ after(async () => {
 const verdicts = async (id: string) => Object.fromEntries((await sql<{ package: string; verdict: string; matched_by: string }[]>`
   SELECT package, verdict, matched_by FROM opp_items WHERE notice_id = ${id} ORDER BY ordinal`).map((r) => [r.package, `${r.verdict}/${r.matched_by}`]));
 
-test("the first round is stored and screened but never pushed; later notices are pushed once with the facts that matter", async () => {
+test("the first round is stored and screened but never pushed; later notices go into the next sheet once, with the same facts for every project", async () => {
   listed = [notice("1001", "存量批次")];
   await discoverCycle();
   const [first] = await sql<{ backfill: boolean; status: string; screened: boolean }[]>`SELECT backfill, status, screened FROM opp_notices WHERE id = 'ecp-1001_2018032900295987'`;
   assert.deepEqual(first, { backfill: true, status: "parsed", screened: true });
-  assert.equal(sent.length, 0, "the backlog found on the first round is not pushed");
 
   listed = [notice("1002", "新批次"), ...listed];
   await discoverCycle();
@@ -178,40 +217,50 @@ test("the first round is stored and screened but never pushed; later notices are
     包1: "relevant/model", 包2: "irrelevant/exclude", 包3: "irrelevant/model", 包4: "maybe/model",
   });
   assert.ok(!prompts.some((p) => p.includes("食堂")), "excluded projects never reach the model");
+  assert.equal(sent.length, 0, "nothing is pushed between the morning and evening sheets");
+
+  const slot = nextSlot();
+  assert.deepEqual(await pushSheet(slot), { [main]: "sent" });
   assert.equal(sent.length, 1);
   const msg = sent[0]!;
   assert.match(msg.url, /&timestamp=\d+&sign=/);
-  assert.match(msg.title, /^投标商机｜示例供电公司营业厅视频监控系统设备运维服务等 2 项$/);
-  for (const fact of ["1 个相关项目，1 个待确认", "新批次（详情）", "国网电子商务平台", "获取截止：**2099-01-05 09:00:00**", "投标截止：**2099-01-08 09:30**",
-    "开标：2099-01-10 09:00:00", "预算 120 万元", "不接受联合体", "限价 29.7 万元", "折扣率 98%", "（待确认）", "采购内容：负责营业厅视频监控系统设备运维",
-    "智能运检与监测：主体是视频监控系统运维", "业绩要求：具有同类服务业绩", "**公告通用要求**", "资质：电子与智能化工程专业承包二级及以上资质",
-    "业绩：近三年不少于2个视频监控系统运维业绩", "dingtalk://dingtalkclient/page/link?url=https%3A%2F%2Finside.invalid%2Fopportunities%2Fecp-1002_2018032900295987&pc_slide=true"]) assert.ok(msg.text.includes(fact), fact);
+  assert.equal(msg.title, "盲投信息表 2090-01-01 早间（2 项）");
+  for (const fact of ["新筛出 **2** 个项目（相关 1，待确认 1）", "**1. [示例供电公司营业厅视频监控系统设备运维服务](", "**2. [示例数据分析平台开发](",
+    "（待确认）", "采购人：国网示例供电公司 ｜ 地区：示例市 ｜ 限价：29.7 万元", "限价：折扣率 98%", "时间：获取截止 01-05 09:00 ｜ 投标截止 01-08 09:30",
+    "资质：电子与智能化工程专业承包二级及以上资质", "业绩：具有同类服务业绩；近三年不少于2个视频监控系统运维业绩", "人员：未写明",
+    "匹配度：没有我司资质 ｜ 国网电子商务平台",
+    sitePage(`/opportunities?sheet=${encodeURIComponent(`${main}:sheet:2090-01-01:am`)}`),
+    "dingtalk://dingtalkclient/page/link?url=https%3A%2F%2Finside.invalid%2Fopportunities%2Fecp-1002_2018032900295987%23item-"]) assert.ok(msg.text.includes(fact), fact);
   assert.ok(!msg.text.includes("食堂") && !msg.text.includes("导线"), "irrelevant projects are not pushed");
-  assert.ok(!msg.text.includes("项目经理") && !msg.text.includes("报名截止"), "details whose quote is not in the notice are dropped");
+  assert.ok(!msg.text.includes("项目经理"), "details whose quote is not in the notice are dropped");
+  assert.ok(!msg.text.includes("主体是视频监控系统运维"), "the screening reason is not shown");
+  assert.ok(!msg.text.includes("ecp-1001_"), "the backlog found on the first round is not pushed");
+  assert.deepEqual(await pushSheet(slot), { skipped: "nothing due" }, "one sheet per group per slot");
 
   await discoverCycle();
   await processCycle();
-  assert.equal(sent.length, 1, "a notice is pushed only once");
   assert.equal(fetched.filter((u) => u === URL_OF("1002")).length, 1, "an attachment is fetched once");
+  await pushSheet(nextSlot());
+  assert.match(sent.at(-1)!.text, /上次推送以来没有新筛出的项目/, "a notice is listed in one sheet only");
+  assert.deepEqual(sent.at(-1)!.at, [], "an empty sheet @s nobody");
 });
 
-test("when the model is down a notice waits for it; after 6 hours names hitting a keyword are pushed as 待确认", async () => {
+test("when the model is down a notice waits for it; after 6 hours names hitting a keyword come as 待确认", async () => {
   modelDown = true;
   listed = [notice("2001", "模型不可用时的批次"), ...listed];
-  const before = sent.length;
   await discoverCycle();
   const [waiting] = await sql<{ screened: boolean; screen_failures: number }[]>`SELECT screened, screen_failures FROM opp_notices WHERE id = 'ecp-2001_2018032900295987'`;
   assert.deepEqual(waiting, { screened: false, screen_failures: 1 });
-  assert.equal(sent.length, before, "nothing is pushed while waiting for the model");
+  await pushSheet(nextSlot());
+  assert.ok(!sent.at(-1)!.text.includes("ecp-2001_"), "a notice waiting for the model is not in the sheet");
 
   await sql`UPDATE opp_notices SET fetched_at = now() - interval '7 hours' WHERE id = 'ecp-2001_2018032900295987'`;
   await processCycle();
   assert.deepEqual(await verdicts("ecp-2001_2018032900295987"), {
     包1: "maybe/keyword", 包2: "irrelevant/exclude", 包3: "irrelevant/keyword", 包4: "maybe/keyword",
   });
-  const msg = sent.at(-1)!;
-  assert.match(msg.text, /2 个待确认项目/);
-  assert.match(msg.text, /关键词命中：视频监控（未经模型判断）/);
+  await pushSheet(nextSlot());
+  assert.match(sent.at(-1)!.text, /新筛出 \*\*2\*\* 个项目（相关 0，待确认 2）/);
 });
 
 test("a keyword only in the procurement content is not enough without the model", () => {
@@ -252,32 +301,41 @@ test("attachment failures are classified: no public file is not retried, a netwo
   assert.equal(after3001!.status, "no_file");
 });
 
-test("a rejected push is retried, a push of unknown outcome is not", async () => {
+test("a rejected sheet is retried within its slot, a sheet of unknown outcome is not; what was not delivered rolls into the next one", async () => {
   dingtalk = "reject";
   listed = [notice("4001", "推送被拒"), ...listed];
   await discoverCycle();
-  const [rejected] = await sql<{ status: string; attempts: number }[]>`SELECT status, attempts FROM opp_pushes WHERE key = ${`${main}:notice:ecp-4001_2018032900295987`}`;
+  const rejectedSlot = nextSlot();
+  const key = `${main}:sheet:${sheetSlot(rejectedSlot).date}:am`;
+  assert.deepEqual(await pushSheet(rejectedSlot), { [main]: "failed" });
+  const [rejected] = await sql<{ status: string; attempts: number }[]>`SELECT status, attempts FROM opp_pushes WHERE key = ${key}`;
   assert.deepEqual(rejected, { status: "failed", attempts: 1 });
+  assert.equal((await sql`SELECT 1 FROM opp_pushes WHERE key = ${`${main}:notice:ecp-4001_2018032900295987`}`).length, 0, "not delivered yet");
   dingtalk = "ok";
-  await processCycle();
-  const [retried] = await sql<{ status: string; attempts: number }[]>`SELECT status, attempts FROM opp_pushes WHERE key = ${`${main}:notice:ecp-4001_2018032900295987`}`;
+  assert.deepEqual(await pushSheet(rejectedSlot, { retry: true }), { [main]: "sent" });
+  const [retried] = await sql<{ status: string; attempts: number }[]>`SELECT status, attempts FROM opp_pushes WHERE key = ${key}`;
   assert.deepEqual(retried, { status: "sent", attempts: 2 });
+  assert.ok(sent.at(-1)!.text.includes("ecp-4001_"));
+  assert.deepEqual(await pushSheet(rejectedSlot, { retry: true }), { skipped: "nothing due" }, "a sent sheet is not retried");
 
   dingtalk = "offline";
   listed = [notice("4002", "推送结果不明"), ...listed];
   await discoverCycle();
+  const unknownSlot = nextSlot();
+  assert.deepEqual(await pushSheet(unknownSlot), { [main]: "unknown" });
   dingtalk = "ok";
   const before = sent.length;
-  await processCycle();
-  const [unknown] = await sql<{ status: string }[]>`SELECT status FROM opp_pushes WHERE key = ${`${main}:notice:ecp-4002_2018032900295987`}`;
-  assert.equal(unknown!.status, "unknown");
+  assert.deepEqual(await pushSheet(unknownSlot, { retry: true }), { skipped: "nothing due" });
   assert.equal(sent.length, before, "an outcome we cannot know is not resent");
+  await pushSheet(nextSlot());
+  assert.ok(!sent.at(-1)!.text.includes("ecp-4002_"), "a notice that may have arrived is not listed again");
 });
 
-test("tender notices from other platforms join as one project each: results are skipped, screened in a batch and pushed with their details", async () => {
+test("tender notices from other platforms join as one project each, split by platform: results are skipped, screened in a batch, 待确认 stays in the list", async () => {
   await sql`INSERT INTO sources (id, name, kind, tier, participation_mode, tags, next_fetch_at) VALUES
     ('opp-csg-tender', '南方电网供应链·招标公告', 'rss', 'T1', 'editorial', ${["招标", "南网"]}, '2100-01-01'),
-    ('opp-csg-result', '南方电网供应链·中标候选人公示', 'rss', 'T1', 'editorial', ${["中标", "南网"]}, '2100-01-01')`;
+    ('opp-csg-result', '南方电网供应链·中标候选人公示', 'rss', 'T1', 'editorial', ${["中标", "南网"]}, '2100-01-01'),
+    ('opp-pc-tender', '中国电建阳光采购网·招采公告', 'rss', 'T1', 'editorial', ${["招标", "中国电建"]}, '2100-01-01')`;
   const add = async (sourceId: string, n: string, title: string, bodyText: string) =>
     (await upsertMaterial({ sourceId, url: `https://example.com/opp-${n}`, title, bodyText, bodyStatus: "ok", via: "fetch", publishedAt: new Date() })).articleId;
   const backlog = await add("opp-csg-tender", "0", "示例供电局存量视频监控项目招标公告", TEXT);
@@ -285,7 +343,6 @@ test("tender notices from other platforms join as one project each: results are 
   const [first] = await sql<{ backfill: boolean; screened: boolean }[]>`SELECT backfill, screened FROM opp_notices WHERE id = ${`web-${backlog}`}`;
   assert.deepEqual(first, { backfill: true, screened: true }, "what is already there the first time is stored, not pushed");
 
-  const before = sent.length;
   const prompted = prompts.length;
   const ids = {
     hit: await add("opp-csg-tender", "1", "示例供电局视频监控平台采购项目招标公告", TEXT),
@@ -293,24 +350,31 @@ test("tender notices from other platforms join as one project each: results are 
     excluded: await add("opp-csg-tender", "3", "示例供电局办公楼保洁服务招标公告", "保洁服务。"),
     result: await add("opp-csg-tender", "4", "示例供电局视频监控平台采购项目中标结果公告", "中标人：某公司。"),
     candidates: await add("opp-csg-result", "5", "示例视频监控项目中标候选人公示", "第一中标候选人：某公司。"),
+    powerchina: await add("opp-pc-tender", "6", "某电建工程视频监控系统采购公告", TEXT),
   };
   await processCycle();
   const rows = await sql<{ id: string; verdict: string; matched_by: string }[]>`
     SELECT n.id, i.verdict, i.matched_by FROM opp_notices n JOIN opp_items i ON i.notice_id = n.id WHERE n.source = 'web' AND NOT n.backfill`;
   assert.deepEqual(Object.fromEntries(rows.map((r) => [r.id, `${r.verdict}/${r.matched_by}`])), {
     [`web-${ids.hit}`]: "relevant/model", [`web-${ids.maybe}`]: "maybe/model", [`web-${ids.excluded}`]: "irrelevant/exclude",
+    [`web-${ids.powerchina}`]: "relevant/model",
   }, "results and candidate lists are not opportunities");
-  assert.equal(prompts.slice(prompted).filter((p) => p.includes("#2 项目：")).length, 1, "the platform's items are screened in one batch");
+  assert.equal(prompts.slice(prompted).filter((p) => p.includes("#2 项目：") && !p.includes("【我司资质】")).length, 1, "the platforms' items are screened in one batch");
 
-  assert.equal(sent.length, before + 1, "only the relevant one is pushed; 待确认 from other platforms waits for the list and digest");
+  await pushSheet(nextSlot());
   const msg = sent.at(-1)!;
-  assert.equal(msg.title, "投标商机｜示例供电局视频监控平台采购项目招标公告");
-  for (const fact of ["南方电网供应链·招标公告", "投标截止：**2099-01-08 09:30**", "预算 120 万元", "资质：电子与智能化工程专业承包二级及以上资质",
-    `[原文](https://example.com/opp-1)`, sitePage(`/opportunities/web-${ids.hit}`)]) assert.ok(msg.text.includes(fact), fact);
+  for (const fact of ["示例供电局视频监控平台采购项目招标公告", "某电建工程视频监控系统采购公告", "南方电网供应链·招标公告", "中国电建阳光采购网·招采公告",
+    "投标截止 01-08 09:30", "限价：预算 120 万元", "资质：电子与智能化工程专业承包二级及以上资质", sitePage(`/opportunities/web-${ids.hit}#item-`).replace(/&pc_slide=true$/, "")]) {
+    assert.ok(msg.text.includes(fact), fact);
+  }
+  assert.ok(!msg.text.includes("数据分析平台采购公告"), "待确认 from other platforms waits for the list");
 
-  const list = (await app.inject({ url: "/api/site/opportunities?source=web", headers: { cookie: adminCookie } })).json();
+  const list = (await app.inject({ url: `/api/site/opportunities?source=${encodeURIComponent("南方电网供应链")}`, headers: { cookie: adminCookie } })).json();
+  assert.deepEqual(list.items.map((i: { noticeId: string }) => i.noticeId).sort(), [`web-${ids.hit}`, `web-${ids.maybe}`, `web-${backlog}`].sort(), "one platform only");
+  assert.deepEqual(list.platforms[0], { key: "ecp", label: "国网电子商务平台" }, "SGCC first");
+  for (const p of ["南方电网供应链", "中国电建阳光采购网"]) assert.ok(list.platforms.some((x: { key: string; label: string }) => x.key === p && x.label === p), p);
   const card = list.items.find((i: { noticeId: string }) => i.noticeId === `web-${ids.hit}`);
-  assert.deepEqual([card.sourceName, card.bidDeadline, card.noticeBudget], ["南方电网供应链·招标公告", "2099-01-08 09:30", "120 万元"]);
+  assert.deepEqual([card.sourceName, card.platform, card.bidDeadline, card.noticeBudget], ["南方电网供应链·招标公告", "南方电网供应链", "2099-01-08 09:30", "120 万元"]);
   const [n] = await sql<{ file_deadline: string }[]>`SELECT file_deadline FROM opp_notices WHERE id = ${`web-${ids.hit}`}`;
   assert.equal(n!.file_deadline, "", "a deadline the notice does not state is not invented");
 });
@@ -327,10 +391,10 @@ test("only details whose quote is in the notice survive; dates and amounts must 
   assert.equal(yuan.budget, "120 万元");
 });
 
-test("each group gets only the directions and sources it chose, from when it was added, and @s the people who follow them", async () => {
+test("each group gets only the directions and platforms it chose, from when it was added, and @s the people who follow them", async () => {
   const headers = adminHeaders();
   const payload = {
-    name: "运检方向群", webhook: ROBOT("0123456789abcdef0123456789"), secret: "SEC-second", includeMaybe: false, digest: false,
+    name: "运检方向群", webhook: ROBOT("0123456789abcdef0123456789"), secret: "SEC-second", includeMaybe: false,
     lines: ["智能运检与监测"], sources: ["ecp"],
     mentions: [{ name: "张三", mobile: "13800000001", lines: ["智能运检与监测"] }, { name: "李四", mobile: "13800000002", lines: ["数字化与信息系统"] },
       { name: "王五", mobile: "13800000003", lines: [] }],
@@ -342,16 +406,17 @@ test("each group gets only the directions and sources it chose, from when it was
   const [g] = await sql<{ id: number }[]>`SELECT id FROM opp_push_groups WHERE name = '运检方向群'`;
   const second = `g${g!.id}`;
 
-  const before = sent.length;
   listed = [notice("7001", "分群推送批次"), ...listed];
   await discoverCycle();
+  const before = sent.length;
+  const result = await pushSheet(nextSlot());
+  assert.deepEqual(result, { [main]: "sent", [second]: "sent" });
   const mine = sent.slice(before);
-  assert.equal(mine.length, 2, "one message per group that wants the notice");
   const toMain = mine.find((m) => m.url.includes(MAIN_TOKEN))!;
   const toSecond = mine.find((m) => !m.url.includes(MAIN_TOKEN))!;
-  assert.match(toMain.text, /1 个相关项目，1 个待确认/);
+  assert.ok(toMain.text.includes("ecp-7001_") && toMain.text.includes("示例数据分析平台开发"), "the group without filters also gets 待确认");
   assert.deepEqual(toMain.at, [], "a group without people @s nobody");
-  assert.match(toSecond.text, /#### 投标商机：1 个相关项目\n/);
+  assert.match(toSecond.text, /新筛出 \*\*1\*\* 个项目（相关 1）/);
   assert.ok(toSecond.text.includes("视频监控") && !toSecond.text.includes("数据分析"), "only the chosen direction, no 待确认");
   assert.deepEqual(toSecond.at, ["13800000001", "13800000003"], "people following that direction, and those following all");
   assert.ok(toSecond.text.endsWith("提醒：@13800000001 @13800000003"));
@@ -363,7 +428,7 @@ test("each group gets only the directions and sources it chose, from when it was
   const admin = await app.inject({ url: "/api/admin/opportunities", headers: { cookie: adminCookie } });
   assert.ok(!admin.body.includes("SEC-second") && !admin.body.includes("0123456789abcdef0123456789"), "webhook and secret stay in the backend");
   const shown = admin.json().groups.find((x: { name: string }) => x.name === "运检方向群");
-  assert.deepEqual([shown.sent, shown.webhookHint], [1, "…456789"]);
+  assert.deepEqual([shown.sent, shown.webhookHint, shown.sources], [1, "…456789", ["ecp"]]);
   assert.deepEqual(admin.json().notices.find((n: { id: string }) => n.id === "ecp-7001_2018032900295987").pushedGroups, ["商务部投标群", "运检方向群"]);
 
   // 修改时 Webhook 和密钥留空沿用原来的；删掉群连同它的推送记录。
@@ -375,15 +440,79 @@ test("each group gets only the directions and sources it chose, from when it was
   assert.equal((await sql`SELECT 1 FROM opp_pushes WHERE key LIKE ${`${second}:%`}`).length, 0);
 });
 
-test("the daily digest lists projects whose file deadline is within 3 days, once a day", async () => {
-  const id = "ecp-1002_2018032900295987";
-  const now = new Date("2099-01-03T00:00:00Z");
-  assert.deepEqual(await pushDigest(now), { [main]: "sent" });
+test("the sheet reminds of projects sent before whose deadline is within 48 hours", async () => {
+  const now = new Date("2099-01-04T01:00:00Z");
+  assert.deepEqual(await pushSheet(now), { [main]: "sent" });
   const msg = sent.at(-1)!;
-  assert.match(msg.title, /^投标商机日报 2099-01-03$/);
-  assert.ok(msg.text.includes("3 天内截止"));
-  assert.ok(msg.text.includes(sitePage(`/opportunities/${id}#item-`).replace(/&pc_slide=true$/, "")), "links open inside DingTalk");
-  assert.deepEqual(await pushDigest(now), { [main]: "skipped" }, "one digest a day");
+  assert.match(msg.title, /^盲投信息表 2099-01-04 早间/);
+  assert.ok(msg.text.includes("48 小时内截止（之前推过）"));
+  assert.ok(msg.text.includes(sitePage("/opportunities/ecp-1002_2018032900295987#item-").replace(/&pc_slide=true$/, "")), "links open inside DingTalk");
+});
+
+test("qualifications sync from 宜搭; each project is matched per company and the best one is suggested, in the list, the export and the sheet page", async () => {
+  const headers = adminHeaders();
+  const sync = (body: Record<string, unknown>) => app.inject({ method: "POST", url: "/api/admin/opportunities/qualifications/sync", headers, payload: body });
+  assert.equal((await sync({ dryRun: true })).statusCode, 400, "not configured yet");
+  Object.assign(process.env, {
+    DINGTALK_APP_KEY: "ding-test-key", DINGTALK_APP_SECRET: "ding-test-secret", YIDA_APP_TYPE: "APP_TEST",
+    YIDA_SYSTEM_TOKEN: "yida-system-token", YIDA_USER_ID: "u-1", YIDA_QUALIFICATION_FORM: "FORM-TEST",
+  });
+  const preview = await sync({ dryRun: true });
+  assert.equal(preview.statusCode, 200, preview.body);
+  assert.deepEqual(preview.json().fields, {
+    类型: "selectField_kind（类型）", "资质/荣誉名称": "textField_name（资质/荣誉名称）", 所属公司: "selectField_company（所属公司）", 有效期: "cascadeDateField_valid（有效期）",
+  });
+  assert.deepEqual(preview.json().sample[0], { id: "FINST-1", company: "安徽博创信息科技有限公司", kind: "资质", name: "电子与智能化工程专业承包一级", validFrom: "2025-01-01", validTo: "2099-12-31" });
+  assert.equal((await sql`SELECT 1 FROM opp_company_quals`).length, 0, "a dry run stores nothing");
+  const synced = await sync({ reason: "测试" });
+  assert.equal(synced.statusCode, 200, synced.body);
+  assert.equal((await sql`SELECT 1 FROM opp_company_quals`).length, 4);
+  assert.ok(!yidaCalls.some((c) => c.includes("save") || c.includes("update")), "only reads 宜搭");
+
+  const save = (body: Record<string, unknown>) => app.inject({ method: "POST", url: "/api/admin/opportunities/company", headers, payload: body });
+  assert.equal((await save({ personnel: ["高级工程师 5 人"], performance: [], other: [] })).statusCode, 400, "every line names its company");
+  assert.equal((await save({ personnel: ["博创：高级工程师 5 人"], performance: [], other: [], reason: "测试" })).statusCode, 200);
+
+  const matchPrompts = () => prompts.filter((p) => p.includes("【我司资质】"));
+  for (let k = 0; k < 6; k++) await processCycle();
+  assert.ok(matchPrompts().length > 0);
+  const prompt = matchPrompts()[0]!;
+  assert.match(prompt, /主体1：安徽博创信息科技有限公司\n资质证书：\n- 电子与智能化工程专业承包一级（有效期至 2099-12-31）\n人员证书：\n- 高级工程师 5 人/);
+  assert.match(prompt, /主体2：安徽博诺思信息科技有限公司\n资质证书：\n- 电子与智能化工程专业承包二级（有效期至 2099-12-31）\n- 高新技术企业（荣誉）\n人员证书：（未填写）/);
+  assert.ok(!prompt.includes("CMMI3级"), "an expired certificate does not count");
+  assert.ok(prompt.includes("[资质] 电子与智能化工程专业承包二级及以上资质"));
+
+  const listed = async () => (await app.inject({ url: "/api/site/opportunities?source=ecp", headers: { cookie: adminCookie } })).json().items
+    .find((i: { noticeId: string; projectName: string }) => i.noticeId === "ecp-1002_2018032900295987" && i.projectName.includes("视频监控"));
+  const card = await listed();
+  assert.deepEqual(card.match, {
+    company: "安徽博创信息科技有限公司", met: 1, unmet: 0, unknown: 2, level: "medium",
+    entities: [{ company: "安徽博创信息科技有限公司", met: 1, unmet: 0, unknown: 2 }, { company: "安徽博诺思信息科技有限公司", met: 0, unmet: 1, unknown: 2 }],
+  }, "one company's certificate never covers another; the one that falls short least is suggested");
+  assert.deepEqual(card.requirements.map((r: { group: string; from: string; status: string }) => [r.group, r.from, r.status]),
+    [["qualification", "notice", "met"], ["performance", "item", "unknown"], ["performance", "notice", "unknown"]]);
+  const asked = matchPrompts().length;
+  await processCycle();
+  assert.equal(matchPrompts().length, asked, "matched projects are not asked again while our qualifications stay the same");
+
+  const csv = await app.inject({ url: "/api/site/opportunities/export.csv?source=ecp", headers: { cookie: adminCookie } });
+  assert.equal(csv.statusCode, 200);
+  assert.match(String(csv.headers["content-type"]), /^text\/csv/);
+  assert.ok(csv.body.startsWith("\uFEFF序号,判断,业务方向,来源,项目名称"));
+  for (const fact of ["【满足：博创有电子与智能化一级】电子与智能化工程专业承包二级及以上资质", "中，建议博创（满足 1，需核实 2）", "https://inside.invalid/opportunities/ecp-1002_2018032900295987#item-"]) {
+    assert.ok(csv.body.includes(fact), fact);
+  }
+
+  const sheet = (await app.inject({ url: `/api/site/opportunities?sheet=${encodeURIComponent(`${main}:sheet:2090-01-01:am`)}`, headers: { cookie: adminCookie } })).json();
+  assert.equal(sheet.sheet.title, "2090-01-01 早间信息表 · 商务部投标群");
+  assert.deepEqual(sheet.items.map((i: { projectName: string }) => i.projectName), ["示例供电公司营业厅视频监控系统设备运维服务", "示例数据分析平台开发"]);
+  assert.equal((await app.inject({ url: "/api/site/opportunities?sheet=g1:sheet:bad", headers: { cookie: adminCookie } })).json().items.length, 0);
+
+  // 宜搭里改了：博诺思升到一级，同步后重新比对，两家都满足时满足多的在前。
+  YIDA_RECORDS[1]!.formData.textField_name = "电子与智能化工程专业承包一级";
+  assert.equal((await sync({ reason: "宜搭更新" })).statusCode, 200);
+  for (let k = 0; k < 6; k++) await processCycle();
+  assert.deepEqual((await listed()).match.entities.map((e: { unmet: number }) => e.unmet), [0, 0], "re-matched after the sync");
 });
 
 test("site and admin APIs: members read the list and details, only admins change the business profile", async () => {
@@ -399,7 +528,10 @@ test("site and admin APIs: members read the list and details, only admins change
   assert.equal(card.bidDeadline, "2099-01-08 09:30");
   assert.equal(card.noticeBudget, "120 万元");
   assert.equal(card.sourceName, "国网电子商务平台");
+  assert.equal(card.platform, "ecp");
   assert.equal(card.expired, false);
+  assert.equal(card.reason, undefined, "the screening reason is not shown");
+  assert.deepEqual(card.requirements.map((r: { group: string }) => r.group), ["qualification", "performance", "performance"]);
 
   const detail = await app.inject({ url: `/api/site/opportunities/${card.noticeId}`, headers: { cookie: adminCookie } });
   assert.equal(detail.statusCode, 200);
@@ -423,6 +555,12 @@ test("site and admin APIs: members read the list and details, only admins change
   assert.equal(admin.statusCode, 200);
   assert.equal(admin.json().status.pushEnabled, true);
   assert.equal(admin.json().status.fetcherConfigured, true);
+  assert.deepEqual(admin.json().company, { personnel: ["博创：高级工程师 5 人"], performance: [], other: [] });
+  assert.deepEqual(admin.json().qualifications.rows.map((q: { name: string }) => q.name).sort(),
+    ["CMMI3级", "电子与智能化工程专业承包一级", "电子与智能化工程专业承包一级", "高新技术企业"].sort());
+  assert.equal(admin.json().qualifications.configured, true);
+  assert.ok(!admin.body.includes("yida-system-token"), "the 宜搭 secret stays in the backend");
+  assert.ok(admin.json().platforms.some((p: { key: string }) => p.key === "南方电网供应链"));
   const [audited] = await sql`SELECT reason FROM audit_log WHERE action = 'opportunities.profile' ORDER BY id DESC LIMIT 1`;
   assert.equal(audited!.reason, "测试");
 });
@@ -441,4 +579,24 @@ test("ceilings carry their unit, deadlines read as Beijing time, keywords match 
   assert.equal(matchKeywords(p, { project_name: "AI 质检平台", package_name: "", scope: "" }).lines.length, 1);
   assert.equal(matchKeywords(p, { project_name: "MAIN 变压器", package_name: "", scope: "" }).lines.length, 0);
   assert.equal(matchKeywords(p, { project_name: "运维", package_name: "", scope: "含食堂保障" }).excludedBy, null, "exclusion reads only names");
+});
+
+test("requirements: a combined column is split at its 业绩 heading, notice requirements apply to their lots only, platforms come from the source name", () => {
+  assert.deepEqual(splitCombined("资质要求：具备电子与智能化二级资质。业绩要求：近三年2个同类业绩"),
+    { qualifications: "具备电子与智能化二级资质", performance: "近三年2个同类业绩" });
+  assert.deepEqual(splitCombined("近三年业绩：不少于2个"), { qualifications: "近三年业绩：不少于2个", performance: "" }, "only a heading splits");
+  assert.equal(appliesTo(["包1"], { package: "包1", package_name: "" }), true);
+  assert.equal(appliesTo(["1"], { package: "包1", package_name: "" }), true);
+  assert.equal(appliesTo(["包2"], { package: "包1", package_name: "" }), false);
+  assert.equal(appliesTo(["包2"], { package: "", package_name: "" }), true, "a notice that is one project takes every requirement");
+  const details = { requirements: [
+    { kind: "qualification", text: "C资质", quote: "", lots: ["包2"] },
+    { kind: "performance", text: "B业绩", quote: "", lots: [] },
+    { kind: "personnel", text: "项目经理一级建造师", quote: "", lots: ["包1"] },
+  ] } as unknown as Parameters<typeof itemRequirements>[1];
+  const item = { package: "包1", package_name: "", qualifications: "资质要求：A资质。业绩要求：B业绩", performance: "/", personnel: "/" };
+  assert.deepEqual(itemRequirements(item, details).map((r) => [r.group, r.text, r.from]),
+    [["qualification", "A资质", "item"], ["performance", "B业绩", "item"], ["personnel", "项目经理一级建造师", "notice"]]);
+  assert.equal(platformOf({ source: "web", source_name: "三峡集团电子采购平台·采购公告" }), "三峡集团电子采购平台");
+  assert.equal(platformOf({ source: "etp", source_name: "" }), "etp");
 });

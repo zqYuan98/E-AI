@@ -1,6 +1,6 @@
-// 商机列表和批次详情共用的小件：判断标签、限价带单位、两个时间。时间和金额照来源原文显示，不换算时区。
-import type { CeilingKind, OpportunityCard, Verdict } from "../types.ts";
-import { VERDICT_LABELS } from "../types.ts";
+// 商机列表和批次详情共用的小件：判断标签、匹配度、资质 / 业绩 / 人员要求、限价带单位、几个时间。时间和金额照来源原文显示，不换算时区。
+import type { CeilingKind, ItemRequirement, MatchStatus, MatchSummary, OpportunityCard, RequirementGroup, Verdict } from "../types.ts";
+import { MATCH_LEVEL_LABELS, MATCH_STATUS_LABELS, REQUIREMENT_GROUP_LABELS, VERDICT_LABELS, shortCompany } from "../types.ts";
 
 /** 限价配上单位：比例写成百分数（0.98 → 98%），没认出单位的照原文。 */
 export function ceilingText(value: string, kind: CeilingKind): string {
@@ -54,3 +54,87 @@ export const NOTICE_STATUS_NOTES: Record<string, string> = {
   failed: "附件下载或解析失败，系统会再试；现在以原公告为准。",
   blocked: "原网站需要人工验证，暂时取不到附件，请打开原公告查看。",
 };
+
+const LEVEL_TONES: Record<MatchSummary["level"], string> = {
+  high: "bg-accent-soft text-accent",
+  medium: "bg-amber-soft text-amber-ink",
+  low: "bg-hot-soft text-hot",
+};
+
+const counts = (m: { met: number; unmet: number; unknown: number }) =>
+  [m.met && `满足 ${m.met}`, m.unmet && `不满足 ${m.unmet}`, m.unknown && `需核实 ${m.unknown}`].filter(Boolean).join(" · ");
+
+/** 匹配度：建议的投标主体和它的等级；没比的不显示。 */
+export function MatchTag({ match }: { match: MatchSummary | null }) {
+  if (!match) return null;
+  return (
+    <span title={`建议投标主体 ${match.company}：${counts(match)}。系统初判，以商务核实为准`}
+      className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${LEVEL_TONES[match.level]}`}>
+      匹配度 {MATCH_LEVEL_LABELS[match.level]} · {shortCompany(match.company)}
+    </span>
+  );
+}
+
+/** 详情里：每家公司（投标主体）对这个项目的满足情况，建议的排第一。 */
+export function EntityList({ match }: { match: MatchSummary }) {
+  return (
+    <ul className="mt-1 space-y-0.5 text-[12.5px] text-ink-3">
+      {match.entities.map((e, k) => (
+        <li key={e.company} className={k === 0 ? "font-medium text-ink-2" : ""}>
+          {k === 0 ? "建议 " : ""}{e.company}：{counts(e) || "—"}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+const STATUS_TONES: Record<MatchStatus, string> = { met: "text-accent", unmet: "text-hot", unknown: "text-amber-ink" };
+
+function StatusMark({ r }: { r: ItemRequirement }) {
+  if (!r.status) return null;
+  return <span className={`mr-1 font-semibold ${STATUS_TONES[r.status]}`} title={r.note || undefined}>[{MATCH_STATUS_LABELS[r.status]}]</span>;
+}
+
+const GROUPS: RequirementGroup[] = ["qualification", "performance", "personnel"];
+
+/** 一类要求没写时的说法：公告说详见招标文件的照说，否则“未写明”。 */
+export const missingText = (inDocuments: boolean) => (inDocuments ? "详见招标文件" : "未写明");
+
+/**
+ * 资质、业绩、人员三行，每行都在（没写的写“未写明”），商务一眼看清。compact 用在列表卡片和表格里：每行最多两行字；
+ * 完整的用在详情里：每条一行，带对比说明和出处。
+ */
+export function Requirements({ o, compact = false }: { o: Pick<OpportunityCard, "requirements" | "requirementsInDocuments">; compact?: boolean }) {
+  return (
+    <dl className={compact ? "grid gap-1 text-[12.5px]" : "space-y-2.5 text-[13.5px]"}>
+      {GROUPS.map((g) => {
+        const rs = o.requirements.filter((r) => r.group === g);
+        return (
+          <div key={g} className={compact ? "flex min-w-0 gap-2" : ""}>
+            <dt className={compact ? "shrink-0 text-ink-4" : "text-[13px] font-semibold text-ink"}>{REQUIREMENT_GROUP_LABELS[g]}{compact ? "" : "要求"}</dt>
+            {rs.length === 0 ? (
+              <dd className={`text-ink-4 ${compact ? "" : "mt-0.5"}`}>{missingText(o.requirementsInDocuments)}</dd>
+            ) : compact ? (
+              <dd className="line-clamp-2 min-w-0 break-words text-ink-2">
+                {rs.map((r, k) => <span key={k}>{k > 0 && "；"}<StatusMark r={r} />{r.text}</span>)}
+              </dd>
+            ) : (
+              <dd className="mt-0.5">
+                <ul className="space-y-1 leading-[1.75] text-ink-2">
+                  {rs.map((r, k) => (
+                    <li key={k} className="whitespace-pre-line break-words">
+                      <StatusMark r={r} />{r.text}
+                      {(r.note || r.from === "notice") && (
+                        <span className="block text-[12px] text-ink-4">{[r.note, r.from === "notice" ? "出自公告正文的通用要求" : ""].filter(Boolean).join(" · ")}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </dd>
+            )}
+          </div>
+        );
+      })}
+    </dl>
+  );
+}

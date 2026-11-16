@@ -1,11 +1,13 @@
-// 后台“投标商机”：采集和推送的运行状态，推送群（每个钉钉群推什么、@ 谁），业务口径（每行一个方向“方向名：词、词、词”，加排除词），最近抓到的公告。
-// 业务口径决定哪些项目算相关或待确认；保存后从下一轮筛选起生效。
+// 后台“投标商机”：采集和推送的运行状态，推送群（每个钉钉群推什么、@ 谁），业务口径（每行一个方向“方向名：词、词、词”，加排除词），
+// 我司资质（资质从宜搭同步，人员证书、业绩和其他手填，见 company.tsx），最近抓到的公告。
+// 业务口径决定哪些项目算相关或待确认，保存后从下一轮筛选起生效；我司资质决定匹配度和建议投标主体。
 import { useState } from "react";
 import { Link, useLoaderData, type LoaderFunctionArgs } from "react-router";
 import { adminGet } from "@aihot/web/lib/admin.server";
 import { useAdminAction } from "@aihot/web/features/admin/action";
 import { AdminPage, Badge, Button, Card, DataTable, Empty, Field, ReasonDialog, Stat, Textarea, Time } from "@aihot/web/features/admin/ui";
 import { SOURCE_NAMES, type BusinessProfile, type OpportunityAdmin } from "../types.ts";
+import { CompanyCard } from "./company.tsx";
 import { PushGroups } from "./push-groups.tsx";
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -62,12 +64,11 @@ function pushState(n: Notice) {
   if (n.pushedGroups.length) return <span className="text-[12px] text-ink-3">已推送到 {n.pushedGroups.join("、")}</span>;
   if (n.backfill) return <Badge tone="muted" title="开始使用前已有的公告，只补进列表，不推送">补录不推送</Badge>;
   if (n.relevant + n.maybe === 0) return <span className="text-[12px] text-ink-4">无需推送</span>;
-  if (n.pushedAt) return <span className="text-[12px] text-ink-4" title="推送群选的方向和来源里没有这份公告的项目">没有群要推</span>;
-  return <Badge tone="warn">待推送</Badge>;
+  return <span className="text-[12px] text-ink-4" title="每天 08:30、17:30 推信息表；推送群选的方向和平台里没有这份公告的项目时不推">等信息表</span>;
 }
 
 export default function OpportunitiesAdmin() {
-  const { profile, defaults, status, groups, notices, counts } = useLoaderData<typeof loader>();
+  const { profile, defaults, company, qualifications, platforms, status, groups, notices, counts } = useLoaderData<typeof loader>();
   const { run, pending } = useAdminAction();
   const [linesText, setLinesText] = useState(formatLines(profile));
   const [excludeText, setExcludeText] = useState(profile.exclude.join("、"));
@@ -88,7 +89,7 @@ export default function OpportunitiesAdmin() {
   return (
     <AdminPage
       title="投标商机"
-      subtitle="自动抓取国网电子商务平台和电工交易专区的招采公告（下载附件拆成具体项目），并收录信源里打了“招标”“招标计划”标签的其他招采平台公告，按下面的业务口径筛出相关和待确认的，抽出预算、时间和资格业绩要求，推送到下面配的钉钉群。"
+      subtitle="自动抓取国网电子商务平台和电工交易专区的招采公告（下载附件拆成具体项目），并收录信源里打了“招标”“招标计划”标签的其他招采平台公告，按下面的业务口径筛出相关和待确认的，抽出预算、时间和资质业绩人员要求，按集团下各公司分别和“我司资质”比对出匹配度和建议投标主体，每天 08:30、17:30 把盲投信息表推到下面配的钉钉群。"
       actions={
         <>
           <Button size="sm" tone="primary" disabled={!status.fetcherConfigured} onClick={() => setAction({ kind: "run" })}>立即采集一轮</Button>
@@ -112,7 +113,7 @@ export default function OpportunitiesAdmin() {
         </ul>
       </Card>
 
-      <PushGroups groups={groups} lines={profile.lines.map((l) => l.name)} pushEnabled={status.pushEnabled} />
+      <PushGroups groups={groups} lines={profile.lines.map((l) => l.name)} platforms={platforms} pushEnabled={status.pushEnabled} />
 
       <Card title="业务口径" className="mb-5" right={<Button size="sm" onClick={reset}>恢复默认</Button>}>
         <div className="grid gap-3">
@@ -128,6 +129,8 @@ export default function OpportunitiesAdmin() {
           </div>
         </div>
       </Card>
+
+      <CompanyCard company={company} qualifications={qualifications} />
 
       <Card title={`最近的国网公告（${notices.length}）`} pad={false}>
         {notices.length ? (

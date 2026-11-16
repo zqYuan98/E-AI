@@ -1,5 +1,5 @@
 // 一份招采公告：公告信息、解析情况、从公告正文抽出的要素（预算、时间、通用资格业绩要求），筛出的相关和待确认项目逐个写全
-// （锚点 item-<id>，列表点进来定位到这里），其余项目只列名称和包。
+// （锚点 item-<id>，列表点进来定位到这里）：资质、业绩、人员要求逐条列出并标出和我司资质的对比结果，其余项目只列名称和包。
 import { useLoaderData } from "react-router";
 import { cachedPage, loadOr404 } from "@aihot/web/lib/api.server";
 import { pageMeta } from "@aihot/web/lib/seo";
@@ -9,7 +9,7 @@ import { PhoneBar } from "@aihot/web/components/shell/PhoneBar";
 import type { Screen } from "@aihot/web/components/shell/screens";
 import { IconExternal } from "@aihot/web/components/icons";
 import { VERDICT_LABELS, type NoticeDetails, type OpportunityItem, type OpportunityNoticeDetail, type RequirementKind } from "../types.ts";
-import { ExpiredTag, MAYBE_HINT, NOTICE_STATUS_NOTES, VerdictTag, ceilingText } from "./parts.tsx";
+import { EntityList, ExpiredTag, MAYBE_HINT, MatchTag, NOTICE_STATUS_NOTES, Requirements, VerdictTag, ceilingText } from "./parts.tsx";
 
 export const handle: Screen = { tab: "opportunities" };
 export { pageHeaders as headers } from "@aihot/web/lib/api.server";
@@ -116,18 +116,13 @@ function Item({ o }: { o: OpportunityItem }) {
     <article id={`item-${o.id}`} className={`card scroll-mt-20 px-5 py-4 target:ring-2 target:ring-accent ${o.expired ? "opacity-75" : ""}`}>
       <div className="flex flex-wrap items-center gap-2 text-[11.5px] text-ink-4">
         <VerdictTag verdict={o.verdict} />
+        <MatchTag match={o.match} />
         {o.expired && <ExpiredTag />}
         {o.line && <span className="text-accent">#{o.line}</span>}
       </div>
       <h3 className="mt-2 break-words text-[16px] font-semibold leading-[1.5] text-ink">{o.projectName || o.packageName || "（原表没写项目名）"}</h3>
       {pkg && <p className="mt-0.5 break-words text-[12.5px] text-ink-3">{pkg}</p>}
-      {(o.reason || o.verdict === "maybe") && (
-        <p className={`mt-2.5 rounded-mark px-3 py-2 text-[12.5px] leading-[1.7] ${o.verdict === "maybe" ? "bg-amber-soft text-amber-ink" : "bg-accent-soft text-ink-2"}`}>
-          {o.line && <span className="font-semibold">{o.line}：</span>}
-          {o.reason || MAYBE_HINT}
-          {o.verdict === "maybe" && o.reason && <span className="block text-[12px] opacity-80">{MAYBE_HINT}。</span>}
-        </p>
-      )}
+      {o.verdict === "maybe" && <p className="mt-2.5 rounded-mark bg-amber-soft px-3 py-2 text-[12.5px] leading-[1.7] text-amber-ink">待确认：{MAYBE_HINT}。</p>}
       <div className="mt-3">
         <Facts rows={[
           ["项目单位", o.buyer],
@@ -141,9 +136,16 @@ function Item({ o }: { o: OpportunityItem }) {
         ]} />
       </div>
       <Block title="采购内容" text={o.scope} />
-      <Block title="资质要求" text={o.qualifications} />
-      <Block title="业绩要求" text={o.performance} />
-      <Block title="人员要求" text={o.personnel} />
+      <div className="mt-4 rounded-panel border border-line px-4 py-3">
+        <Requirements o={o} />
+        {o.match && (
+          <div className="mt-3 border-t border-line pt-2.5">
+            <h4 className="text-[13px] font-semibold text-ink">各投标主体</h4>
+            <EntityList match={o.match} />
+            <p className="mt-2 text-[11.5px] leading-5 text-ink-4">上面的 [满足] [不满足] [需核实] 是建议主体“{o.match.company}”的结果。都是系统按我司资质逐条初判的，以商务核实原件为准。</p>
+          </div>
+        )}
+      </div>
       {o.evidence.length > 0 && (
         <ul className="mt-4 space-y-0.5 border-t border-line pt-2.5 text-[11.5px] leading-[1.6] text-ink-4">
           {o.evidence.map((e, i) => (

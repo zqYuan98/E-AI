@@ -1,4 +1,4 @@
-// 一轮工作：发现国网新公告 → 取附件并解析；登记其他招采平台的新资料 → 筛选 → 抽要素 → 推送。定时任务和后台“立即采集一轮”都走这里；
+// 一轮工作：发现国网新公告 → 取附件并解析；登记其他招采平台的新资料 → 筛选 → 抽要素 → 和我司资质比对；信息表这一期没推成的再推。定时任务和后台“立即采集一轮”都走这里；
 // worker 是单进程，同一时间只跑一轮，后到的这一轮直接跳过（下一个点会再来）。
 import { sql } from "@aihot/backend/db";
 import { audit } from "@aihot/backend/audit";
@@ -7,8 +7,9 @@ import { collectionOn } from "@aihot/backend/operations/switches";
 import type { SourceKey } from "../types.ts";
 import { discover, fetcherUrl, fetchNotice, FetcherError } from "./fetcher.ts";
 import { trackArticles } from "./articles.ts";
-import { extractDetails, MAX_DETAIL_FAILURES } from "./details.ts";
-import { MAX_PUSH_ATTEMPTS, pushNotice } from "./push.ts";
+import { extractDetails } from "./details.ts";
+import { matchRequirements } from "./match.ts";
+import { pushSheet } from "./push.ts";
 import { screenNotice, screenWebItems } from "./screen.ts";
 import { hasNotices, markFailed, pendingNotices, saveFetched, unscreenedNotices, upsertDiscovered } from "./store.ts";
 
@@ -28,7 +29,7 @@ async function discoverAll(): Promise<{ discovered: number; failed: number }> {
   let discovered = 0;
   let failed = 0;
   for (const source of SOURCES) {
-    // 一个来源第一次采集时列表上已有的都是存量：入库、可查，但不实时推送。
+    // 一个来源第一次采集时列表上已有的都是存量：入库、可查，但不推送。
     const backfill = !(await hasNotices(source));
     for (const category of CATEGORIES) {
       try {
@@ -62,10 +63,9 @@ async function fetchPending(): Promise<{ fetched: number; failed: number }> {
   return { fetched, failed };
 }
 
-/** 筛选、抽要素，然后推送。推送等要素抽完；模型不行时最多等到取到附件 6 小时，不让推送一直等。 */
+/** 筛选、抽要素、比对资质；本期信息表有群明确失败的，再推一次（推送本身在 08:30、17:30 的定时任务里）。 */
 async function screenAndPush(): Promise<Record<string, unknown>> {
   let screened = 0;
-  let pushed = 0;
   let tracked = 0;
   try {
     tracked = await trackArticles();
@@ -91,23 +91,19 @@ async function screenAndPush(): Promise<Record<string, unknown>> {
   } catch (error) {
     warn("opportunity details failed", { err: logError(error) });
   }
-  // 还没推完的，或者有群明确失败、还能再试的。
-  const due = await sql<{ id: string }[]>`
-    SELECT id FROM opp_notices n
-    WHERE screened AND NOT backfill AND discovered_at > now() - interval '48 hours'
-      AND (pushed_at IS NULL OR EXISTS (SELECT 1 FROM opp_pushes p JOIN opp_push_groups g ON p.key = 'g' || g.id || ':notice:' || n.id
-        WHERE p.status = 'failed' AND p.attempts < ${MAX_PUSH_ATTEMPTS}))
-      AND EXISTS (SELECT 1 FROM opp_items i WHERE i.notice_id = n.id AND (i.verdict = 'relevant' OR (i.verdict = 'maybe' AND n.source <> 'web')))
-      AND (details IS NOT NULL OR doc_text = '' OR details_failures >= ${MAX_DETAIL_FAILURES} OR fetched_at < now() - interval '6 hours')
-    ORDER BY discovered_at LIMIT 20`;
-  for (const { id } of due) {
-    try {
-      if ((await pushNotice(id)) === "sent") pushed += 1;
-    } catch (error) {
-      warn("opportunity push failed", { noticeId: id, err: logError(error) });
-    }
+  let match = { matched: 0, matchFailed: 0 };
+  try {
+    match = await matchRequirements();
+  } catch (error) {
+    warn("opportunity match failed", { err: logError(error) });
   }
-  return { tracked, screened, webScreened: web.screened, webRelevant: web.relevant, webDeferred: web.deferred, ...details, pushed };
+  let retried: Record<string, string> = {};
+  try {
+    retried = await pushSheet(new Date(), { retry: true });
+  } catch (error) {
+    warn("opportunity sheet retry failed", { err: logError(error) });
+  }
+  return { tracked, screened, webScreened: web.screened, webRelevant: web.relevant, webDeferred: web.deferred, ...details, ...match, sheetRetry: retried };
 }
 
 async function once<T>(work: () => Promise<T>): Promise<T | { skipped: string }> {
@@ -130,7 +126,7 @@ export async function discoverCycle() {
 }
 
 /**
- * 定时（每 5 分钟）：取下一批国网附件，登记其他招采平台的新资料，筛选、抽要素、推送。
+ * 定时（每 5 分钟）：取下一批国网附件，登记其他招采平台的新资料，筛选、抽要素、比对资质，重推本期没推成的信息表。
  * 后台要求过“立即采集一轮”的先看一遍国网列表。没配采集服务时只处理其他平台的资料。
  */
 export async function processCycle() {

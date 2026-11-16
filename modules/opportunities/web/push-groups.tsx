@@ -1,14 +1,11 @@
-// 后台“投标商机”的推送群：每个钉钉群推哪些业务方向和来源、要不要待确认、实时推送和每日汇总，以及要 @ 的提醒人。
+// 后台“投标商机”的推送群：每天 08:30、17:30 各推一期盲投信息表；每个钉钉群推哪些业务方向和平台、要不要待确认，以及要 @ 的提醒人。
 // 修改时 Webhook 和密钥留空就沿用原来的；页面上只看得到 Webhook 末尾几位。
 import { useState, type ReactNode } from "react";
 import { useAdminAction } from "@aihot/web/features/admin/action";
 import { Badge, Button, Card, DataTable, Empty, Field, Input, ReasonDialog, Textarea, Time } from "@aihot/web/features/admin/ui";
-import { SOURCE_NAMES, type PushGroup, type PushGroupInput, type PushMention, type SourceKey } from "../types.ts";
+import type { PlatformOption, PushGroup, PushGroupInput, PushMention } from "../types.ts";
 
-const SOURCES = Object.keys(SOURCE_NAMES) as SourceKey[];
-const BLANK: PushGroupInput = {
-  name: "", webhook: "", secret: "", enabled: true, lines: [], sources: [], includeMaybe: true, realtime: true, digest: true, mentions: [],
-};
+const BLANK: PushGroupInput = { name: "", webhook: "", secret: "", enabled: true, lines: [], sources: [], includeMaybe: true, mentions: [] };
 
 const formatMentions = (ms: PushMention[]) => ms.map((m) => `${m.name} ${m.mobile}${m.lines.length ? `：${m.lines.join("、")}` : ""}`).join("\n");
 
@@ -39,10 +36,14 @@ function Check({ checked, onChange, children }: { checked: boolean; onChange: (o
   );
 }
 
-function scope(g: PushGroup) {
+/** 平台的名称；以前的“其他招采平台”选项（web）已拆成各个平台，提示重选。 */
+const platformName = (key: string, platforms: PlatformOption[]) =>
+  platforms.find((p) => p.key === key)?.label ?? (key === "web" ? "其他招采平台（旧选项，请改选具体平台）" : key);
+
+function scope(g: PushGroup, platforms: PlatformOption[]) {
   return [
     g.lines.length ? g.lines.join("、") : "全部方向",
-    g.sources.length ? g.sources.map((s) => SOURCE_NAMES[s]).join("、") : "全部来源",
+    g.sources.length ? g.sources.map((s) => platformName(s, platforms)).join("、") : "全部来源",
     g.includeMaybe ? "含待确认" : "只推相关",
   ].join(" · ");
 }
@@ -50,7 +51,7 @@ function scope(g: PushGroup) {
 type Draft = { id: number | null; input: PushGroupInput; mentionsText: string };
 type Action = { kind: "save"; id: number | null; input: PushGroupInput } | { kind: "delete"; group: PushGroup };
 
-export function PushGroups({ groups, lines, pushEnabled }: { groups: PushGroup[]; lines: string[]; pushEnabled: boolean }) {
+export function PushGroups({ groups, lines, platforms, pushEnabled }: { groups: PushGroup[]; lines: string[]; platforms: PlatformOption[]; pushEnabled: boolean }) {
   const { run, pending } = useAdminAction();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -70,13 +71,13 @@ export function PushGroups({ groups, lines, pushEnabled }: { groups: PushGroup[]
     const problem = error
       ?? (!input.name.trim() ? "填一个群名，方便认出是哪个群" : null)
       ?? (draft.id === null && !input.webhook.trim() ? "填机器人的 Webhook 地址" : null)
-      ?? (draft.id === null && !input.secret.trim() ? "填机器人的加签密钥" : null)
-      ?? (!input.realtime && !input.digest ? "实时推送和每日汇总至少选一样" : null);
+      ?? (draft.id === null && !input.secret.trim() ? "填机器人的加签密钥" : null);
     setError(problem);
     if (!problem) setAction({ kind: "save", id: draft.id, input });
   };
-  // 业务口径改过以后，群里原来选的方向也列出来，方便取消。
+  // 业务口径改过以后，群里原来选的方向（和已经没有公告的平台）也列出来，方便取消。
   const options = draft ? [...new Set([...lines, ...draft.input.lines])] : lines;
+  const sourceOptions = draft ? [...new Set([...platforms.map((p) => p.key), ...draft.input.sources])] : [];
 
   return (
     <Card title={`推送群（${groups.length}）`} className="mb-5" pad={false} right={!draft && <Button size="sm" onClick={() => edit(null)}>添加推送群</Button>}>
@@ -99,8 +100,8 @@ export function PushGroups({ groups, lines, pushEnabled }: { groups: PushGroup[]
               key: "s", label: "推什么",
               render: (g) => (
                 <div className="min-w-[220px] text-[12.5px] leading-relaxed text-ink-2">
-                  <div>{scope(g)}</div>
-                  <div className="text-ink-4">{[g.realtime && "实时推送", g.digest && "每日 8:30 汇总"].filter(Boolean).join("、")}</div>
+                  <div>{scope(g, platforms)}</div>
+                  <div className="text-ink-4">每天 08:30、17:30 推盲投信息表</div>
                 </div>
               ),
             },
@@ -115,8 +116,8 @@ export function PushGroups({ groups, lines, pushEnabled }: { groups: PushGroup[]
               render: (g) => (
                 <div className="flex flex-col items-start gap-1 text-[12px] text-ink-3">
                   <Badge tone={g.enabled ? "ok" : "muted"}>{g.enabled ? "启用" : "停用"}</Badge>
-                  <span>已推 {g.sent} 条{g.lastSentAt && <>，最近 <Time at={g.lastSentAt} /></>}</span>
-                  {g.problems > 0 && <Badge tone="bad" title={g.lastError}>7 天内 {g.problems} 条没推成</Badge>}
+                  <span>已推 {g.sent} 期{g.lastSentAt && <>，最近 <Time at={g.lastSentAt} /></>}</span>
+                  {g.problems > 0 && <Badge tone="bad" title={g.lastError}>7 天内 {g.problems} 期没推成</Badge>}
                 </div>
               ),
             },
@@ -158,25 +159,23 @@ export function PushGroups({ groups, lines, pushEnabled }: { groups: PushGroup[]
               {options.map((l) => <Check key={l} checked={draft.input.lines.includes(l)} onChange={(on) => set({ lines: toggle(draft.input.lines, l, on) })}>{l}</Check>)}
             </div>
           </Field>
-          <Field label="来源" hint="都不选就是全部来源">
+          <Field label="来源平台" hint="都不选就是全部来源；有公告的平台才会列出">
             <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-              {SOURCES.map((s) => <Check key={s} checked={draft.input.sources.includes(s)} onChange={(on) => set({ sources: toggle(draft.input.sources, s, on) })}>{SOURCE_NAMES[s]}</Check>)}
+              {sourceOptions.map((s) => <Check key={s} checked={draft.input.sources.includes(s)} onChange={(on) => set({ sources: toggle(draft.input.sources, s, on) })}>{platformName(s, platforms)}</Check>)}
             </div>
           </Field>
-          <Field label="推送方式">
+          <Field label="推送" hint="每天 08:30、17:30 各推一期盲投信息表，列出上一期以后新筛出的项目">
             <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-              <Check checked={draft.input.realtime} onChange={(on) => set({ realtime: on })}>实时推送（一份公告一条）</Check>
-              <Check checked={draft.input.digest} onChange={(on) => set({ digest: on })}>每日 8:30 汇总</Check>
-              <Check checked={draft.input.includeMaybe} onChange={(on) => set({ includeMaybe: on })}>也推待确认的项目</Check>
+              <Check checked={draft.input.includeMaybe} onChange={(on) => set({ includeMaybe: on })}>也推待确认的项目（其他招采平台的待确认不推）</Check>
               <Check checked={draft.input.enabled} onChange={(on) => set({ enabled: on })}>启用</Check>
             </div>
           </Field>
-          <Field label="提醒人" hint="每行一人：“姓名 手机号：方向、方向”。消息里有他关注方向的项目时 @ 他；不写方向就是每条都 @。手机号要是他钉钉绑定的，人要在这个群里">
+          <Field label="提醒人" hint="每行一人：“姓名 手机号：方向、方向”。信息表里有他关注方向的新项目时 @ 他；不写方向就是有新项目就 @。手机号要是他钉钉绑定的，人要在这个群里">
             <Textarea rows={Math.max(3, draft.mentionsText.split("\n").length + 1)} value={draft.mentionsText}
               placeholder={`张三 13800000000：${lines.slice(0, 2).join("、")}\n李四 13900000000`}
               onChange={(e) => setDraft({ ...draft, mentionsText: e.target.value })} className="font-mono text-[12.5px]" />
           </Field>
-          <p className="text-[12.5px] text-ink-3">新加或重新启用的群，从那时起发现的公告才实时推，之前的不补发（每日汇总照常列出）。</p>
+          <p className="text-[12.5px] text-ink-3">新加或重新启用的群，只列从那时起发现的公告，之前的不补发。</p>
           {error && <p role="alert" className="text-[13px] text-hot">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button onClick={() => { setDraft(null); setError(null); }}>取消</Button>
