@@ -620,7 +620,7 @@ test("requirements: a combined column is split at its 业绩 heading, notice req
     "人员要求按采购公告附件需求一览表提供", "详见招标文件"]) assert.equal(isBoilerplate(t), true, t);
   for (const t of ["具有电子与智能化工程专业承包二级及以上资质", "须取得法律法规规定的有效许可证，并具有承装（修、试）电力设施许可证四级及以上资质，且近三年无重大安全事故",
     "自2021年1月1日至投标截止日，投标人须具有信息系统实施业绩。", "按招标文件要求具有电子与智能化工程专业承包二级资质"]) assert.equal(isBoilerplate(t), false, t);
-  assert.deepEqual(itemRequirements({ ...item, qualifications: "须取得国家规定的有效许可证" }, null).map((r) => r.group), ["performance"]);
+  assert.deepEqual(itemRequirements({ ...item, qualifications: "须取得国家规定的有效许可证", performance: "B业绩" }, null).map((r) => [r.group, r.text]), [["performance", "B业绩"]]);
 });
 
 test("match summary: the company that falls short least is suggested, but none when all companies come out the same", () => {
