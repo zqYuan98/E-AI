@@ -142,7 +142,7 @@ function Item({ o }: { o: OpportunityItem }) {
           <div className="mt-3 border-t border-line pt-2.5">
             <h4 className="text-[13px] font-semibold text-ink">各投标主体</h4>
             <EntityList match={o.match} />
-            <p className="mt-2 text-[11.5px] leading-5 text-ink-4">上面的 [满足] [不满足] [需核实] 是建议主体“{o.match.company}”的结果。都是系统按我司资质逐条初判的，以商务核实原件为准。</p>
+            <p className="mt-2 text-[11.5px] leading-5 text-ink-4">上面的 [满足] [不满足] [需核实] 是{o.match.company ? `建议主体“${o.match.company}”的结果` : "各公司共同的结果"}。都是系统按我司资质逐条初判的，以商务核实原件为准。</p>
           </div>
         )}
       </div>

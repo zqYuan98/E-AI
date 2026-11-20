@@ -56,13 +56,16 @@ export interface ItemRequirement {
   note: string;
 }
 
-/** 匹配度：有不满足的为低，有需核实的为中，都满足为高。 */
-export type MatchLevel = "high" | "medium" | "low";
-export const MATCH_LEVEL_LABELS: Record<MatchLevel, string> = { high: "高", medium: "中", low: "低" };
+/** 匹配度：有不满足的为低，一条都没满足的为资料不足，有需核实的为中，都满足为高。 */
+export type MatchLevel = "high" | "medium" | "low" | "unknown";
+export const MATCH_LEVEL_LABELS: Record<MatchLevel, string> = { high: "高", medium: "中", low: "低", unknown: "资料不足" };
+
+/** 一类要求一条都没有时怎么说：公告写了“详见采购文件”的要下载采购文件看，否则公告没写。 */
+export const missingRequirement = (inDocuments: boolean) => (inDocuments ? "见采购文件（需下载）" : "公告未写明");
 export interface EntityMatch { company: string; met: number; unmet: number; unknown: number }
 /**
- * 按投标主体（集团下各公司）分别比对：company 是最合适的主体（不满足最少、满足最多），等级和条数是它的；
- * entities 是所有主体，按同样的顺序排。一个主体的要求只看它自己的资质、人员和业绩，不跨公司拼。
+ * 按投标主体（集团下各公司）分别比对：company 是建议的主体（不满足最少、满足最多），所有主体结果一样时为空串（不建议）；
+ * 等级和条数是排第一的主体的。entities 是所有主体，按同样的顺序排。一个主体的要求只看它自己的资质、人员和业绩，不跨公司拼。
  */
 export interface MatchSummary extends EntityMatch { level: MatchLevel; entities: EntityMatch[] }
 

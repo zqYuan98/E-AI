@@ -94,8 +94,11 @@ export async function loadEntities(now = new Date()): Promise<Entity[]> {
   return buildEntities(await loadQualifications(), await loadCompany(), beijingDate(now));
 }
 
-/** 比对结果对应哪一版条件（资质过期、同步到新资质、手填改了都会变）；什么都没有时为空串（不比）。 */
+/** 比对规则的版本：改了提示词里的判断规则或要求的取舍时加一，还没截止的项目会按新规则重比。 */
+const MATCH_RULES = 2;
+
+/** 比对结果对应哪一版条件（资质过期、同步到新资质、手填改了、规则改了都会变）；什么都没有时为空串（不比）。 */
 export function entitiesKey(entities: Entity[]): string {
   if (!entities.length) return "";
-  return createHash("sha256").update(JSON.stringify(entities)).digest("hex").slice(0, 16);
+  return createHash("sha256").update(JSON.stringify([MATCH_RULES, entities])).digest("hex").slice(0, 16);
 }

@@ -6,6 +6,7 @@
 // 采集服务、模型和钉钉都是本地替身，不访问外部服务。
 import { pointModels, Reply, stub } from "../../../tests/setup.ts";
 import { createServer } from "node:http";
+import { inflateRawSync } from "node:zlib";
 import assert from "node:assert/strict";
 import { after, before, beforeEach, test } from "node:test";
 import { config } from "@aihot/backend/config";
@@ -19,7 +20,7 @@ import { access } from "../../access/server.ts";
 import { opportunities } from "../server.ts";
 import { discoverCycle, processCycle } from "../backend/run.ts";
 import { formatCeiling, pushSheet, sheetSlot, sitePage } from "../backend/push.ts";
-import { appliesTo, itemRequirements, splitCombined } from "../backend/requirements.ts";
+import { appliesTo, isBoilerplate, itemRequirements, splitCombined, summarize } from "../backend/requirements.ts";
 import { deadlineAt, isExpired, packageLabel, platformOf } from "../backend/store.ts";
 import { verified } from "../backend/details.ts";
 import { DEFAULT_PROFILE, matchKeywords, validateProfile } from "../backend/profile.ts";
@@ -202,6 +203,17 @@ after(async () => {
   installModules([]);
 });
 
+/** 从导出的 .xlsx（zip）里取出一个文件的文字。 */
+function unzipText(buf: Buffer, name: string): string {
+  for (let p = 0; p + 30 <= buf.length && buf.readUInt32LE(p) === 0x04034b50;) {
+    const size = buf.readUInt32LE(p + 18), nameLen = buf.readUInt16LE(p + 26), extra = buf.readUInt16LE(p + 28);
+    const start = p + 30 + nameLen + extra;
+    if (buf.toString("utf8", p + 30, p + 30 + nameLen) === name) return inflateRawSync(buf.subarray(start, start + size)).toString("utf8");
+    p = start + size;
+  }
+  throw new Error(`${name} is not in the file`);
+}
+
 const verdicts = async (id: string) => Object.fromEntries((await sql<{ package: string; verdict: string; matched_by: string }[]>`
   SELECT package, verdict, matched_by FROM opp_items WHERE notice_id = ${id} ORDER BY ordinal`).map((r) => [r.package, `${r.verdict}/${r.matched_by}`]));
 
@@ -227,7 +239,7 @@ test("the first round is stored and screened but never pushed; later notices go 
   assert.equal(msg.title, "盲投信息表 2090-01-01 早间（2 项）");
   for (const fact of ["新筛出 **2** 个项目（相关 1，待确认 1）", "**1. [示例供电公司营业厅视频监控系统设备运维服务](", "**2. [示例数据分析平台开发](",
     "（待确认）", "采购人：国网示例供电公司 ｜ 地区：示例市 ｜ 限价：29.7 万元", "限价：折扣率 98%", "时间：获取截止 01-05 09:00 ｜ 投标截止 01-08 09:30",
-    "资质：电子与智能化工程专业承包二级及以上资质", "业绩：具有同类服务业绩；近三年不少于2个视频监控系统运维业绩", "人员：未写明",
+    "资质：电子与智能化工程专业承包二级及以上资质", "业绩：具有同类服务业绩；近三年不少于2个视频监控系统运维业绩", "人员：公告未写明",
     "匹配度：没有我司资质 ｜ 国网电子商务平台",
     sitePage(`/opportunities?sheet=${encodeURIComponent(`${main}:sheet:2090-01-01:am`)}`),
     "dingtalk://dingtalkclient/page/link?url=https%3A%2F%2Finside.invalid%2Fopportunities%2Fecp-1002_2018032900295987%23item-"]) assert.ok(msg.text.includes(fact), fact);
@@ -495,13 +507,16 @@ test("qualifications sync from 宜搭; each project is matched per company and t
   await processCycle();
   assert.equal(matchPrompts().length, asked, "matched projects are not asked again while our qualifications stay the same");
 
-  const csv = await app.inject({ url: "/api/site/opportunities/export.csv?source=ecp", headers: { cookie: adminCookie } });
-  assert.equal(csv.statusCode, 200);
-  assert.match(String(csv.headers["content-type"]), /^text\/csv/);
-  assert.ok(csv.body.startsWith("\uFEFF序号,判断,业务方向,来源,项目名称"));
-  for (const fact of ["【满足：博创有电子与智能化一级】电子与智能化工程专业承包二级及以上资质", "中，建议博创（满足 1，需核实 2）", "https://inside.invalid/opportunities/ecp-1002_2018032900295987#item-"]) {
-    assert.ok(csv.body.includes(fact), fact);
+  const exported = await app.inject({ url: "/api/site/opportunities/export.xlsx?source=ecp", headers: { cookie: adminCookie } });
+  assert.equal(exported.statusCode, 200);
+  assert.match(String(exported.headers["content-type"]), /spreadsheetml\.sheet/);
+  const cells = unzipText(exported.rawPayload, "xl/worksheets/sheet1.xml");
+  for (const fact of ["项目名称（点开看详情）", "[满足] 电子与智能化工程专业承包二级及以上资质", "中，建议博创（满足 1，需核实 2）", "获取 2099-01-05 09:00\n投标 2099-01-08 09:30", "<pane ySplit=\"1\""]) {
+    assert.ok(cells.includes(fact), fact);
   }
+  assert.ok(unzipText(exported.rawPayload, "xl/worksheets/_rels/sheet1.xml.rels").includes("https://inside.invalid/opportunities/ecp-1002_2018032900295987#item-"), "the name links to the detail page");
+  const fromSheet = await app.inject({ url: `/api/site/opportunities/export.xlsx?sheet=${encodeURIComponent(`${main}:sheet:2090-01-01:am`)}`, headers: { cookie: adminCookie } });
+  assert.match(String(fromSheet.headers["content-disposition"]), /filename\*=UTF-8''%E7%9B%B2%E6%8A%95%E4%BF%A1%E6%81%AF%E8%A1%A8-2090-01-01-%E6%97%A9%E9%97%B4\.xlsx/);
 
   const sheet = (await app.inject({ url: `/api/site/opportunities?sheet=${encodeURIComponent(`${main}:sheet:2090-01-01:am`)}`, headers: { cookie: adminCookie } })).json();
   assert.equal(sheet.sheet.title, "2090-01-01 早间信息表 · 商务部投标群");
@@ -599,4 +614,19 @@ test("requirements: a combined column is split at its 业绩 heading, notice req
     [["qualification", "A资质", "item"], ["performance", "B业绩", "item"], ["personnel", "项目经理一级建造师", "notice"]]);
   assert.equal(platformOf({ source: "web", source_name: "三峡集团电子采购平台·采购公告" }), "三峡集团电子采购平台");
   assert.equal(platformOf({ source: "etp", source_name: "" }), "etp");
+
+  // 每份公告都有的套话和“见附件”的指引不列、不比；后面跟着具体资质的长句留着。
+  for (const t of ["须取得国家法律、法规、规章规定的有效许可证。", "应答人须取得采购文件要求的国家强制认证证书。", "须取得专业检测机构出具的有效产品试验报告", "须取得国家授权专业检测机构或国际专业权威机构出具的产品有效试验报告。",
+    "人员要求按采购公告附件需求一览表提供", "详见招标文件"]) assert.equal(isBoilerplate(t), true, t);
+  for (const t of ["具有电子与智能化工程专业承包二级及以上资质", "须取得法律法规规定的有效许可证，并具有承装（修、试）电力设施许可证四级及以上资质，且近三年无重大安全事故",
+    "自2021年1月1日至投标截止日，投标人须具有信息系统实施业绩。", "按招标文件要求具有电子与智能化工程专业承包二级资质"]) assert.equal(isBoilerplate(t), false, t);
+  assert.deepEqual(itemRequirements({ ...item, qualifications: "须取得国家规定的有效许可证" }, null).map((r) => r.group), ["performance"]);
+});
+
+test("match summary: the company that falls short least is suggested, but none when all companies come out the same", () => {
+  const two = (checks: Array<{ met: number[]; unmet: number[] }>) => summarize({ reqs: "x", companies: ["甲公司", "乙公司"], checks: checks.map((c) => ({ ...c, note: "" })) })!;
+  assert.deepEqual([two([{ met: [1], unmet: [0] }]).company, two([{ met: [1], unmet: [0] }]).level], ["乙公司", "high"]);
+  assert.deepEqual([two([{ met: [], unmet: [] }]).company, two([{ met: [], unmet: [] }]).level], ["", "unknown"], "nothing known about anyone: no suggestion");
+  assert.deepEqual([two([{ met: [], unmet: [0, 1] }]).company, two([{ met: [], unmet: [0, 1] }]).level], ["", "low"], "everyone falls short");
+  assert.deepEqual([two([{ met: [0, 1], unmet: [] }, { met: [], unmet: [] }]).company, two([{ met: [0, 1], unmet: [] }, { met: [], unmet: [] }]).level], ["", "medium"]);
 });

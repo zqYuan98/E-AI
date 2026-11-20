@@ -183,7 +183,7 @@ export default function OpportunityList() {
   const busy = navigation.state === "loading" && navigation.location?.pathname === "/opportunities";
   const to = (change: Partial<Query>) => href({ ...query, page: 1, ...change });
   const filtered = !!(query.source || query.line || query.q);
-  const exportHref = `/api/site/opportunities/export.csv?${apiParams(query)}`;
+  const exportHref = `/api/site/opportunities/export.xlsx?${apiParams(query)}`;
 
   return (
     <div className={`mx-auto pb-14 ${query.layout === "table" ? "max-w-[1200px]" : "max-w-[var(--page-max-reading)]"}`}>

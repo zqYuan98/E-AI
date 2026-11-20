@@ -9,7 +9,7 @@ import { adminHandler } from "../../apps/api/src/routes/admin-auth.ts";
 import { DEFAULT_PROFILE, loadProfile, saveProfile } from "./backend/profile.ts";
 import { entitiesKey, loadCompany, loadEntities, saveCompany } from "./backend/company.ts";
 import { loadQualifications, syncQualifications, syncStatus, yidaConfig } from "./backend/yida.ts";
-import { opportunitiesCsv } from "./backend/export.ts";
+import { exportFilename, opportunitiesXlsx } from "./backend/export.ts";
 import { fetcherUrl } from "./backend/fetcher.ts";
 import { createGroup, deleteGroup, listGroups, updateGroup } from "./backend/groups.ts";
 import { pushEnabled, pushSheet, pushTest } from "./backend/push.ts";
@@ -39,14 +39,15 @@ export const opportunities: ServerModule = {
       const profile = await loadProfile();
       return listOpportunities(listQuery(req), profile.lines.map((l) => l.name));
     });
-    // 导出：和列表同样的筛选，Excel 能直接打开的 CSV。
-    app.get("/api/site/opportunities/export.csv", async (req, reply) => {
+    // 导出：和列表同样的筛选（或一期信息表），Excel 文件。
+    app.get("/api/site/opportunities/export.xlsx", async (req, reply) => {
       const profile = await loadProfile();
-      const rows = await exportOpportunities(listQuery(req), profile.lines.map((l) => l.name));
+      const query = listQuery(req);
+      const rows = await exportOpportunities(query, profile.lines.map((l) => l.name));
       return reply
-        .header("Content-Type", "text/csv; charset=utf-8")
-        .header("Content-Disposition", `attachment; filename="opportunities.csv"; filename*=UTF-8''${encodeURIComponent("盲投信息表.csv")}`)
-        .send(opportunitiesCsv(rows, entitiesKey(await loadEntities()) !== ""));
+        .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        .header("Content-Disposition", `attachment; filename="opportunities.xlsx"; filename*=UTF-8''${encodeURIComponent(exportFilename(query.sheet))}`)
+        .send(opportunitiesXlsx(rows, entitiesKey(await loadEntities()) !== ""));
     });
     app.get("/api/site/opportunities/:id", async (req, reply) => {
       const detail = await noticeDetail((req.params as { id: string }).id);

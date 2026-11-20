@@ -257,7 +257,7 @@ export async function listOpportunities(q: ListQuery, lines: string[], now = new
   return { items: rows.map((r) => card(r, now)), total, page, pages: Math.max(1, Math.ceil(total / PAGE)), lines, platforms, sheet: null };
 }
 
-/** 导出（Excel 打开的 CSV）：和列表同样的筛选，最多 2000 个项目，采购内容不截短。 */
+/** 导出 Excel：和列表同样的筛选（或一期信息表），最多 2000 个项目。 */
 export async function exportOpportunities(q: ListQuery, lines: string[], now = new Date()): Promise<Array<OpportunityCard & { scope: string }>> {
   const { where } = await filters(q, lines);
   const rows = await sql<CardRow[]>`

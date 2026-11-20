@@ -9,7 +9,7 @@ import { createHmac } from "node:crypto";
 import { config } from "@aihot/backend/config";
 import { sql } from "@aihot/backend/db";
 import { beijingDate, beijingTime } from "@aihot/contracts/time";
-import { MATCH_LEVEL_LABELS, shortCompany, type OpportunityCard, type PushMention, type RequirementGroup, type SourceKey, type Verdict } from "../types.ts";
+import { MATCH_LEVEL_LABELS, missingRequirement, shortCompany, type OpportunityCard, type PushMention, type RequirementGroup, type SourceKey, type Verdict } from "../types.ts";
 import { entitiesKey, loadEntities } from "./company.ts";
 import { activeGroups, loadGroup, type GroupRow } from "./groups.ts";
 import { byDeadline, card, cardColumns, deadlineAt, detailsSettled, sheetKey, type CardRow } from "./store.ts";
@@ -128,20 +128,22 @@ export function sheetSlot(now: Date): { date: string; slot: "am" | "pm"; label: 
 
 const GROUP_LINES: Array<[string, RequirementGroup]> = [["资质", "qualification"], ["业绩", "performance"], ["人员", "personnel"]];
 
-/** 一类要求一行：没写的写“未写明”（公告说详见招标文件的写“详见招标文件”）。 */
+/** 一类要求一行：不满足的标出来；没写的写“公告未写明”或“见采购文件（需下载）”。 */
 function requirementLine(c: OpportunityCard, label: string, group: RequirementGroup): string {
   const rs = c.requirements.filter((r) => r.group === group);
-  if (!rs.length) return `${label}：${c.requirementsInDocuments ? "详见招标文件" : "未写明"}`;
-  return `${label}：${md(short(rs.map((r) => r.text).join("；"), 60))}`;
+  if (!rs.length) return `${label}：${missingRequirement(c.requirementsInDocuments)}`;
+  return `${label}：${md(short(rs.map((r) => `${r.status === "unmet" ? "[不满足]" : ""}${r.text}`).join("；"), 60))}`;
 }
 
 /** 匹配度：建议的投标主体、等级和条数，有不满足的写出第一条差在哪里。companyOn：有我司资质可比（宜搭同步到了或手填了）。 */
 export function matchText(c: OpportunityCard, companyOn: boolean): string {
   const m = c.match;
   if (!m) return !c.requirements.length ? "无可比要求" : companyOn ? "待比对" : "没有我司资质";
+  if (m.level === "unknown") return "资料不足，需人工核实";
   const parts = [m.met && `满足 ${m.met}`, m.unmet && `不满足 ${m.unmet}`, m.unknown && `需核实 ${m.unknown}`].filter(Boolean).join("，");
   const gap = c.requirements.find((r) => r.status === "unmet");
-  return `${MATCH_LEVEL_LABELS[m.level]}，建议${shortCompany(m.company)}（${parts}${gap?.note ? `；${gap.note}` : ""}）`;
+  const who = m.company ? `建议${shortCompany(m.company)}` : m.unmet ? "各公司都不满足" : "各公司相同";
+  return `${MATCH_LEVEL_LABELS[m.level]}，${who}（${parts}${gap?.note ? `；${gap.note}` : ""}）`;
 }
 
 const detailPath = (c: OpportunityCard) => `/opportunities/${encodeURIComponent(c.noticeId)}#item-${c.id}`;
