@@ -7,6 +7,7 @@ formats, formula caches, hidden state and merge anchors.
 """
 from __future__ import annotations
 
+import datetime
 import hashlib
 import io
 import math
@@ -351,8 +352,18 @@ def _display_number(value: Decimal, code: str) -> tuple[str, str]:
     plain = format(value, 'f')
     if '.' in plain:
         plain = plain.rstrip('0').rstrip('.')
+    # “_”加一个字符是留出那个字符宽度的空白（“0.000_ ”），不影响数值。
+    code = re.sub(r'_.', '', code).strip() or 'General'
     if code in ('General', '@'):
         return plain, ''
+    # 纯日期格式（yyyy/mm/dd、yyyy-m-d、yyyy年m月d日）：Excel 1900 日期系统的序号换成同样写法的日期。
+    date = re.fullmatch(r'(yyyy|yy)([-/.年])(m{1,2})([-/.月])(d{1,2})(日?)', code.lower())
+    if date and value >= 61 and value < 2958466:
+        day = datetime.date(1899, 12, 30) + datetime.timedelta(days=int(value))
+        year = str(day.year) if date[1] == 'yyyy' else f'{day.year % 100:02d}'
+        month = f'{day.month:0{len(date[3])}d}'
+        dom = f'{day.day:0{len(date[5])}d}'
+        return f'{year}{date[2]}{month}{date[4]}{dom}{date[6]}', ''
     # Only formats we can reproduce faithfully are interpreted. Unsupported
     # Excel formats remain explicit in evidence instead of silently guessed.
     if len(code) <= 128 and re.fullmatch(r'(?:#,##)?0+(?:\.[0#]+)?%?', code):
@@ -447,7 +458,7 @@ _ALIASES = {
     'package': ('包号', '包编号', '标包编号', '包件编号', '分包'),
     'subpackage': ('子包号', '子包编号', '分包编号'),
     'package_name': ('包名称', '标包名称', '包件名称', '分包名称'),
-    'project_name': ('项目名称', '工程名称', '采购项目名称'),
+    'project_name': ('项目名称', '工程名称', '采购项目名称', '工程项目名称'),
     'buyer': ('项目单位', '采购人', '采购单位', '需求单位', '建设单位'),
     'scope': ('采购内容', '采购范围', '服务内容', '工作内容', '项目概况', '招标范围', '物料(服务)名称',
               '物资名称', '物料名称', '物资描述', '物料描述'),
@@ -456,7 +467,8 @@ _ALIASES = {
     'performance': ('供应商业绩要求', '投标人业绩要求', '业绩要求'),
     'location': ('建设地点', '实施地点', '项目地点', '服务地点', '交货地点'),
     'deadline': ('投标截止时间', '响应截止时间', '应答截止时间', '投标截止日期', '响应截止日期'),
-    'ceiling': ('最高限价', '最高投标限价', '控制价'),
+    # 物资清单的“单项最高限价”是单价上限，不当作限价；按包投标看“合计最高限价”。
+    'ceiling': ('最高限价', '最高投标限价', '控制价', '合计最高限价'),
     'budget': ('采购估算金额', '估算金额', '预算金额', '采购预算'),
     'pricing': ('报价方式', '计价方式'),
     'request_id': ('采购申请标识', '采购申请号', '采购申请编号', '网省采购申请号', '网省采购申请行号', '需求编号'),
@@ -471,13 +483,15 @@ def _label_key(text: str) -> str | None:
     if normalized in _ALIAS_MAP:
         return _ALIAS_MAP[normalized]
     base = re.sub(r'\([^)]*\)', '', normalized)
+    # 有的模板少了右括号：“合计最高限价（含税·万元”。
+    base = re.sub(r'\([^)]*$', '', base)
     return _ALIAS_MAP.get(base)
 
 
 def _schema(row: dict[int, _Cell]) -> tuple[str, dict[str, int]] | None:
     mapping: dict[str, int] = {}
     labels = {_normal(cell.text) for cell in row.values()}
-    goods = '网省采购申请号' in labels and ('物资名称' in labels or '物料编码' in labels)
+    goods = bool({'网省采购申请号', '采购申请标识'} & labels) and bool({'物资名称', '物料编码', '物料名称'} & labels)
     for col, cell in row.items():
         key = _label_key(cell.text)
         if key:
@@ -597,7 +611,9 @@ def _table(grid: dict[int, dict[int, _Cell]], hidden: dict[int, bool], merge_lis
                     raise _Invalid('合并单元格范围重叠')
                 merges[r, c] = ((r1, c1), reference)
                 existing = grid.get(r, {}).get(c)
-                if (r, c) != (r1, c1) and existing and existing.text:
+                anchor = grid.get(r1, {}).get(c1)
+                # 有的表把合并区域里每格都填了同样的值（“/”）；和左上角一样的不算冲突，不一样的才拒绝。
+                if (r, c) != (r1, c1) and existing and existing.text and existing.text.strip() != (anchor.text.strip() if anchor else ''):
                     raise _Invalid('合并区域非锚点包含冲突值')
 
     def resolve(r: int, c: int) -> _Cell | None:
@@ -621,13 +637,20 @@ def _table(grid: dict[int, dict[int, _Cell]], hidden: dict[int, bool], merge_lis
     view, mapping = schema
     # 两行表头：上一行是“响应供应商专用资格要求”这样的分组名，下一行才是“资质要求”“业绩要求”。
     # 下一行只有认得出的列名、没有数据时，按它细化列，数据从它下面开始。
+    # 分组标题是“投标人专用资格要求”这类的，下一行里认不出的小列（可接受的投标主体、认证证书、试验设备……）也收下，
+    # 每行按“列名：内容”记进资质要求。
     top_row = header_row
+    extras: dict[int, str] = {}
     below = sorted(r for r in grid if r > header_row)[:1]
     if below:
         sub = {c: cell.text for c, cell in grid[below[0]].items() if cell.text.strip()}
         keys = {c: _label_key(text) for c, text in sub.items()}
-        if sub and all(keys.values()):
-            mapping = {**mapping, **{key: c for c, key in keys.items()}}
+        group = {c: (resolve(top_row, c).text if resolve(top_row, c) else '') for c in sub}
+        grouped = {c for c, key in keys.items() if not key and re.search(r'资格|资质', _normal(group[c]))}
+        identity = {mapping[k] for k in ('section', 'package', 'project_name') if k in mapping}
+        if sub and all(keys[c] or c in grouped for c in sub) and not identity & sub.keys():
+            mapping = {**mapping, **{key: c for c, key in keys.items() if key}}
+            extras = {c: re.sub(r'\s+', '', sub[c]) for c in sorted(grouped)}
             header_row = below[0]
     summary.update(schema=view, header_row=header_row, status='parsed',
                    missing_fields=[key for key in _ALIASES if key not in mapping])
@@ -645,10 +668,24 @@ def _table(grid: dict[int, dict[int, _Cell]], hidden: dict[int, bool], merge_lis
             continue
         resolved = {key: resolve(rownum, col) for key, col in mapping.items()}
         values = {key: cell.text.strip() if cell else '' for key, cell in resolved.items()}
+        extra_lines = []
+        for c, label in extras.items():
+            cell = resolve(rownum, c)
+            text = cell.text.strip() if cell else ''
+            if text and text not in ('/', '-', '无', '不适用'):
+                extra_lines.append(f'{label}：{text}')
+        if extra_lines:
+            own = values.get('qualifications', '')
+            values['qualifications'] = '\n'.join(([own] if own and own != '/' else []) + extra_lines)
+            context.budget.text(len(values['qualifications']))
         row_warnings: list[str] = []
         if not any(values.get(k) for k in ('section', 'package', 'project_name', 'request_id')):
             summary['status'] = 'partial'
             context.warn(f'{parsed.name} / {name} / 行 {rownum}: 非空行无法识别为项目，未静默丢弃')
+            continue
+        # 表底的“备注：报价方式……”常是横跨整行的合并单元格，读出来分标、包、项目名都是这句话；不当作项目。
+        if re.match(r'(备注|注|说明)\s*[:：]', values.get('project_name', '')):
+            context.warn(f'{parsed.name} / {name} / 行 {rownum}: 备注行，不当作项目')
             continue
         if not values.get('section') or not values.get('package'):
             row_warnings.append('分标或包号缺失；不进行隐式向下填充或名称关联')
@@ -775,11 +812,10 @@ class _XLSLog:
 _OLE_SIGNATURE = b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1'
 
 
-def _xls_stream(data: bytes, context: _Context, log: _XLSLog) -> tuple[bytes, bool]:
+def _compound(data: bytes, context: _Context, log: _XLSLog):
+    """有界地打开 OLE 复合文件（XLS、Word 里的嵌入对象）：扇区链、目录树和流大小都先检查，不执行任何内容。"""
     from xlrd import compdoc
 
-    if not data.startswith(_OLE_SIGNATURE):
-        return data, False
     if len(data) < 512 or len(data) % 512 or struct.unpack_from('<HH', data, 30) != (9, 6):
         raise _Invalid('不支持或损坏的 XLS OLE 扇区结构（仅支持 512/64 字节扇区）')
 
@@ -833,7 +869,13 @@ def _xls_stream(data: bytes, context: _Context, log: _XLSLog) -> tuple[bytes, bo
                         pending.append((child, depth + 1))
             return value
 
-    document = BoundedCompound(data, logfile=log, ignore_workbook_corruption=False)
+    return BoundedCompound(data, logfile=log, ignore_workbook_corruption=False)
+
+
+def _xls_stream(data: bytes, context: _Context, log: _XLSLog) -> tuple[bytes, bool]:
+    if not data.startswith(_OLE_SIGNATURE):
+        return data, False
+    document = _compound(data, context, log)
     active = any(node.name.lower() in ('vba', '_vba_project', '_vba_project_cur', 'objectpool')
                  or node.name.lower().startswith('mbd') for node in document.dirlist)
     stream = document.get_named_stream('Workbook')
@@ -1048,7 +1090,155 @@ def _xls(data: bytes, parsed: ParsedFile, context: _Context) -> list[_Candidate]
             book.release_resources()
 
 
-def _docx(parts: dict[str, bytes], parsed: ParsedFile, context: _Context) -> None:
+def _paragraph_text(paragraph: ET.Element) -> str | None:
+    """一个段落的文字（文本框里的段落另算）；没有任何文字节点时为 None。"""
+    content = []
+    pending = list(reversed(list(paragraph)))
+    while pending:
+        node = pending.pop()
+        tag = _tag(node)
+        if tag == 'p':
+            continue
+        if tag == 't':
+            content.append(node.text or '')
+        elif tag == 'tab':
+            content.append('\t')
+        elif tag in ('br', 'cr'):
+            content.append('\n')
+        pending.extend(reversed(list(node)))
+    return ''.join(content) if content else None
+
+
+def _word_attr(element: ET.Element | None, name: str) -> str | None:
+    if element is None:
+        return None
+    return next((v for k, v in element.attrib.items() if k == name or k.endswith('}' + name)), None)
+
+
+def _word_grid(table: ET.Element, context: _Context) -> tuple[dict[int, dict[int, _Cell]], list[str]]:
+    """Word 表格转成工作表那样的网格：横向合并（gridSpan）、纵向合并（vMerge）记成合并区域，只有左上角的格子有字。"""
+    grid: dict[int, dict[int, _Cell]] = {}
+    merges: list[str] = []
+    vertical: dict[int, list[int]] = {}
+    count = 0
+
+    def close(c: int) -> None:
+        top, bottom, span = vertical.pop(c)
+        if bottom > top or span > 1:
+            merges.append(f'{_column(c)}{top}:{_column(c + span - 1)}{bottom}')
+
+    for r, tr in enumerate(_children(table, 'tr'), 1):
+        row: dict[int, _Cell] = {}
+        c = 1
+        for tc in _children(tr, 'tc'):
+            props = _child(tc, 'tcPr')
+            span_text = _word_attr(_child(props, 'gridSpan') if props is not None else None, 'val') or '1'
+            if not span_text.isdigit() or not 1 <= int(span_text) <= 64:
+                raise _Invalid('Word 表格合并列数无效')
+            span = int(span_text)
+            vmerge = _child(props, 'vMerge') if props is not None else None
+            if vmerge is not None and _word_attr(vmerge, 'val') != 'restart' and c in vertical:
+                vertical[c][1] = r
+            else:
+                if c in vertical:
+                    close(c)
+                texts = [t for p in tc.iter() if _tag(p) == 'p' and (t := _paragraph_text(p)) is not None]
+                text = '\n'.join(texts).strip()
+                row[c] = _Cell(f'{_column(c)}{r}', text, {'type': 'docx', 'value': text, 'text': text})
+                context.budget.text(len(text))
+                count += 1
+                if count > _MAX_CELLS:
+                    raise _Limit('Word 表格单元格数超过安全限制')
+                if vmerge is not None:
+                    vertical[c] = [r, r, span]
+                elif span > 1:
+                    merges.append(f'{_column(c)}{r}:{_column(c + span - 1)}{r}')
+            c += span
+        grid[r] = row
+    for c in list(vertical):
+        close(c)
+    return grid, merges
+
+
+def _docx_tables(root: ET.Element, parsed: ParsedFile, context: _Context) -> list[_Candidate]:
+    """公告直接把需求一览表做成 Word 表格的，按工作表同样的规则认表头、拆项目。认不出表头的表格（公告信息、联系方式）不报告。"""
+    rows: list[_Candidate] = []
+    for index, table in enumerate((t for t in root.iter() if _tag(t) == 'tbl'), 1):
+        grid, merges = _word_grid(table, context)
+        if not any(_schema(grid[r]) for r in sorted(grid)[:50]):
+            continue
+        summary, candidates = _table(grid, {r: False for r in grid}, merges, 'word/document.xml', f'正文表格{index}',
+                                     'visible', parsed, context)
+        parsed.sheets.append(summary)
+        rows.extend(candidates)
+    return rows
+
+
+_SPREADSHEET = ('.xlsx', '.xls')
+
+
+def _ole10native(stream: bytes) -> tuple[str, bytes] | None:
+    """“由文件创建”的嵌入对象（Packager）：4 字节总长、2 字节标志、文件名、原路径，中间几个字段各版本不一，
+    然后是 4 字节内容长度和内容。从文件名之后找内容开头（ZIP 或 OLE 签名），用它前面的 4 字节长度核对。"""
+    end = stream.find(b'\0', 6)
+    if len(stream) < 12 or end < 0:
+        return None
+    label = stream[6:end].decode('gb18030', 'replace')
+    label = re.sub(r'[\x00-\x1f]', '', label.replace('\\', '/')).rsplit('/', 1)[-1][:120]
+    for signature in (b'PK\x03\x04', _OLE_SIGNATURE):
+        k = stream.find(signature, end)
+        while k >= 4:
+            size = struct.unpack_from('<I', stream, k - 4)[0]
+            if 0 < size <= len(stream) - k:
+                return label, stream[k:k + size]
+            k = stream.find(signature, k + 1)
+    return None
+
+
+def _ole_package(data: bytes, context: _Context) -> tuple[str, bytes] | None:
+    """OLE 包装的嵌入对象里的文件：Package 流是整个文件（嵌入的 Excel），Ole10Native 是“由文件创建”的附件（带原文件名）。"""
+    document = _compound(data, context, _XLSLog())
+    package = document.get_named_stream('Package')
+    if package:
+        return ('嵌入表格.xlsx' if package.startswith(b'PK') else '嵌入表格.xls'), package
+    native = document.get_named_stream('\x01Ole10Native')
+    return _ole10native(native) if native else None
+
+
+def _embedded_tables(parts: dict[str, bytes], parsed: ParsedFile, depth: int, context: _Context) -> set[str]:
+    """Word 里“插入对象”嵌进来的表格（需求一览表常这样附在公告里）：直接是 .xlsx / .xls 的，或 OLE 包装的。
+    只取出文件内容，按附件同样的规则解析，不执行；不是表格的（.wps、图片）照旧报告为未解析。返回解析过的部件。"""
+    handled: set[str] = set()
+    for name in sorted(parts):
+        if not name.startswith('word/embeddings/'):
+            continue
+        data = parts[name]
+        try:
+            if Path(name).suffix.lower() in _SPREADSHEET:
+                inner = (Path(name).name, data)
+            elif data.startswith(_OLE_SIGNATURE):
+                inner = _ole_package(data, context)
+            else:
+                inner = None
+        except _Limit:
+            raise
+        except (_Invalid, ValueError, struct.error, IndexError, KeyError) as exc:
+            context.warn(f'{parsed.name}: 嵌入对象 {name} 读取失败：{exc}')
+            continue
+        if not inner:
+            continue
+        label, content = inner
+        suffix = Path(label).suffix.lower()
+        if suffix not in _SPREADSHEET:
+            if suffix or not content.startswith(b'PK'):
+                continue
+            label += '.xlsx'
+        handled.add(name)
+        _visit(content, f'{parsed.name}!/{label}', depth + 1, context)
+    return handled
+
+
+def _docx(parts: dict[str, bytes], parsed: ParsedFile, context: _Context) -> list[_Candidate]:
     root = _xml(parts['word/document.xml'])
     if _tag(root) != 'document' or _child(root, 'body') is None:
         raise _Invalid('Word 主文档 XML 无效')
@@ -1059,26 +1249,8 @@ def _docx(parts: dict[str, bytes], parsed: ParsedFile, context: _Context) -> Non
     texts = []
     has_text = False
     for name, section in sections:
-        paragraphs = []
-        for paragraph in section.iter():
-            if _tag(paragraph) == 'p':
-                content = []
-                pending = list(reversed(list(paragraph)))
-                while pending:
-                    node = pending.pop()
-                    tag = _tag(node)
-                    if tag == 'p':
-                        # Text-box paragraphs are visited independently below.
-                        continue
-                    if tag == 't':
-                        content.append(node.text or '')
-                    elif tag == 'tab':
-                        content.append('\t')
-                    elif tag in ('br', 'cr'):
-                        content.append('\n')
-                    pending.extend(reversed(list(node)))
-                if content:
-                    paragraphs.append(''.join(content))
+        # Text-box paragraphs are visited independently.
+        paragraphs = [t for paragraph in section.iter() if _tag(paragraph) == 'p' and (t := _paragraph_text(paragraph)) is not None]
         has_text = has_text or any(p.strip() for p in paragraphs)
         texts.append(f'[{name}]\n' + '\n'.join(paragraphs))
     parsed.text = '\n\n'.join(texts)
@@ -1086,10 +1258,13 @@ def _docx(parts: dict[str, bytes], parsed: ParsedFile, context: _Context) -> Non
     if not has_text:
         context.warn(f'{parsed.name}: Word 没有可提取的普通文字；图片或嵌入内容未识别')
     context.warn(f'{parsed.name}: 仅本地提取 Word 普通正文/表格及页眉页脚文字；不渲染、不执行域、不做图片 OCR，不代表已核验完整资质')
+    return _docx_tables(root, parsed, context)
 
 
-def _office_warnings(parts: dict[str, bytes], parsed: ParsedFile, context: _Context) -> None:
+def _office_warnings(parts: dict[str, bytes], parsed: ParsedFile, context: _Context, handled: set[str]) -> None:
     for name, data in parts.items():
+        if name in handled:
+            continue
         if '/embeddings/' in name or name.lower().endswith('vbaproject.bin') or '/altchunk' in name.lower():
             parsed.status = 'partial'
             warning = f'未解析嵌入或活动内容 {name}（未执行）'
@@ -1135,13 +1310,13 @@ def _visit(data: bytes, name: str, depth: int, context: _Context) -> None:
                 content = archive.read(member)
                 if not member.name.endswith('/'):
                     parts[member.name] = content
+            handled: set[str] = set()
             if parsed.kind == 'xlsx':
-                candidates = _xlsx(parts, parsed, context)
+                context.candidates.extend(_xlsx(parts, parsed, context))
             else:
-                _docx(parts, parsed, context)
-                candidates = []
-            _office_warnings(parts, parsed, context)
-            context.candidates.extend(candidates)
+                context.candidates.extend(_docx(parts, parsed, context))
+                handled = _embedded_tables(parts, parsed, depth, context)
+            _office_warnings(parts, parsed, context, handled)
         elif suffix in ('.xlsx', '.docx'):
             raise _Invalid('Office 包缺少主文档')
         else:

@@ -85,22 +85,30 @@ def _distinct(values, limit):
     return seen[:limit], len(seen)
 
 
-def _goods_unit(rows):
+def _goods_unit(rows, by_project):
     first = rows[0]
     sheets, _ = _distinct([r.evidence[0].sheet for r in rows], 3)
     names, total = _distinct([r.scope for r in rows], GOODS_NAMES)
+    projects, project_total = _distinct([r.project_name for r in rows], GOODS_NAMES)
     buyers, buyer_count = _distinct([r.buyer for r in rows], 3)
     places, place_count = _distinct([r.location for r in rows], 3)
     generic = not sheets or any(re.search(r'清单|^sheet\d*$', s, re.I) for s in sheets)
-    if generic and names:
+    if by_project and projects:
+        name = projects[0] + (f' 等 {project_total} 个工程项目' if project_total > 1 else '')
+    elif generic and names:
         name = names[0] + (f' 等 {total} 种物资' if total > 1 else '')
     else:
         name = '、'.join(sheets) or first.project_name
     scope = ('物资：' + '；'.join(names) + (f' 等 {total} 种' if total > len(names) else '') if names else '') + f'（货物清单 {len(rows)} 行）'
+    if by_project and project_total > 1:
+        scope = '工程项目：' + '；'.join(projects) + (f' 等 {project_total} 个' if project_total > len(projects) else '') + '。' + scope
     ceilings = {(r.ceiling, r.ceiling_kind) for r in rows}
     ceiling, kind = ceilings.pop() if len(ceilings) == 1 else ('', 'unknown')
     warnings = list(dict.fromkeys(w for r in rows for w in r.warnings))[:5]
-    return replace(first, subpackage='', project_name=name, scope=scope, ceiling=ceiling, ceiling_kind=kind,
+    # 专用资格要求常按包合并单元格，一包里通常只有一种；不同的都列出来。
+    joined = {field: '\n'.join(_distinct([getattr(r, field) for r in rows], 6)[0])
+              for field in ('qualifications', 'performance', 'personnel')}
+    return replace(first, subpackage='', project_name=name, scope=scope, ceiling=ceiling, ceiling_kind=kind, **joined,
                    buyer='、'.join(buyers) + ('等' if buyer_count > 3 else ''),
                    location='、'.join(places) + ('等' if place_count > 3 else ''),
                    request_id='', technical_id='', evidence=[r.evidence[0] for r in rows[:4]], warnings=warnings)
@@ -108,7 +116,11 @@ def _goods_unit(rows):
 
 def bid_units(rows):
     """货物清单（物资框架、批次物资招标）一行是一种物资，一份公告几千行；投标按分标+包投，合成一包一条：
-    名称用工作表名（物资类别），采购内容列出物资名称。和需求表对上的货物行已经并进需求行，不在这里。"""
+    名称用工程项目名称（清单里每行写了各自的工程项目时），否则用工作表名（物资类别）；采购内容列出工程项目和物资名称，
+    专用资格要求汇总到这一包。和需求表对上的货物行已经并进需求行，不在这里。
+    整份清单只有一个项目名的，那是批次名（“某公司2026年第三次物资框架协议公开招标采购”），不拿来当名称。"""
+    goods = [r for r in rows if r.evidence and (r.evidence[0].raw or {}).get('view') == 'goods']
+    by_project = len({r.project_name.strip() for r in goods if r.project_name.strip()}) > 1
     order, groups = [], {}
     for row in rows:
         if not row.evidence or (row.evidence[0].raw or {}).get('view') != 'goods':
@@ -119,7 +131,7 @@ def bid_units(rows):
             groups[key] = []
             order.append(key)
         groups[key].append(row)
-    return [_goods_unit(groups[x]) if isinstance(x, tuple) else x for x in order]
+    return [_goods_unit(groups[x], by_project) if isinstance(x, tuple) else x for x in order]
 
 
 def display_name(filename):

@@ -19,6 +19,15 @@ export function isBoilerplate(text: string): boolean {
   return (t.length <= 50 && BOILERPLATE.some((re) => re.test(t))) || POINTER.test(t);
 }
 
+/** 只说“见附件 / 采购文件”的指引。 */
+const isPointer = (text: string) => POINTER.test(text.replace(/\s+/g, ""));
+
+/**
+ * 需求表里的专用资格要求常是几列合在一起，一列一行“列名：内容”（可接受的投标主体：制造商 / 试验设备：1、亮度计 2、……）：
+ * 在“列名：”开头的行前拆开，各算一条；没有列名的续行跟着上一条。
+ */
+export const splitLabeled = (text: string) => text.split(/\n(?=[^\n：:]{2,24}[：:])/).map((t) => t.trim()).filter(Boolean);
+
 export interface RequirementSource {
   package: string; package_name: string; qualifications: string; performance: string; personnel: string;
 }
@@ -52,7 +61,10 @@ export function appliesTo(lots: string[], item: Pick<RequirementSource, "package
   return lots.some((l) => norm(l) === pkg || (!!item.package_name && norm(l) === norm(item.package_name)) || (pkgNum !== null && num(l) === pkgNum));
 }
 
-/** 项目的要求列表（不含对比结果），按资质、业绩、人员排；同一类里先项目自己的，再公告通用的，文字相同的只留一条。 */
+/**
+ * 项目的要求列表（不含对比结果），按资质、业绩、人员排；同一类里先项目自己的，再公告通用的，文字相同的只留一条。
+ * 项目自己的（需求表里的专用资格要求）照原样列，只去掉指引；公告通用的再去掉套话。
+ */
 export function itemRequirements(item: RequirementSource, details: NoticeDetails | null): Array<Omit<ItemRequirement, "status" | "note">> {
   const own: Record<RequirementGroup, string> = { qualification: item.qualifications, performance: item.performance, personnel: item.personnel };
   if (!shown(own.performance) && shown(own.qualification)) {
@@ -65,11 +77,11 @@ export function itemRequirements(item: RequirementSource, details: NoticeDetails
     const seen = new Set<string>();
     const add = (text: string, from: "item" | "notice") => {
       const t = text.trim();
-      if (!shown(t) || seen.has(norm(t)) || isBoilerplate(t)) return;
+      if (!shown(t) || seen.has(norm(t)) || (from === "notice" ? isBoilerplate(t) : isPointer(t))) return;
       seen.add(norm(t));
       out.push({ group, text: t, from });
     };
-    add(own[group], "item");
+    for (const line of splitLabeled(own[group])) add(line, "item");
     for (const r of details?.requirements ?? []) if (r.kind === group && appliesTo(r.lots, item)) add(r.text, "notice");
   }
   return out;

@@ -189,8 +189,8 @@ def xls_workbook(rows=None, *, formats=(), merges=(), hidden=(), extra_globals=b
     return globals_ + sheet + biff_record(0x000A)
 
 
-def ole_xls(stream, *, mini=False):
-    """Minimal OLE compound document with generated Workbook and FAT streams."""
+def ole_xls(stream, *, mini=False, name='Workbook'):
+    """Minimal OLE compound document with one generated stream (Workbook by default) and FAT streams."""
     sectors = []
     directory = bytearray(512)
     def entry(index, name, kind, start, size, child=-1):
@@ -209,13 +209,13 @@ def ole_xls(stream, *, mini=False):
         short_data = stream.ljust(((len(stream) + 511) // 512) * 512, b'\x00')
         sectors.extend(short_data[p:p + 512] for p in range(0, len(short_data), 512))
         entry(0, 'Root Entry', 5, 2, len(short_data), 1)
-        entry(1, 'Workbook', 2, 0, len(stream))
+        entry(1, name, 2, 0, len(stream))
         fat = [-2, -2] + list(range(3, len(sectors))) + [-2]
     else:
         stream = stream.ljust(max(4096, ((len(stream) + 511) // 512) * 512), b'\x00')
         sectors = [b''] + [stream[p:p + 512] for p in range(0, len(stream), 512)]
         entry(0, 'Root Entry', 5, -2, 0, 1)
-        entry(1, 'Workbook', 2, 1, len(stream))
+        entry(1, name, 2, 1, len(stream))
         fat = [-2] + list(range(2, len(sectors))) + [-2]
     sectors[0] = bytes(directory)
     fat_sector = len(sectors)
@@ -228,6 +228,36 @@ def ole_xls(stream, *, mini=False):
                      1 if mini else 0, 0xFFFFFFFE, 0, fat_sector)
     struct.pack_into('<109i', header, 76, fat_sector, *([-1] * 108))
     return bytes(header) + b''.join(sectors)
+
+
+def ole10native(label, content):
+    """“由文件创建”的嵌入对象：总长、标志、文件名、原路径、两个未知字段、临时路径、内容长度、内容。"""
+    body = (struct.pack('<H', 2) + label.encode('gb18030') + b'\0' + ('C:\\tmp\\' + label).encode('gb18030') + b'\0'
+            + struct.pack('<HH', 0, 3) + struct.pack('<I', 9) + b'C:\\tmp\\x\0' + struct.pack('<I', len(content)) + content)
+    return struct.pack('<I', len(body)) + body
+
+
+# 国网青海物资招标的“招标需求一览表”：标题两行，表头两行（“投标人专用资格要求”分组下面的小列名多数不在已知列名里），
+# 项目名在“工程项目名称”，合计最高限价的列名少了右括号；资格要求按包合并单元格，合并区域里每格都填了同样的“/”。
+QINGHAI_TOP = ['序号', '分标编号', '分标名称', '包号', '需求单位', '物料编码', '物料名称', '工程项目名称', '单价(含税·万元）',
+               '合计最高限价（含税·万元', '首批交货时间', '交货地点', '采购申请标识', '投标人专用资格要求', None, None, None]
+QINGHAI_SUB = [None] * 13 + ['可接受的投标主体', '业绩要求（不少于）', '生产设备', '认证证书或3C认证证书']
+
+
+def qinghai_sheet():
+    def line(n, section, package, material, project, ceiling, request, *requirements):
+        return [str(n), section, section + '办公家具', package, '青海某供电公司', f'5000{n}', material, project,
+                {'type': 'n', 'style': 1, 'value': 1.188}, {'type': 'n', 'style': 1, 'value': ceiling},
+                {'type': 'n', 'style': 2, 'value': 46376}, '西宁市', request, *requirements]
+    rows = [['附件1'], ['国网青海省电力公司2026年第八次公开招标采购'], QINGHAI_TOP, QINGHAI_SUB,
+            line(1, '001', '包1', '主控桌', '某公司2026年办公家具采购项目（主控桌）', 299.278, '1563219652470493184',
+                 '制造商', '累计销售业绩不少于2000万元', '/', '/'),
+            line(2, '001', '包1', '办公椅', '某公司2026年办公家具采购项目（办公椅）', 299.278, '1563219652470493185',
+                 None, None, None, '/'),
+            line(3, '002', '包1', '大屏幕', '某公司2026年大屏幕采购项目', 42.62, '1563219652470493186',
+                 '制造商/代理商', '5套LED大屏幕', '装配生产线', '/')]
+    merges = ['A3:A4', 'B3:B4', 'H3:H4', 'J3:J4', 'N3:Q3', 'J5:J6', 'N5:N6', 'O5:O6', 'P5:P6', 'Q5:Q6']
+    return workbook([('sheet', sheet_xml(rows, merges=merges))], formats=('0.000_ ', 'yyyy/mm/dd'))
 
 
 class ParsingTests(unittest.TestCase):
@@ -696,6 +726,69 @@ class ParsingTests(unittest.TestCase):
         self.assertEqual(len(result.rows), 1)
         self.assertEqual(result.rows[0].project_name, '共享项目')
         self.assertEqual(result.files[0].sheets[1]['status'], 'error')
+
+    def test_qinghai_goods_list_with_project_names_and_grouped_qualifications(self):
+        result = self.parse(qinghai_sheet(), '招标需求一览表.xlsx')
+        self.assertEqual(len(result.rows), 3, result.warnings)
+        first, second, screen = result.rows
+        self.assertEqual(first.evidence[0].raw['view'], 'goods')
+        self.assertEqual((first.section, first.package, first.project_name), ('001', '包1', '某公司2026年办公家具采购项目（主控桌）'))
+        self.assertEqual((first.ceiling, first.ceiling_kind), ('299.278', 'amount_wan'), '合计最高限价, not the unit price')
+        self.assertEqual(first.request_id, '1563219652470493184')
+        # 分组标题下认不出的小列按“列名：内容”记进资质要求，“/”不记；业绩单列；合并单元格里同样的“/”不算冲突。
+        self.assertEqual(first.qualifications, '可接受的投标主体：制造商')
+        self.assertEqual(first.performance, '累计销售业绩不少于2000万元')
+        self.assertEqual((second.qualifications, second.performance), (first.qualifications, first.performance))
+        self.assertEqual(screen.qualifications, '可接受的投标主体：制造商/代理商\n生产设备：装配生产线')
+        self.assertFalse(any('未解释的数值格式' in w for w in result.warnings), result.warnings)
+        self.assertEqual(first.evidence[0].raw['cells']['K5']['text'] if 'K5' in first.evidence[0].raw['cells'] else
+                         first.evidence[0].raw['extra'].get('K: 首批交货时间'), '2026/12/20')
+
+    def test_merged_cells_holding_a_different_value_are_still_rejected(self):
+        rows = [HEADERS, demand(), demand(request='0002', **{'响应供应商资质要求': '另一种资质'})]
+        result = self.parse(workbook([('项目', sheet_xml(rows, merges=['J2:J3']))]), 'conflict.xlsx')
+        self.assertEqual(result.rows, [])
+        self.assertTrue(any('冲突值' in w for w in result.warnings))
+
+    def test_spreadsheet_embedded_in_word_is_parsed_without_execution(self):
+        table = qinghai_sheet()
+        document = f'<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>招标公告附件1：招标需求一览表</w:t></w:r></w:p></w:body></w:document>'
+        # “由文件创建”的 OLE 对象（带原文件名），直接嵌入的 .xlsx，以及不是表格的 .wps：前两种解析，后一种照旧报告未解析。
+        native = ole_xls(ole10native('招标公告附件1-招标需求一览表.xlsx', table), name='\x01Ole10Native')
+        wps = ole_xls(ole10native('合规约定.wps', b'\xd0\xcf\x11\xe0' + b'\0' * 60), name='\x01Ole10Native')
+        result = self.parse(docx(extra={'word/document.xml': document, 'word/embeddings/oleObject1.bin': native,
+                                        'word/embeddings/oleObject2.bin': wps}), 'notice.docx')
+        self.assertEqual([r.project_name for r in result.rows][:1], ['某公司2026年办公家具采购项目（主控桌）'])
+        self.assertEqual(len(result.rows), 3, result.warnings)
+        self.assertTrue(any(f.name == 'notice.docx!/招标公告附件1-招标需求一览表.xlsx' and f.status == 'parsed' for f in result.files))
+        self.assertTrue(any('oleObject2.bin' in w for w in result.warnings), 'a non-spreadsheet object is still reported')
+        self.assertFalse(any('oleObject1.bin' in w for w in result.warnings))
+        direct = self.parse(docx(extra={'word/document.xml': document, 'word/embeddings/Microsoft_Excel_Worksheet.xlsx': table}), 'notice.docx')
+        self.assertEqual(len(direct.rows), 3, direct.warnings)
+
+    def test_demand_table_in_word_body_is_parsed_like_a_sheet(self):
+        def cell(text, props=''):
+            return f'<w:tc><w:tcPr>{props}</w:tcPr><w:p><w:r><w:t>{escape(text)}</w:t></w:r></w:p></w:tc>'
+        def row(*cells):
+            return '<w:tr>' + ''.join(cells) + '</w:tr>'
+        info = '<w:tbl>' + row(cell('采购人'), cell('国网某公司')) + '</w:tbl>'
+        demand_table = '<w:tbl>' + ''.join([
+            row(*(cell(h) for h in ['分标编号', '包号', '项目名称', '采购内容', '资质要求', '最高限价（万元）'])),
+            row(cell('S1'), cell('包1'), cell('变电站视频监控运维'), cell('视频监控系统运维'),
+                cell('电子与智能化二级', '<w:vMerge w:val="restart"/>'), cell('30')),
+            row(cell('S1'), cell('包2'), cell('输电通道可视化运维'), cell('通道可视化运维'), cell('', '<w:vMerge/>'), cell('20')),
+            row(cell('S1'), cell('包3'), cell('备注：报价含税', '<w:gridSpan w:val="6"/>')),
+        ]) + '</w:tbl>'
+        document = f'<w:document xmlns:w="{W}"><w:body>{info}{demand_table}</w:body></w:document>'
+        result = self.parse(docx(extra={'word/document.xml': document}), 'notice.docx')
+        names = [r.project_name for r in result.rows]
+        self.assertEqual(names[:2], ['变电站视频监控运维', '输电通道可视化运维'], result.warnings)
+        self.assertEqual([r.qualifications for r in result.rows[:2]], ['电子与智能化二级'] * 2, 'vertically merged requirement applies to both')
+        self.assertEqual([(r.ceiling, r.ceiling_kind) for r in result.rows[:2]], [('30', 'amount_wan'), ('20', 'amount_wan')])
+        self.assertEqual(len(result.rows), 2, 'the remark row spanning the table is not a project')
+        self.assertTrue(any('备注行' in w for w in result.warnings))
+        self.assertEqual(result.rows[0].evidence[0].sheet, '正文表格2')
+        self.assertFalse(any('正文表格1' in w for w in result.warnings), 'tables without a demand header are not reported')
 
 
 if __name__ == '__main__':

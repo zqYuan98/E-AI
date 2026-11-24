@@ -2,7 +2,7 @@
 
 投标商机模块的内部采集服务。它用无头 Chromium 打开国网电子商务平台（ECP）和电工交易专区（ETP）的公开页面，列出采购/招标公告，下载单个公告的“公告文件”并解析其中的需求表，按 `../types.ts` 里的 `FetcherNotice` / `FetcherResult` 返回 JSON。worker 通过内部网络调用它，不对外发布端口。
 
-代码：`sgcc/sources.py`（浏览器访问）、`sgcc/parsing.py`（附件解析，ZIP / XLSX / XLS / DOCX）、`sgcc/server.py`（HTTP 服务）。
+代码：`sgcc/sources.py`（浏览器访问）、`sgcc/parsing.py`（附件解析，ZIP / XLSX / XLS / DOCX；Word 里嵌入的表格和正文里的需求表也解析，嵌入对象只读出文件内容、不执行）、`sgcc/server.py`（HTTP 服务）。
 
 ## 接口
 

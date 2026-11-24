@@ -1,4 +1,5 @@
 """HTTP contract of the fetcher. Fakes stand in for the browser and parser."""
+from dataclasses import replace
 import http.client
 import json
 from pathlib import Path
@@ -211,6 +212,20 @@ def test_goods_list_rows_become_one_item_per_section_and_package(base, fakes):
     assert cable['scope'].startswith('物资：电力电缆,AC110kV,截面2；') and '等 20 种' in cable['scope'] and '货物清单 20 行' in cable['scope']
     assert cable['buyer'] == '国网山东省电力公司本部' and cable['location'] == '买方指定仓库'
     assert len(cable['evidence']) == 4 and cable['evidence'][0] == {'file': '公告文件.zip!/货物清单.xlsx', 'sheet': '110kV电力电缆', 'row': 2}
+
+
+def test_goods_with_their_own_project_names_are_named_by_project_and_gather_requirements(base, fakes):
+    # 清单每行写了各自的工程项目名称时（不是整批一个批次名），一包一条按工程项目命名，专用资格要求汇总到这一包。
+    def row(n, package, project, qualifications='', performance=''):
+        return replace(goods_row('sheet', n, '001', package, f'物资{n}'), project_name=project,
+                       qualifications=qualifications, performance=performance)
+    fakes.rows = [row(5, '包1', '某公司2026年办公家具采购项目（主控桌）', '可接受的投标主体：制造商', '累计销售业绩不少于2000万元'),
+                  row(6, '包1', '某公司2026年办公家具采购项目（办公椅）', '可接受的投标主体：制造商', '累计销售业绩不少于2000万元'),
+                  row(7, '包2', '某公司2026年厨具采购项目')]
+    items = call(base, 'POST', '/fetch', {'url': ECP})[1]['items']
+    assert [i['project_name'] for i in items] == ['某公司2026年办公家具采购项目（主控桌） 等 2 个工程项目', '某公司2026年厨具采购项目']
+    assert items[0]['scope'].startswith('工程项目：某公司2026年办公家具采购项目（主控桌）；某公司2026年办公家具采购项目（办公椅）。物资：物资5；物资6')
+    assert (items[0]['qualifications'], items[0]['performance']) == ('可接受的投标主体：制造商', '累计销售业绩不少于2000万元')
 
 
 def test_warnings_are_capped(base, fakes):
