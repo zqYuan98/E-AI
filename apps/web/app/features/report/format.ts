@@ -1,5 +1,5 @@
 // Names, dates and grouping for daily, weekly and monthly reports.
-import { ACCESS } from "../../lib/access";
+import { ACCESS } from "../../lib/access.ts";
 import type { ReportNavigationEntry, ReportKind } from "@aihot/contracts/site";
 import { beijingDate, beijingWeekday, isoWeekLabel, isoWeekRange } from "@aihot/contracts/time";
 import { EDITION_WHEN, REPORTS, SITE, subjectAfter } from "@aihot/site";
