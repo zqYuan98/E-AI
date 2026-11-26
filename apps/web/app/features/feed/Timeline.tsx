@@ -2,7 +2,7 @@
 // phones. Keeps its place across back navigation and loads further pages. There is no "new items"
 // prompt: readers refresh for the latest head — on phones also by tapping the tab again.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigation } from "react-router";
+import { Link, useLocation, useNavigation } from "react-router";
 import { Collapse } from "../../components/ui/Presence";
 import type { TimelineCard, TimelineFilters, TimelineResponse } from "@aihot/contracts/site";
 import { FeedItem } from "./FeedItem";
@@ -282,7 +282,10 @@ export function Timeline({ initial, filters }: { initial: TimelineResponse; filt
     <div className="relative">
       {days.length === 0 && (
         <div className="lg:card">
-          <EmptyState title="这个筛选下还没有精选内容">换个类别看看，或者去全部动态里找找。</EmptyState>
+          <EmptyState title="这个筛选下还没有精选内容">
+            <Link to="/" className="text-accent hover:underline">看全部精选</Link>，或者
+            <Link to={`/all${location.search}`} className="ml-1 text-accent hover:underline">在全部动态里找找</Link>。
+          </EmptyState>
         </div>
       )}
 

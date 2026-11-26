@@ -77,14 +77,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {ACCESS && <>
           <meta name="robots" content="noindex, nofollow" />
           <style>{"html[data-access-paused] body{visibility:hidden!important}"}</style>
-          <script dangerouslySetInnerHTML={{ __html: accessBootScript(site?.principal ? { id: site.principal.id, csrf: site.principal.csrf, ...(site.adminSession ? { adminCsrf: site.adminSession.csrf } : {}) } : null, ACCESS.loginPath, ACCESS.sessionPath) }} />
+          {/* Built from the boot function's source, which the server and browser builds print differently; it has run before hydration. */}
+          <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: accessBootScript(site?.principal ? { id: site.principal.id, csrf: site.principal.csrf, ...(site.adminSession ? { adminCsrf: site.adminSession.csrf } : {}) } : null, ACCESS.loginPath, ACCESS.sessionPath) }} />
         </>}
         <Meta />
         <Links />
       </head>
       <body>
         {children}
-        {!ACCESS && <ScrollRestoration getKey={(location) => location.key} />}
+        {/* An internal site keeps positions under an aihot- key, which its boot script clears with every new document. */}
+        <ScrollRestoration getKey={(location) => location.key} storageKey={ACCESS ? "aihot-scroll-positions" : undefined} />
         <Scripts />
       </body>
     </html>

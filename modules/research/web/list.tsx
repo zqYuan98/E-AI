@@ -1,5 +1,5 @@
 // 研报库列表：搜索标题、机构、摘要和要点，按主题筛选。研报原文在研报网站上看，站内只有摘要和要点。
-import { useLoaderData, useSearchParams } from "react-router";
+import { Form, useLoaderData, useSearchParams } from "react-router";
 import { SITE } from "@aihot/site";
 import { apiGet, cachedPage } from "@aihot/web/lib/api.server";
 import { pageMeta } from "@aihot/web/lib/seo";
@@ -35,7 +35,7 @@ function Card({ r }: { r: ResearchCard }) {
       {r.summary && <p className="mt-1.5 line-clamp-3 text-[13px] leading-[1.75] text-ink-3">{r.summary}</p>}
       {r.topics.length > 0 && (
         <div className="mt-2.5 flex flex-wrap gap-1.5">
-          {r.topics.map((t) => <span key={t} className="text-[11.5px] text-accent">#{t}</span>)}
+          {r.topics.map((t) => <span key={t} className="text-[11.5px] text-ink-4">#{t}</span>)}
         </div>
       )}
     </IntentLink>
@@ -69,19 +69,20 @@ export default function ResearchList() {
       </header>
 
       <div className="mt-4 space-y-2.5">
-        <form method="get" action="/research" className="flex gap-2">
+        <Form method="get" action="/research" preventScrollReset className="flex gap-2">
           {current && <input type="hidden" name="topic" value={current} />}
           <input type="search" name="q" defaultValue={params.get("q") ?? ""} maxLength={40} placeholder="搜标题、机构、摘要或要点，例如 虚拟电厂、算力"
             className="h-9 min-w-0 flex-1 rounded-full border border-line bg-surface px-4 text-[13.5px] text-ink outline-none focus:border-accent" />
           <button type="submit" className="h-9 shrink-0 rounded-full border border-line bg-surface px-4 text-[13px] text-ink-2 hover:text-accent">搜索</button>
-        </form>
+        </Form>
         {topics.length > 0 && <div className="flex flex-wrap gap-1.5">{[chip(null, "全部主题"), ...topics.map((t) => chip(t.topic, `${t.topic} ${t.count}`))]}</div>}
+        {(params.get("q") || current) && reports.length > 0 && <IntentLink to="/research" preventScrollReset className="inline-block text-[12.5px] text-accent hover:underline">清除全部筛选</IntentLink>}
       </div>
 
       <section className="mt-6">
         {reports.length === 0 ? (
           <EmptyState title={params.get("q") || current ? "没有符合条件的研报" : "研报库还是空的"}>
-            {params.get("q") || current ? "换一个关键词或主题试试。" : "管理员在后台“研报库管理”里导入研报后，会出现在这里。"}
+            {params.get("q") || current ? <>换一个关键词或主题试试，或者 <IntentLink to="/research" className="text-accent hover:underline">看全部研报</IntentLink>。</> : "研报整理好后会陆续出现在这里。想看哪方面的研报，可以在“意见反馈”里告诉管理员。"}
           </EmptyState>
         ) : (
           <ul className="grid gap-3 lg:grid-cols-2">

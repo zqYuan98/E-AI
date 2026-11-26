@@ -95,12 +95,15 @@ for (const engine of ["Chromium", "WebKit"] as const) {
       page.on("request", req => { if (req.url().includes(".data")) navigation.push(req.url()); });
       await page.locator('aside a[href="/all"]').hover();
       await page.waitForTimeout(200);
-      assert.deepEqual(navigation, []);
+      assert.deepEqual(navigation, [], "hovering a link loads nothing ahead of the click");
       assert.equal(await page.locator('link[rel="prefetch"]').count(), 0);
+      await page.evaluate(() => { (window as unknown as { sameDocument: boolean }).sameDocument = true; });
       await page.locator('aside a[href="/all"]').click();
       await expect(page).toHaveURL(web.origin + "/all");
       await expect(page.getByRole("region", { name: "当前成员" })).toContainText("成员甲");
-      assert.deepEqual(navigation, []);
+      // The click stays in the document (no blank reload, no lost place): one data request, checked against the session.
+      assert.ok(navigation.length >= 1, "the page's data came over the session-checked fetch");
+      assert.equal(await page.evaluate(() => (window as unknown as { sameDocument?: boolean }).sameDocument), true);
       assert.deepEqual(await page.evaluate(() => Object.entries(localStorage).filter(([key]) => key !== "aihot-theme" && key !== "aihot:access-epoch")), []);
       await page.getByRole("button", { name: "退出登录", exact: true }).click();
       await expect(page).toHaveURL(/\/login/);
@@ -145,8 +148,8 @@ test("dual-cookie admin creates, resets and disables members using the admin CSR
     await page.getByLabel("新密码", { exact: false }).fill("sensitive-reset-password");
     await page.getByRole("button", { name: "确认重置", exact: true }).click();
     await expect(page.getByLabel("初始密码", { exact: false })).toBeVisible();
-    page.once("dialog", dialog => dialog.accept());
     await page.getByRole("button", { name: "停用", exact: true }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "停用", exact: true }).click();
     await expect(page.getByText("已停用", { exact: true })).toBeVisible();
     const commands = mutations.filter(value => value.path.startsWith("/api/admin/access/"));
     assert.equal(commands.length, 3);

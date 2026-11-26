@@ -1,4 +1,5 @@
 // Item detail and Markdown export, both behind the same visibility and licence rules.
+import { itemParts } from "../modules.ts";
 import type { OutlineEntry, SiteItemDetail, StoryRef } from "@aihot/contracts/site";
 import { ITEM_COPY, SITE } from "@aihot/site";
 import { bodyToMarkdown } from "../content/markdown.ts";
@@ -148,6 +149,7 @@ export async function loadItemDetail(id: string, language: "zh" | "original" = "
 
   // The reason goes with the seat; a report yielding it points to the one holding it.
   const sameEvent = (await seatHolders([row], now)).get(row.id) ?? null;
+  const modules = await itemParts(id);
   const item: SiteItemDetail = {
     ...summary,
     x,
@@ -163,6 +165,7 @@ export async function loadItemDetail(id: string, language: "zh" | "original" = "
     group,
     hasTranslation: reading.hasTranslation,
     bodyLanguage: reading.bodyLanguage,
+    ...(modules ? { modules } : {}),
   };
   return { kind: "found", item, row };
 }

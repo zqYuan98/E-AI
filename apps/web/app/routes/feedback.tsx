@@ -120,6 +120,15 @@ export default function FeedbackPage() {
     return () => URL.revokeObjectURL(shot.url);
   }, [shot]);
 
+  // An internal site keeps no draft in the browser: leaving with unsent words asks first.
+  const unsent = ACCESS && state.kind !== "done" && draft.content.trim().length > 0;
+  useEffect(() => {
+    if (!unsent) return;
+    const ask = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", ask);
+    return () => window.removeEventListener("beforeunload", ask);
+  }, [unsent]);
+
   const pick = (picked: File | null | undefined) => {
     if (!picked) return;
     const type = screenshotType(picked);
@@ -157,7 +166,7 @@ export default function FeedbackPage() {
       setDraft({ content: "", email: "", pageUrl: "" });
       setShot(null);
     } catch {
-      setState({ kind: "error", message: "网络不太顺，草稿已保存在本机，稍后再提交。" });
+      setState({ kind: "error", message: ACCESS ? "网络不太顺，没发出去。内容还在这一页上，先别刷新或关闭，稍后再点发送。" : "网络不太顺，草稿已保存在本机，稍后再提交。" });
     }
   };
 

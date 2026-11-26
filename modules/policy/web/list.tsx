@@ -1,5 +1,5 @@
 // 政策规划库列表：按发文层级、类型、AI 相关程度筛选；上方是国家和两网的关键目标对照表。
-import { useLoaderData, useSearchParams } from "react-router";
+import { Form, useLoaderData, useSearchParams } from "react-router";
 import { SITE } from "@aihot/site";
 import { apiGet, cachedPage } from "@aihot/web/lib/api.server";
 import { pageMeta } from "@aihot/web/lib/seo";
@@ -96,24 +96,25 @@ export default function PolicyList() {
       </header>
 
       <div className="mt-4 space-y-2.5">
-        {/* A plain GET form: the other filters ride along as hidden fields. */}
-        <form method="get" action="/policy" className="flex gap-2">
+        {/* A GET form: the other filters ride along as hidden fields. */}
+        <Form method="get" action="/policy" preventScrollReset className="flex gap-2">
           {KEYS.filter((k) => k !== "q" && params.get(k)).map((k) => <input key={k} type="hidden" name={k} value={params.get(k)!} />)}
           <input
             type="search" name="q" defaultValue={params.get("q") ?? ""} maxLength={40} placeholder="搜文件名、文号或摘要，例如 人工智能、新型电力系统"
             className="h-9 min-w-0 flex-1 rounded-full border border-line bg-surface px-4 text-[13.5px] text-ink outline-none focus:border-accent"
           />
           <button type="submit" className="h-9 shrink-0 rounded-full border border-line bg-surface px-4 text-[13px] text-ink-2 hover:text-accent">搜索</button>
-        </form>
+        </Form>
         <Chips name="level" options={[[null, "全部单位"], ...Object.entries(POLICY_LEVELS)]} />
-        <Chips name="ai" options={[[null, "全部"], ["any", "涉及 AI"], ["core", "AI 专项"]]} />
+        <Chips name="ai" options={[[null, "AI 不限"], ["any", "涉及 AI"], ["core", "AI 专项"]]} />
         <Chips name="type" options={[[null, "全部类型"], ...POLICY_TYPES.map((t): [string, string] => [t, t])]} />
+        {filtered && <IntentLink to="/policy" preventScrollReset className="inline-block text-[12.5px] text-accent hover:underline">清除全部筛选</IntentLink>}
       </div>
 
-      {!filtered && targets.length > 0 && (
+      {targets.length > 0 && (
         <section className="mt-8" aria-labelledby="policy-targets">
           <h2 id="policy-targets" className="text-[15px] font-bold text-ink">关键目标对照</h2>
-          <p className="mt-0.5 text-[12px] text-ink-4">国家部委与两网文件里写明年份的量化目标，按年份排列；指针停在一行上可看原话。</p>
+          <p className="mt-0.5 text-[12px] text-ink-4">国家部委与两网文件里写明年份的量化目标，按年份排列，每行附文件原话；随上面的筛选变化。</p>
           <div className="mt-3 overflow-x-auto rounded-card border border-line bg-surface">
             <table className="w-full min-w-[640px] text-left text-[13px]">
               <thead className="border-b border-line-soft text-[12px] text-ink-4">
@@ -127,12 +128,15 @@ export default function PolicyList() {
               </thead>
               <tbody className="divide-y divide-line-soft">
                 {targets.map((t, i) => (
-                  <tr key={i} title={t.quote}>
-                    <td className="num px-4 py-2 text-ink-3">{t.year ?? "—"}</td>
-                    <td className="px-4 py-2 text-ink-3">{levelLabel(t.level)}</td>
-                    <td className="px-4 py-2 text-ink">{t.metric}</td>
-                    <td className="px-4 py-2 font-semibold text-ink">{t.value}</td>
-                    <td className="px-4 py-2">
+                  <tr key={i}>
+                    <td className="num px-4 py-2 align-top text-ink-3">{t.year ?? "—"}</td>
+                    <td className="px-4 py-2 align-top text-ink-3">{levelLabel(t.level)}</td>
+                    <td className="px-4 py-2 align-top text-ink">
+                      {t.metric}
+                      {t.quote && <span className="mt-0.5 block text-[11.5px] leading-5 text-ink-4">“{t.quote}”</span>}
+                    </td>
+                    <td className="px-4 py-2 align-top font-semibold text-ink">{t.value}</td>
+                    <td className="px-4 py-2 align-top">
                       <IntentLink to={`/policy/${t.docId}`} className="line-clamp-1 text-accent hover:underline">{t.docName}</IntentLink>
                     </td>
                   </tr>

@@ -4,16 +4,20 @@ import { Link, useLocation } from "react-router";
 import { SITE } from "@aihot/site";
 import { Wordmark } from "@aihot/site/brand/Logo.tsx";
 import { useChangelogSeen } from "../../lib/local-state";
+import { webModules } from "../../site-modules";
 import { sidebar, sidebarIsActive, type NavItem } from "./nav";
 import { ThemeSwitch } from "./ThemeSwitch";
 import { IconGithub } from "../icons";
 
-/** True while the changelog has an entry newer than the one this reader last opened. */
+/**
+ * True while the changelog has an entry newer than the one this reader last opened. An internal site keeps
+ * nothing in the browser, so it could never remember the opening: it shows no dot rather than one that never goes.
+ */
 export function useChangelogDot(latestVersion: string | null): boolean {
   const seen = useChangelogSeen();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  if (!mounted || !latestVersion) return false;
+  if (ACCESS || !mounted || !latestVersion) return false;
   return !seen || seen < latestVersion;
 }
 
@@ -24,7 +28,7 @@ function SideLink({ item, dot }: { item: NavItem; dot: boolean }) {
   return (
     <Link
       to={item.to}
-      reloadDocument={!!ACCESS} prefetch={ACCESS ? "none" : "intent"}
+      prefetch={ACCESS ? "none" : "intent"}
       aria-current={isActive ? "page" : undefined}
       className={`flex h-10 items-center gap-2.5 rounded-control px-2.5 text-[14px] transition-colors duration-150 ${
         isActive ? "bg-accent/10 font-semibold text-ink dark:bg-accent-soft" : "font-medium text-ink-3 hover:bg-bg-sunk hover:text-ink"
@@ -59,6 +63,7 @@ export function Sidebar({ changelogVersion }: { changelogVersion: string | null 
         ))}
       </nav>
       <div className="mt-2 space-y-2.5 px-1 pt-1">
+        {webModules().map((m) => m.account && <m.account key={m.name} place="sidebar" />)}
         {SITE.github && (
           <a
             href={SITE.github}

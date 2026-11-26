@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { data, redirectDocument, useActionData, useLoaderData, type ActionFunctionArgs, type LoaderFunctionArgs } from "react-router";
 import { safeReturnPath, originAllowed } from "@aihot/contracts/access";
 import { SITE } from "@aihot/site";
@@ -15,7 +16,9 @@ export const headers = () => PRIVATE_HEADERS;
 export const meta = () => [{ title: `成员登录 · ${SITE.name}` }, { name: "robots", content: "noindex, nofollow" }];
 
 export async function action({ request }: ActionFunctionArgs) {
-  const fail = (error: string, status: number) => data({ error }, { status, headers: PRIVATE_HEADERS });
+  // A failed sign-in keeps the user name (never the password) so only the password has to be typed again.
+  let username = "";
+  const fail = (error: string, status: number) => data({ error, username }, { status, headers: PRIVATE_HEADERS });
   if (request.method !== "POST") return fail("请使用登录表单提交。", 405);
   if (!originAllowed(request.headers.get("origin") ?? undefined, [siteUrl()])) return fail("请从本站登录页面重新提交。", 403);
   if (!request.headers.get("content-type")?.startsWith("application/x-www-form-urlencoded")) return fail("登录信息格式不正确。", 400);
@@ -32,6 +35,7 @@ export async function action({ request }: ActionFunctionArgs) {
     chunks.push(value);
   }
   const form = new URLSearchParams(Buffer.concat(chunks).toString("utf8"));
+  username = (form.get("username") ?? "").slice(0, 64);
   try {
     const res = await fetch(`${API_BASE_URL}/api/access/login`, {
       method: "POST", redirect: "manual", cache: "no-store",
@@ -53,18 +57,20 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function MemberLogin() {
   const { returnTo } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
+  const [sending, setSending] = useState(false);
+  const known = result && "username" in result ? result.username : "";
   return <main className="flex min-h-dvh items-center justify-center bg-bg px-4 py-12">
     <div className="w-full max-w-[390px]">
       <Wordmark size={30} className="text-ink" />
       <p className="mt-8 text-[12px] font-medium tracking-widest text-accent">内部资料 · 成员访问</p>
       <h1 className="mt-2 text-[28px] font-semibold tracking-tight text-ink">登录工作空间</h1>
-      <p className="mt-3 text-[14px] leading-7 text-ink-3">使用管理员分配的账号阅读资讯与政策规划。没有账号？请联系站点管理员。</p>
-      <form method="post" className="card mt-7 space-y-5 p-6">
+      <p className="mt-3 text-[14px] leading-7 text-ink-3">使用管理员分配的账号阅读资讯、政策规划和研报。没有账号？请联系站点管理员。</p>
+      <form method="post" className="card mt-7 space-y-5 p-6" onSubmit={() => setSending(true)}>
         <input type="hidden" name="returnTo" value={returnTo} />
-        <label className="block text-[13px] font-medium text-ink-2">用户名<input name="username" autoComplete="username" required maxLength={64} className="mt-2 h-11 w-full rounded-control border border-line-strong bg-surface px-3 text-[15px] outline-none focus:border-accent" /></label>
-        <label className="block text-[13px] font-medium text-ink-2">密码<input name="password" type="password" autoComplete="current-password" required maxLength={1024} className="mt-2 h-11 w-full rounded-control border border-line-strong bg-surface px-3 text-[15px] outline-none focus:border-accent" /></label>
+        <label className="block text-[13px] font-medium text-ink-2">用户名<input name="username" autoComplete="username" required maxLength={64} defaultValue={known} autoFocus={!known} className="mt-2 h-11 w-full rounded-control border border-line-strong bg-surface px-3 text-[15px] outline-none focus:border-accent" /></label>
+        <label className="block text-[13px] font-medium text-ink-2">密码<input name="password" type="password" autoComplete="current-password" required maxLength={1024} autoFocus={!!known} className="mt-2 h-11 w-full rounded-control border border-line-strong bg-surface px-3 text-[15px] outline-none focus:border-accent" /></label>
         {result && "error" in result && <p role="alert" className="text-[13px] leading-6 text-hot">{result.error}</p>}
-        <button className={`${buttonClass("primary", "lg")} w-full`} type="submit">登录</button>
+        <button className={`${buttonClass("primary", "lg")} w-full`} type="submit" disabled={sending}>{sending ? "正在登录…" : "登录"}</button>
       </form>
       <p className="mt-5 text-[12px] leading-6 text-ink-4">本工作空间不开放匿名阅读。使用结束后请退出，勿在共享设备上保存密码。</p>
       <a href="/admin/login" className="mt-5 inline-block text-[13px] text-ink-3 underline underline-offset-4">管理员入口</a>

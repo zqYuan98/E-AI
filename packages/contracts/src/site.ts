@@ -146,6 +146,8 @@ export interface SiteItemDetail extends ItemSummary {
   group: GroupInfo | null;
   hasTranslation: boolean;
   bodyLanguage: "zh" | "original";
+  /** What the site's modules add about this report, by module name (backend ServerModule.item). */
+  modules?: Record<string, unknown>;
 }
 
 /** A fact's public reports under the list's filters: what "另有 N 家信源报道" opens. */

@@ -92,7 +92,7 @@ export default function AgentPage() {
 }
 
 function InternalAgent() {
-  return <div className="mx-auto max-w-[var(--page-max-reading)] py-8"><PhoneBar back={{ to: "/more", label: "我的" }} title="内部接口说明" /><Kicker>内部访问</Kicker><h1 className="mt-4 text-[26px] font-semibold text-ink">接口与成员权限</h1><div className="mt-6 space-y-5 text-[14px] leading-7 text-ink-3"><p>本工作空间不是匿名公开站点。网页、资料下载、RSS 与只读 API 都需要有效的成员或管理员会话；链接本身不授予访问权。</p><p><strong className="text-ink">MCP 暂未开放。</strong>当前版本拒绝 MCP POST 请求，因此不能直接配置远程 MCP 客户端使用；不会要求你把浏览器 Cookie 复制给第三方客户端。</p><p>成员仅有读取权限，账号由管理员创建、停用和重置。不要把内部资料、会话 Cookie 或任何密钥转发给未授权人员或第三方服务。</p><p>在接口客户端登录、令牌管理与授权范围完成验收前，请通过本站阅读和检索资料。</p></div></div>;
+  return <div className="mx-auto max-w-[var(--page-max-reading)] py-8"><PhoneBar back={{ to: "/more", label: "我的" }} title="接口说明" /><Kicker>内部访问</Kicker><h1 className="mt-4 text-[26px] font-semibold text-ink">暂不开放外部接入</h1><div className="mt-6 space-y-5 text-[14px] leading-7 text-ink-3"><p>本站内容只在浏览器里登录后阅读和搜索，暂时没有给 AI 客户端（Agent、MCP）或订阅器（RSS）用的接入方式。</p><p>需要把本站接入公司的其他系统，请联系管理员。</p><p>请不要把站内资料、登录状态或任何密钥交给外部服务。</p></div></div>;
 }
 
 function PublicAgentPage() {

@@ -264,7 +264,8 @@ export function Json({ value, collapsed = true, label = "原始数据" }: { valu
 
 /**
  * A modal that collects a reason (and optional extra fields) before a manual change. The submit
- * handler receives the reason; returning true closes the dialog.
+ * handler receives the reason; returning true closes the dialog. `note={false}` makes it a plain
+ * confirmation, for changes whose record has no place for a note.
  */
 export function ReasonDialog({
   open,
@@ -273,6 +274,7 @@ export function ReasonDialog({
   confirmLabel = "确认",
   danger,
   requireReason = true,
+  note = true,
   children,
   onClose,
   onSubmit,
@@ -284,6 +286,7 @@ export function ReasonDialog({
   confirmLabel?: string;
   danger?: boolean;
   requireReason?: boolean;
+  note?: boolean;
   children?: ReactNode;
   onClose: () => void;
   onSubmit: (reason: string) => Promise<boolean | void> | boolean | void;
@@ -318,7 +321,7 @@ export function ReasonDialog({
             className="relative max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-sheet bg-raised p-5 shadow-2xl ring-1 ring-line-strong"
             onSubmit={async (e) => {
               e.preventDefault();
-              if (requireReason && !reason.trim()) return;
+              if (note && requireReason && !reason.trim()) return;
               const closed = await onSubmit(reason.trim());
               if (closed !== false) onClose();
             }}
@@ -326,14 +329,16 @@ export function ReasonDialog({
             <h2 className="text-[16px] font-semibold text-ink">{title}</h2>
             {description && <div className="mt-1.5 text-[13px] leading-relaxed text-ink-3">{description}</div>}
             {children && <div className="mt-4 space-y-3">{children}</div>}
-            <div className="mt-4">
-              <Field label={requireReason ? "原因（写进审计记录）" : "备注（可选）"}>
-                <Textarea ref={ref} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={requireReason ? "为什么做这个改动" : ""} rows={2} />
-              </Field>
-            </div>
+            {note && (
+              <div className="mt-4">
+                <Field label={requireReason ? "原因（写进审计记录）" : "备注（可选）"}>
+                  <Textarea ref={ref} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={requireReason ? "为什么做这个改动" : ""} rows={2} />
+                </Field>
+              </div>
+            )}
             <div className="mt-5 flex justify-end gap-2">
               <Button tone="ghost" onClick={onClose}>取消</Button>
-              <Button type="submit" tone={danger ? "danger" : "primary"} busy={busy} disabled={requireReason && !reason.trim()}>
+              <Button type="submit" tone={danger ? "danger" : "primary"} busy={busy} disabled={note && requireReason && !reason.trim()}>
                 {confirmLabel}
               </Button>
             </div>
