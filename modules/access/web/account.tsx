@@ -6,6 +6,7 @@ import type { AccessPrincipal } from "@aihot/contracts/access";
 import { SITE } from "@aihot/site";
 import { PRIVATE_HEADERS } from "@aihot/web/lib/access";
 import { buttonClass } from "@aihot/web/components/ui/Controls";
+import { PhoneBar } from "@aihot/web/components/shell/PhoneBar";
 
 export const headers = () => PRIVATE_HEADERS;
 export const meta = () => [{ title: `修改密码 · ${SITE.name}` }, { name: "robots", content: "noindex, nofollow" }];
@@ -18,7 +19,7 @@ export default function Account() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   if (principal?.kind !== "member") {
-    return <main className="mx-auto max-w-[420px] py-12"><h1 className="text-[22px] font-semibold text-ink">修改密码</h1><p className="mt-3 text-[14px] leading-7 text-ink-3">这里修改成员账号的密码。管理员密码在服务器上设置。</p></main>;
+    return <div className="mx-auto max-w-[420px] pb-12 pt-3 lg:pt-1"><PhoneBar back={{ to: "/more", label: "我的" }} title="修改密码" /><h1 className="text-[22px] font-semibold text-ink">修改密码</h1><p className="mt-3 text-[14px] leading-7 text-ink-3">这里修改成员账号的密码。管理员密码在服务器上设置。</p></div>;
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -29,8 +30,9 @@ export default function Account() {
     const next = String(values.get("next") ?? "");
     if (next.length < 12) return setError("新密码至少 12 个字符。");
     if (next !== String(values.get("confirm") ?? "")) return setError("两次输入的新密码不一致。");
-    // Passwords are never kept in React state; the inputs are cleared before the request.
-    for (const name of ["current", "next", "confirm"]) (form.elements.namedItem(name) as HTMLInputElement).value = "";
+    // Passwords are never kept in React state, only in the inputs: a refused change clears just what has to be
+    // typed again, and leaving the page clears them all (access-browser.ts).
+    const clear = (...names: string[]) => { for (const name of names) (form.elements.namedItem(name) as HTMLInputElement).value = ""; };
     setBusy(true);
     try {
       const res = await fetch("/api/access/password", {
@@ -38,7 +40,14 @@ export default function Account() {
         headers: { "content-type": "application/json", "x-csrf-token": principal!.csrf },
         body: JSON.stringify({ current, next }),
       });
-      if (!res.ok) { setError(MESSAGES[res.status] ?? "暂时无法修改，请稍后重试。"); setBusy(false); return; }
+      if (!res.ok) {
+        if (res.status === 403) clear("current");
+        if (res.status === 400) clear("next", "confirm");
+        setError(MESSAGES[res.status] ?? "暂时无法修改，请稍后重试。");
+        setBusy(false);
+        return;
+      }
+      clear("current", "next", "confirm");
       notifyAccessChange();
       window.location.replace("/login");
     } catch {
@@ -46,7 +55,8 @@ export default function Account() {
       setBusy(false);
     }
   }
-  return <main className="mx-auto max-w-[420px] py-10">
+  return <div className="mx-auto max-w-[420px] pb-10 pt-3 lg:pt-1">
+    <PhoneBar back={{ to: "/more", label: "我的" }} title="修改密码" />
     <h1 className="text-[22px] font-semibold text-ink">修改密码</h1>
     <p className="mt-2 text-[13px] leading-6 text-ink-3">{principal.name}。改好后所有设备上的登录都会退出，请用新密码重新登录。</p>
     <form onSubmit={submit} className="card mt-6 space-y-5 p-6">
@@ -56,5 +66,5 @@ export default function Account() {
       {error && <p role="alert" className="text-[13px] text-hot">{error}</p>}
       <button disabled={busy} className={`${buttonClass("primary", "lg")} w-full`} type="submit">{busy ? "正在修改…" : "修改密码"}</button>
     </form>
-  </main>;
+  </div>;
 }

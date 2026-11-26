@@ -7,6 +7,7 @@ import type { AdminDeliveryIssue, AdminReceiptIssue, AdminRuns } from "@aihot/co
 import { adminGet } from "../../lib/admin.server";
 import { useAdminAction } from "../../features/admin/action";
 import { bj, duration, num } from "../../features/admin/format";
+import { DELIVERY_STATUS_LABEL, HEALTH_LABEL, RECEIPT_STATUS_LABEL, RUN_STATUS_LABEL, SERVICE_LABEL } from "../../features/admin/labels";
 import { AdminPage, Badge, Button, Card, DataTable, Dot, Empty, Field, Json, ReasonDialog, Select, Stat, Time } from "../../features/admin/ui";
 import { loadParts } from "../../site-modules";
 
@@ -96,7 +97,7 @@ export default function RunsAdmin({ loaderData }: Route.ComponentProps) {
             rowKey={(j) => j.job}
             columns={[
               { key: "j", label: "任务", render: (j) => <span className="font-mono text-[12.5px]">{j.job}</span> },
-              { key: "s", label: "上次", render: (j) => <Badge tone={j.status === "ok" ? "ok" : j.status === "failed" ? "bad" : "muted"} title={j.error ?? undefined}>{j.status ?? "运行中"}</Badge> },
+              { key: "s", label: "上次", render: (j) => <Badge tone={j.status === "ok" ? "ok" : j.status === "failed" ? "bad" : "muted"} title={j.error ?? j.status}>{RUN_STATUS_LABEL[j.status] ?? j.status}</Badge> },
               { key: "at", label: "时间", render: (j) => <Time at={j.started_at} /> },
               { key: "d", label: "耗时", align: "right", render: (j) => duration(j.started_at, j.finished_at) },
               { key: "f", label: "24h 失败", align: "right", render: (j) => (j.failed_24h ? <span className="text-hot">{j.failed_24h}/{j.runs_24h}</span> : `0/${j.runs_24h}`) },
@@ -122,7 +123,7 @@ export default function RunsAdmin({ loaderData }: Route.ComponentProps) {
       )}
 
       <div className="mt-5 grid gap-5 xl:grid-cols-2">
-        <Card title="需要核对的付费回执" right={<span>{Object.entries(r.receipts.counts).map(([k, v]) => `${k} ${v}`).join(" · ")}</span>} pad={false}>
+        <Card title="需要核对的付费回执" right={<span>{Object.entries(r.receipts.counts).map(([k, v]) => `${RECEIPT_STATUS_LABEL[k] ?? k} ${v}`).join(" · ")}</span>} pad={false}>
           <DataTable
             dense
             rows={r.receipts.issues}
@@ -130,8 +131,8 @@ export default function RunsAdmin({ loaderData }: Route.ComponentProps) {
             empty="没有待处理的回执"
             columns={[
               { key: "id", label: "回执", render: (x) => <span className="num">#{x.id}</span> },
-              { key: "s", label: "状态", render: (x) => <Badge tone={x.status === "unknown" ? "bad" : "warn"}>{x.status}</Badge> },
-              { key: "w", label: "服务", render: (x) => <span className="whitespace-nowrap">{x.service}{x.model ? ` · ${x.model}` : ""}</span> },
+              { key: "s", label: "状态", render: (x) => <Badge tone={x.status === "unknown" ? "bad" : "warn"} title={x.status}>{RECEIPT_STATUS_LABEL[x.status] ?? x.status}</Badge> },
+              { key: "w", label: "服务", render: (x) => <span className="whitespace-nowrap" title={x.service}>{SERVICE_LABEL[x.service] ?? x.service}{x.model ? ` · ${x.model}` : ""}</span> },
               { key: "p", label: "用途", render: (x) => (x.subject && /^[\w-]{10,}$/.test(x.subject) && x.purpose.includes("analy") ? <Link className="text-accent" to={`/admin/content/${x.subject}`}>{x.purpose}</Link> : x.purpose) },
               { key: "e", label: "错误", render: (x) => <span className="line-clamp-2 text-[12px] text-ink-3" title={x.error ?? ""}>{x.error}</span> },
               { key: "a", label: "", render: (x) => (x.status === "unknown" ? <Button size="sm" onClick={() => setReceipt(x)}>核对</Button> : null) },
@@ -146,7 +147,7 @@ export default function RunsAdmin({ loaderData }: Route.ComponentProps) {
             empty="没有待核实的投递"
             columns={[
               { key: "t", label: "目标", render: (d) => d.target_key },
-              { key: "s", label: "状态", render: (d) => <Badge tone={d.status === "unknown" ? "bad" : "warn"}>{d.status}</Badge> },
+              { key: "s", label: "状态", render: (d) => <Badge tone={d.status === "unknown" ? "bad" : "warn"} title={d.status}>{DELIVERY_STATUS_LABEL[d.status] ?? d.status}</Badge> },
               { key: "sub", label: "内容", render: (d) => (d.subject_kind === "selected" ? <Link className="text-accent" to={`/admin/content/${d.subject_id}`}>{d.subject_id}</Link> : `${d.subject_kind} ${d.subject_id}`) },
               { key: "at", label: "时间", render: (d) => <Time at={d.updated_at} /> },
               { key: "a", label: "", render: (d) => <Button size="sm" onClick={() => setDelivery(d)}>处理</Button> },
@@ -164,7 +165,7 @@ export default function RunsAdmin({ loaderData }: Route.ComponentProps) {
             empty="信源都按时采集"
             columns={[
               { key: "n", label: "信源", render: (s) => <Link className="text-ink hover:text-accent" to={`/admin/sources/${encodeURIComponent(s.id)}`}>{s.name}</Link> },
-              { key: "h", label: "健康", render: (s) => <Badge tone={s.health === "failing" ? "bad" : s.health === "degraded" ? "warn" : "muted"}>{s.health}</Badge> },
+              { key: "h", label: "健康", render: (s) => <Badge tone={s.health === "failing" ? "bad" : s.health === "degraded" ? "warn" : "muted"} title={s.health}>{HEALTH_LABEL[s.health] ?? s.health}</Badge> },
               { key: "ok", label: "上次成功", render: (s) => <Time at={s.last_ok_at} /> },
               { key: "nx", label: "应抓", render: (s) => <Time at={s.next_fetch_at} /> },
               { key: "e", label: "错误", render: (s) => <span className="line-clamp-1 text-[12px] text-ink-3" title={s.last_error ?? ""}>{s.last_error}</span> },
@@ -209,7 +210,7 @@ export default function RunsAdmin({ loaderData }: Route.ComponentProps) {
               columns={[
                 { key: "at", label: "开始", render: (t) => <span className="num whitespace-nowrap">{bj(t.started_at)}</span> },
                 { key: "j", label: "任务", render: (t) => <span className="font-mono text-[12px]">{t.job}</span> },
-                { key: "s", label: "结果", render: (t) => <Badge tone={t.status === "ok" ? "ok" : t.status === "failed" ? "bad" : "muted"} title={t.error ?? undefined}>{t.status ?? "运行中"}</Badge> },
+                { key: "s", label: "结果", render: (t) => <Badge tone={t.status === "ok" ? "ok" : t.status === "failed" ? "bad" : "muted"} title={t.error ?? t.status}>{RUN_STATUS_LABEL[t.status] ?? t.status}</Badge> },
                 { key: "d", label: "耗时", align: "right", render: (t) => duration(t.started_at, t.finished_at) },
               ]}
             />
@@ -225,7 +226,7 @@ export default function RunsAdmin({ loaderData }: Route.ComponentProps) {
                 { key: "at", label: "时间", render: (e) => <Time at={e.created_at} /> },
                 { key: "c", label: "客户端", render: (e) => e.client },
                 { key: "k", label: "类型", render: (e) => e.kind },
-                { key: "s", label: "结果", render: (e) => <Badge tone={e.status === "ok" ? "ok" : e.status === "error" ? "bad" : "muted"} title={e.error ?? undefined}>{e.status}</Badge> },
+                { key: "s", label: "结果", render: (e) => <Badge tone={e.status === "ok" ? "ok" : e.status === "error" ? "bad" : "muted"} title={e.error ?? e.status}>{RUN_STATUS_LABEL[e.status] ?? e.status}</Badge> },
                 { key: "x", label: "摘要", render: (e) => <Json value={e.summary} label="摘要" /> },
               ]}
             />

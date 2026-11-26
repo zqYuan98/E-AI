@@ -5,6 +5,7 @@ import { CATEGORY_KEYS, CATEGORY_LABELS } from "@aihot/contracts/taxonomy";
 import type { Route } from "./+types/content-item";
 import type { AdminContentChain } from "@aihot/contracts/admin";
 import { adminGet } from "../../lib/admin.server";
+import { ACCESS } from "../../lib/access";
 import { useAdminAction } from "../../features/admin/action";
 import { bj, money } from "../../features/admin/format";
 import { KIND_LABEL, MODE_LABEL, VISIBILITY_LABEL } from "../../features/admin/labels";
@@ -43,6 +44,7 @@ export default function ContentItem({ loaderData }: Route.ComponentProps) {
   const [visibility, setVisibility] = useState<string>(p?.visibility ?? "public");
   const [fields, setFields] = useState({ title: "", summary: "", reason: "", category: "", tags: "", selected: "", silent: "" });
   const [mergeInto, setMergeInto] = useState("");
+  const [mergeError, setMergeError] = useState<string | null>(null);
   const version = c.override?.version ?? 0;
   const base = `/api/admin/content/${encodeURIComponent(a.id)}`;
   const story = c.membership[0];
@@ -82,8 +84,9 @@ export default function ContentItem({ loaderData }: Route.ComponentProps) {
       }
       actions={
         <>
-          <Button onClick={() => setDialog("visibility")}>公开范围</Button>
-          {p && <Button onClick={() => setDialog("seo")}>{p.indexable ? "取消收录" : "标记收录"}</Button>}
+          <Button onClick={() => { setVisibility(p?.visibility ?? "public"); setDialog("visibility"); }}>公开范围</Button>
+          {/* An internal site is never indexed and submits nothing to search engines: no switch for it. */}
+          {p && !ACCESS && <Button onClick={() => setDialog("seo")}>{p.indexable ? "取消收录" : "标记收录"}</Button>}
           <Button onClick={openOverride}>人工修正</Button>
           <Button onClick={() => setDialog("analyze")}>重新评估</Button>
         </>
@@ -181,7 +184,7 @@ export default function ContentItem({ loaderData }: Route.ComponentProps) {
                     [
                       "正文展示",
                       `${p.body_mode}${p.syndicate ? " · 对外可带全文" : ""}${
-                        p.indexable ? (p.seo_indexed_at ? " · 可收录（手动标记）" : " · 可收录（精选自动）") : p.seo_excluded_at ? " · 不收录（手动排除）" : " · 不收录"
+                        ACCESS ? "" : p.indexable ? (p.seo_indexed_at ? " · 可收录（手动标记）" : " · 可收录（精选自动）") : p.seo_excluded_at ? " · 不收录（手动排除）" : " · 不收录"
                       }`,
                     ],
                   ]}
@@ -239,7 +242,7 @@ export default function ContentItem({ loaderData }: Route.ComponentProps) {
               <div className="mt-2 flex flex-wrap gap-2">
                 <Button size="sm" onClick={() => setDialog("group")}>重新归组</Button>
                 {c.membership.length > 0 && <Button size="sm" onClick={() => setDialog("detach")}>移出事件</Button>}
-                {story?.story_id && <Button size="sm" onClick={() => setDialog("merge")}>把这个事件并入…</Button>}
+                {story?.story_id && <Button size="sm" onClick={() => { setMergeError(null); setDialog("merge"); }}>把这个事件并入…</Button>}
               </div>
             </Step>
             <Step title="投递" last meta={`${c.deliveries.length} 条`} tone={c.deliveries.some((d) => d.status === "unknown") ? "bad" : c.deliveries.length ? "accent" : "muted"}>
@@ -330,7 +333,7 @@ export default function ContentItem({ loaderData }: Route.ComponentProps) {
       <ReasonDialog
         open={dialog === "override"}
         title="人工修正"
-        description="人工值优先于模型输出，之后的重处理不会覆盖；留空表示不修正该字段（清除已有修正请选“清除”）。"
+        description="人工值优先于模型输出，之后的重处理不会覆盖。文字留空、下拉选“不修正”“按模型”“正常”，就沿用模型结果；把已有的修正清空或改回这些选项再保存，就撤销这项修正。"
         confirmLabel="保存修正"
         busy={pending === "override"}
         onClose={() => setDialog(null)}
@@ -428,13 +431,17 @@ export default function ContentItem({ loaderData }: Route.ComponentProps) {
         busy={pending === "merge"}
         onClose={() => setDialog(null)}
         onSubmit={async (reason) => {
-          if (!/^\d+$/.test(mergeInto.trim())) return false;
-          return (await run("POST", "/api/admin/stories/merge", { from: story!.story_id, into: Number(mergeInto), reason }, { label: "merge", success: "事件已合并" })) !== null;
+          // The number as the diagnosis pages show it: "#1234" works as well as "1234".
+          const into = mergeInto.trim().replace(/^#/, "");
+          if (!/^\d+$/.test(into)) { setMergeError("请填目标事件的编号，只写数字，例如 1234"); return false; }
+          if (Number(into) === Number(story!.story_id)) { setMergeError("这就是当前事件，请填另一个事件的编号"); return false; }
+          return (await run("POST", "/api/admin/stories/merge", { from: story!.story_id, into: Number(into), reason }, { label: "merge", success: "事件已合并" })) !== null;
         }}
       >
         <Field label="并入的目标事件编号" hint="在目标事件任一内容的诊断页里可以看到 #编号">
-          <Input inputMode="numeric" value={mergeInto} onChange={(e) => setMergeInto(e.target.value)} placeholder="例如 1234" />
+          <Input inputMode="numeric" value={mergeInto} onChange={(e) => { setMergeInto(e.target.value); setMergeError(null); }} placeholder="例如 1234" />
         </Field>
+        {mergeError && <p role="alert" className="text-[13px] text-hot">{mergeError}</p>}
       </ReasonDialog>
     </AdminPage>
   );

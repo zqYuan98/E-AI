@@ -48,7 +48,12 @@ const api = createServer((req, res) => {
     if (!admin) return json(403, {});
     if (path === "/api/admin/access/members") return body(input => { rows.push({ id: rows.length + 1, username: input.username, name: input.name, disabled: false }); json(200, { member: rows.at(-1) }); });
     const member = rows.find(row => path.includes(`/members/${row.id}/`));
-    if (member && path.endsWith("/disable")) { member.disabled = true; return json(200, { member }); }
+    // Like the real api (Fastify): a JSON content type with an empty body is refused.
+    if (member && path.endsWith("/disable")) {
+      if (/json/.test(String(req.headers["content-type"] ?? "")) && !Number(req.headers["content-length"] ?? 0)) return json(400, { code: "FST_ERR_CTP_EMPTY_JSON_BODY" });
+      member.disabled = true;
+      return json(200, { member });
+    }
     if (member && path.endsWith("/reset")) return body(() => json(200, { member }));
     return json(404, {});
   }
@@ -95,12 +100,15 @@ for (const engine of ["Chromium", "WebKit"] as const) {
       page.on("request", req => { if (req.url().includes(".data")) navigation.push(req.url()); });
       await page.locator('aside a[href="/all"]').hover();
       await page.waitForTimeout(200);
-      assert.deepEqual(navigation, []);
+      assert.deepEqual(navigation, [], "hovering a link loads nothing ahead of the click");
       assert.equal(await page.locator('link[rel="prefetch"]').count(), 0);
+      await page.evaluate(() => { (window as unknown as { sameDocument: boolean }).sameDocument = true; });
       await page.locator('aside a[href="/all"]').click();
       await expect(page).toHaveURL(web.origin + "/all");
       await expect(page.getByRole("region", { name: "当前成员" })).toContainText("成员甲");
-      assert.deepEqual(navigation, []);
+      // The click stays in the document (no blank reload, no lost place): one data request, checked against the session.
+      assert.ok(navigation.length >= 1, "the page's data came over the session-checked fetch");
+      assert.equal(await page.evaluate(() => (window as unknown as { sameDocument?: boolean }).sameDocument), true);
       assert.deepEqual(await page.evaluate(() => Object.entries(localStorage).filter(([key]) => key !== "aihot-theme" && key !== "aihot:access-epoch")), []);
       await page.getByRole("button", { name: "退出登录", exact: true }).click();
       await expect(page).toHaveURL(/\/login/);
@@ -145,8 +153,8 @@ test("dual-cookie admin creates, resets and disables members using the admin CSR
     await page.getByLabel("新密码", { exact: false }).fill("sensitive-reset-password");
     await page.getByRole("button", { name: "确认重置", exact: true }).click();
     await expect(page.getByLabel("初始密码", { exact: false })).toBeVisible();
-    page.once("dialog", dialog => dialog.accept());
     await page.getByRole("button", { name: "停用", exact: true }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "停用", exact: true }).click();
     await expect(page.getByText("已停用", { exact: true })).toBeVisible();
     const commands = mutations.filter(value => value.path.startsWith("/api/admin/access/"));
     assert.equal(commands.length, 3);
@@ -159,6 +167,52 @@ test("dual-cookie admin creates, resets and disables members using the admin CSR
   } finally { await ctx.close(); }
 });
 
+
+test("the router's record of visited paths never reaches storage; a shown password is cleared when the page goes away", async () => {
+  rows = [];
+  const ctx = await context(chrome);
+  try {
+    const page = await login(ctx);
+    await page.goto(web.origin + "/more");
+    await page.getByRole("link", { name: "意见反馈" }).click();
+    await expect(page).toHaveURL(web.origin + "/feedback");
+    await page.locator("aside").getByRole("button", { name: "退出登录", exact: true }).click();
+    await expect(page).toHaveURL(/\/login/);
+    assert.equal(await page.evaluate(() => sessionStorage.getItem("remix-router-transitions")), null);
+
+    await login(ctx);
+    await ctx.addCookies([{ name: "aihot_admin", value: "fixture-admin", url: web.origin, httpOnly: true, sameSite: "Lax" }]);
+    const admin = await ctx.newPage();
+    await admin.goto(web.origin + "/admin/access");
+    await admin.getByLabel("初始密码", { exact: false }).fill("sensitive-shown-password");
+    await admin.getByRole("button", { name: "显示", exact: true }).click();
+    await expect(admin.getByLabel("初始密码", { exact: false })).toHaveAttribute("type", "text");
+    await admin.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted: true })));
+    assert.equal(await admin.evaluate(() => document.querySelector<HTMLInputElement>('input[name="password"]')!.value), "");
+  } finally { await ctx.close(); }
+});
+
+test("a sign-in change elsewhere covers the page until it is checked; a quick switch to another window does not", async () => {
+  const ctx = await context(chrome);
+  try {
+    const page = await login(ctx);
+    const paused = () => page.evaluate(() => document.documentElement.hasAttribute("data-access-paused"));
+    const coveredAtOnce = await page.evaluate(() => {
+      window.dispatchEvent(new StorageEvent("storage", { key: "aihot:access-epoch", newValue: "elsewhere" }));
+      return document.documentElement.hasAttribute("data-access-paused");
+    });
+    assert.equal(coveredAtOnce, true);
+    await expect.poll(paused).toBe(false);
+    const flickered = await page.evaluate(() => {
+      const state = (value: string) => Object.defineProperty(document, "visibilityState", { configurable: true, get: () => value });
+      state("hidden"); document.dispatchEvent(new Event("visibilitychange"));
+      state("visible"); document.dispatchEvent(new Event("visibilitychange"));
+      return document.documentElement.hasAttribute("data-access-paused");
+    });
+    assert.equal(flickered, false);
+    await expect(page.getByRole("region", { name: "当前成员" })).toContainText("成员甲");
+  } finally { await ctx.close(); }
+});
 
 test("a delayed business response cannot repopulate a revoked document", async () => {
   const ctx = await context(chrome);

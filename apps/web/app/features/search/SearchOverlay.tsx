@@ -136,7 +136,7 @@ export function SearchOverlay() {
             type="search"
             onInput={(e) => setHasText(!!e.currentTarget.value)}
             tabIndex={shown ? 0 : -1}
-            placeholder="搜索标题、摘要和正文"
+            placeholder="搜索标题和摘要，结果页可切全文"
             maxLength={200}
             autoComplete="off"
             enterKeyHint="search"

@@ -33,7 +33,7 @@ function reportText(r: ImportReport): string {
 }
 
 export default function StarredPage() {
-  if (ACCESS) return <div className="py-8"><PhoneBar title="收藏" /><h1 className="text-[22px] font-semibold text-ink">内部模式不保存本机收藏</h1><p className="mt-4 text-[14px] leading-7 text-ink-3">为避免退出或切换账号后留下内部内容，当前版本禁用浏览器中的资料快照、收藏和搜索记录。请使用站内搜索重新查找。</p></div>;
+  if (ACCESS) return <div className="py-8"><PhoneBar back={{ to: "/", label: "精选" }} title="收藏" /><h1 className="text-[22px] font-semibold text-ink">本站不在浏览器里保存收藏</h1><p className="mt-4 text-[14px] leading-7 text-ink-3">为避免退出或换人使用后留下内部内容，本站不在浏览器里保存收藏、已读和搜索记录。要找之前看过的内容，请用站内搜索。</p><div className="mt-6 flex gap-4 text-[14px]"><Link to="/all" className="text-accent hover:underline">去全部动态搜索</Link><Link to="/" className="text-accent hover:underline">回到精选</Link></div></div>;
   return <PublicStarredPage />;
 }
 function PublicStarredPage() {

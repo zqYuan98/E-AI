@@ -1,5 +1,6 @@
 // Share poster: the server-rendered poster (with a QR code to the article), to save or hand to the
 // system share sheet. Loaded on demand from the article page; a bottom sheet on phones, centred above.
+import { ACCESS } from "../../lib/access";
 import { useEffect, useState } from "react";
 import { SITE } from "@aihot/site";
 import { Sheet } from "../../components/ui/Sheet";
@@ -46,7 +47,7 @@ export default function PosterSheet({ id, title, open, onClose }: { id: string; 
             />
           )}
         </div>
-        <p className="mt-3 text-[12.5px] text-ink-3">长按图片可保存或发送给朋友</p>
+        <p className="mt-3 text-[12.5px] text-ink-3">{ACCESS ? "长按图片可保存，仅限公司内部交流" : "长按图片可保存或发送给朋友"}</p>
         <div className="mt-3 flex w-full max-w-[360px] gap-2">
           <a
             href={src}

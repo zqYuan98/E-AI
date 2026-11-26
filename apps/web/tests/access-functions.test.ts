@@ -51,16 +51,35 @@ test("direct session contract and real administrator shape reject wrappers and d
   assert.deepEqual(await requireAccess(request()), value);
 });
 
-test("internal loaders and snapshot helpers never renew or retain public content", async () => {
+test("internal loaders never renew content; list snapshots stay in this document and never reach browser storage", async () => {
   assert.equal(cachedPage(3600, { content: "internal" }).data.expiresAt, 0);
   assert.equal(edgeTtl(3600)["Cache-Control"], "private, no-store");
   const reuse = pageReuse(); let calls = 0;
   const args = { request: request(), serverLoader: async () => ({ expiresAt: Date.now() + 60_000, calls: ++calls }) } as unknown as ClientLoaderFunctionArgs;
   await reuse.clientLoader(args); await reuse.clientLoader(args);
   assert.equal(calls, 2); assert.equal(hasFreshPage(new URL(request().url)), false);
-  const cache = sessionCache<{ savedAt: number; content: string }>("test", 3600);
-  cache.set("page", { savedAt: Date.now(), content: "internal" });
-  assert.equal(cache.peek("page"), null); assert.equal(cache.read("page"), null);
+  const stored = new Map<string, string>();
+  const storage = {
+    get length() { return stored.size; },
+    key: (index: number) => [...stored.keys()][index] ?? null,
+    getItem: (key: string) => stored.get(key) ?? null,
+    setItem: (key: string, value: string) => { stored.set(key, value); },
+    removeItem: (key: string) => { stored.delete(key); },
+  };
+  Object.assign(globalThis, { window: Object.assign(new EventTarget(), { sessionStorage: storage, localStorage: storage }), document: Object.assign(new EventTarget(), { visibilityState: "hidden" }) });
+  try {
+    const cache = sessionCache<{ savedAt: number; content: string }>("test", 3600);
+    cache.set("page", { savedAt: Date.now(), content: "internal" });
+    cache.flush();
+    (globalThis as unknown as { window: EventTarget }).window.dispatchEvent(new Event("pagehide"));
+    // Back within this document finds the list; nothing of it is written to storage, so a new document starts empty.
+    assert.equal(cache.peek("page")?.content, "internal");
+    assert.equal(stored.size, 0);
+    assert.equal(sessionCache<{ savedAt: number; content: string }>("test", 3600).read("page"), null);
+  } finally {
+    delete (globalThis as { window?: unknown }).window;
+    delete (globalThis as { document?: unknown }).document;
+  }
 });
 
 test("inline identity JSON cannot break out of a script", () => {

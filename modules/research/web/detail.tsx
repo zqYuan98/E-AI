@@ -49,7 +49,7 @@ export default function ResearchDetailPage() {
         }
       >
         <article className="pt-3 lg:pt-1">
-          <IntentLink to="/research" className="text-[12.5px] text-ink-4 hover:text-accent">← 研报库</IntentLink>
+          <IntentLink to="/research" className="hidden text-[12.5px] text-ink-4 hover:text-accent lg:inline-flex">← 研报库</IntentLink>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[11.5px] text-ink-4">
             {r.institution && <span className="rounded bg-bg-sunk px-1.5 py-0.5 text-ink-3">{r.institution}</span>}
             {r.date && <span className="num">{r.date}</span>}

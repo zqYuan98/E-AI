@@ -1,6 +1,7 @@
-// 后台“政策库管理”：导入网址、看导入结果；文件的隐藏、删除和重新抽取。每次改动写审计记录。
+// 后台“政策规划库管理”：导入网址、看导入结果；文件的隐藏、删除和重新抽取。每次改动写审计记录。
 import { sql } from "@aihot/backend/db";
 import { audit } from "@aihot/backend/audit";
+import { allowedByEnvironment, modelCallsOn } from "@aihot/backend/operations/switches";
 import { POLICY_LEVELS } from "../types.ts";
 import { enqueueImports, enqueueReextract, seedUrls } from "./import.ts";
 
@@ -31,17 +32,21 @@ export async function policyAdmin() {
     pending: counts!.pending,
     failed: counts!.failed,
     seeds: seedUrls().length,
+    // 导入只在“模型调用”运行时处理：allowed 是服务器 .env 允不允许，running 是现在在不在运行（允许且设置页没有暂停）。
+    modelCalls: { allowed: allowedByEnvironment("models"), running: await modelCallsOn() },
   };
 }
 
 const bad = (message: string) => Object.assign(new Error(message), { statusCode: 400 });
 const needReason = (reason: string) => { if (!reason.trim()) throw bad("a reason is required"); };
 
-export async function importUrls(input: { urls?: unknown; seeds?: unknown }, actor: string) {
+/** 登记导入。再次导入首批种子时，后台确认框里填的原因（reason）写进审计记录。 */
+export async function importUrls(input: { urls?: unknown; seeds?: unknown; reason?: unknown }, actor: string) {
   const urls = input.seeds === true ? seedUrls() : Array.isArray(input.urls) ? input.urls.map(String) : String(input.urls ?? "").split(/\s+/);
   if (!urls.some((u) => /^https?:\/\//.test(u.trim()))) throw bad("没有可导入的网址（每行一个 http(s) 网址）");
   const result = await enqueueImports(urls, actor);
-  await audit(actor, "policy.import", "policy:imports", null, null, { queued: result.queued, seeds: input.seeds === true });
+  const reason = typeof input.reason === "string" && input.reason.trim() ? input.reason.trim() : null;
+  await audit(actor, "policy.import", "policy:imports", reason, null, { queued: result.queued, seeds: input.seeds === true });
   return result;
 }
 

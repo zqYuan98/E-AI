@@ -49,7 +49,7 @@ export default function PolicyDetail() {
   ];
   return (
     <>
-      <PhoneBar back={{ to: "/policy", label: "政策规划" }} title={d.name} />
+      <PhoneBar back={{ to: "/policy", label: "政策规划库" }} title={d.name} />
       <ReadingLayout
         aside={
           <>
@@ -92,7 +92,7 @@ export default function PolicyDetail() {
         }
       >
         <article className="pt-3 lg:pt-1">
-          <IntentLink to="/policy" className="text-[12.5px] text-ink-4 hover:text-accent">← 政策规划库</IntentLink>
+          <IntentLink to="/policy" className="hidden text-[12.5px] text-ink-4 hover:text-accent lg:inline-flex">← 政策规划库</IntentLink>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[11.5px]">
             <span className="rounded bg-bg-sunk px-1.5 py-0.5 text-ink-3">{levelLabel(d.level)}</span>
             <span className="rounded bg-bg-sunk px-1.5 py-0.5 text-ink-3">{d.docType}</span>
@@ -121,7 +121,8 @@ export default function PolicyDetail() {
           <Clauses title="重点任务" items={d.tasks} />
           {d.targets.length + d.aiClauses.length + d.tasks.length === 0 && (
             <p className="mt-8 rounded-card border border-line bg-surface px-4 py-3 text-[13px] leading-6 text-ink-3">
-              这份文件没有抽取到能在原文里逐字核对上的目标、任务或 AI 条款（核对不上的不展示）。请看下方原文和报道。
+              这份文件没有抽取到能在原文里逐字核对上的目标、任务或 AI 条款（核对不上的不展示）。
+              <a href={d.url} target="_blank" rel="noopener noreferrer" className="ml-1 text-accent hover:underline">打开原文 ↗</a>
             </p>
           )}
         </article>

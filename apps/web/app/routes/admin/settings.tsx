@@ -1,10 +1,11 @@
-import { ADMIN, SITE } from "@aihot/site";
+import { ABOUT, ADMIN, SITE } from "@aihot/site";
 import { useRef, useState } from "react";
 import type { Route } from "./+types/settings";
 import type { AdminSettings } from "@aihot/contracts/admin";
 import { adminGet } from "../../lib/admin.server";
 import { useAdminAction } from "../../features/admin/action";
 import { bj, num } from "../../features/admin/format";
+import { SERVICE_LABEL } from "../../features/admin/labels";
 import { AdminPage, Badge, Button, Card, DataTable, Field, Input, ReasonDialog } from "../../features/admin/ui";
 import { toast } from "../../features/admin/toast";
 
@@ -54,9 +55,10 @@ function BudgetRow({ b }: { b: AdminSettings["budgets"][number] }) {
   const [v, setV] = useState({ perMinute: b.per_minute, perHour: b.per_hour, perDay: b.per_day });
   const [open, setOpen] = useState(false);
   const changed = v.perMinute !== b.per_minute || v.perHour !== b.per_hour || v.perDay !== b.per_day;
+  const name = SERVICE_LABEL[b.service] ?? b.service;
   return (
     <tr className="border-b border-line/70 last:border-0">
-      <td className="px-3 py-2 font-mono text-[12.5px]">{b.service}</td>
+      <td className="px-3 py-2 text-[13px]" title={b.service}>{name}</td>
       {(["perMinute", "perHour", "perDay"] as const).map((k) => (
         <td key={k} className="px-3 py-2">
           <Input type="number" min={0} className="!w-24 !py-1 text-right" value={v[k]} onChange={(e) => setV({ ...v, [k]: Number(e.target.value) })} />
@@ -67,7 +69,7 @@ function BudgetRow({ b }: { b: AdminSettings["budgets"][number] }) {
         <Button size="sm" tone="primary" disabled={!changed} onClick={() => setOpen(true)}>保存</Button>
         <ReasonDialog
           open={open}
-          title={`调整 ${b.service} 的请求上限`}
+          title={`调整“${name}”的请求上限`}
           description={`上限是付费请求的熔断：超过后请求暂停并按窗口重试。填 0 表示立即停用这个服务。${ADMIN.budgetNote ?? ""}`}
           confirmLabel="保存"
           busy={pending === "budget"}
@@ -227,17 +229,21 @@ function EmbeddingService({ e }: { e: AdminSettings["embedding"] }) {
 }
 
 export default function SettingsAdmin({ loaderData: s }: Route.ComponentProps) {
+  // The about page shows a code only in its maker block, and only the cards that block has (site/site.ts ABOUT.maker).
+  const qr = { wechat: !!ABOUT.maker?.wechat, feishu: !!ABOUT.maker?.feishu };
   return (
     <AdminPage title="设置" subtitle="不改代码即可替换的运营设置。每次修改都写入审计记录。">
       <RunSwitches switches={s.switches} />
       <EmbeddingService e={s.embedding} />
-      <div className="grid gap-5 xl:grid-cols-2">
-        <Card title="关于页二维码">
-          <div className="space-y-5">
-            <QrSlot slot="wechatQr" label="微信公众号二维码" src={s.contact.wechatQr} />
-            <QrSlot slot="feishuQr" label="飞书群二维码" src={s.contact.feishuQr} />
-          </div>
-        </Card>
+      <div className={`grid gap-5 ${qr.wechat || qr.feishu ? "xl:grid-cols-2" : ""}`}>
+        {(qr.wechat || qr.feishu) && (
+          <Card title="关于页二维码">
+            <div className="space-y-5">
+              {qr.wechat && <QrSlot slot="wechatQr" label="微信公众号二维码" src={s.contact.wechatQr} />}
+              {qr.feishu && <QrSlot slot="feishuQr" label="飞书群二维码" src={s.contact.feishuQr} />}
+            </div>
+          </Card>
+        )}
         <Card title="通知目的地" pad={false}>
           <DataTable
             rows={s.targets}

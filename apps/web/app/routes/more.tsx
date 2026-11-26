@@ -36,7 +36,8 @@ const agentWays = () => [...webModules().flatMap((m) => m.agentWays ?? []), "MCP
 const tools = (): Row[] => [
   ...webModules().flatMap((m) => m.tools ?? []),
   { to: "/topics", label: "主题", icon: <IconGrid size={20} /> },
-  { to: "/agent", label: "Agent 接入", icon: <IconPlug size={20} />, detail: ACCESS ? "需授权 · MCP 暂停" : agentWays().slice(0, 3).join(" · ") },
+  // An internal site has no way in for Agents yet: no row that leads nowhere.
+  ...(ACCESS ? [] : [{ to: "/agent", label: "Agent 接入", icon: <IconPlug size={20} />, detail: agentWays().slice(0, 3).join(" · ") }]),
 ];
 
 function Group({ title, children }: { title?: string; children: ReactNode }) {
@@ -75,6 +76,7 @@ export default function MorePage() {
     <div className="mx-auto max-w-[var(--page-max-reading)] pb-8">
       <PhoneBar title="我的" large />
       <h1 className="hidden pb-4 pt-1 text-[22px] font-bold text-ink lg:block">我的</h1>
+      {webModules().map((m) => m.account && <m.account key={m.name} place="more" />)}
       <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-4 2xl:grid-cols-3">
         <Group>
           {!ACCESS && <RowLink row={{ to: "/starred", label: "收藏", icon: <IconBookmark size={20} />, detail: here && starred.length > 0 ? <span className="num">{starred.length}</span> : undefined }} />}

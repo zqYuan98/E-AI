@@ -1,5 +1,7 @@
 // History-entry caches keep same-document returns synchronous. Writes are coalesced after interaction;
 // hiding/leaving the document flushes them so a browser back/forward reload can restore the same data.
+// An internal site keeps them in memory only: Back within the site still finds them, while nothing of the
+// content reaches the browser's storage and a new document starts empty.
 import { ACCESS } from "./access.ts";
 import { readJson, storedKeys, writeRaw } from "./local-state.ts";
 
@@ -7,7 +9,7 @@ interface Timed { savedAt: number }
 const MAX_MEMORY_ENTRIES = 20;
 
 export function sessionCache<T extends Timed>(prefix: string, maxAge: number) {
-  if (ACCESS) return { peek: (_key: string): T | null => null, read: (_key: string): T | null => null, set: (_key: string, _value: T) => {}, flush: () => {} };
+  const persist = !ACCESS;
   const memory = new Map<string, T>();
   const dirty = new Map<string, T>();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -15,6 +17,7 @@ export function sessionCache<T extends Timed>(prefix: string, maxAge: number) {
 
   /** A stored entry still young enough to use; null when it is missing, unreadable or expired. */
   function stored(storedKey: string): T | null {
+    if (!persist) return null;
     const value = readJson(storedKey, "session") as T | null;
     return value && Number.isFinite(value.savedAt) && Date.now() - value.savedAt <= maxAge ? value : null;
   }
@@ -22,7 +25,7 @@ export function sessionCache<T extends Timed>(prefix: string, maxAge: number) {
     clearTimeout(timer);
     timer = undefined;
     // Storage unavailable or full: memory still works.
-    for (const [key, value] of dirty) writeRaw(prefix + key, JSON.stringify(value), "session");
+    if (persist) for (const [key, value] of dirty) writeRaw(prefix + key, JSON.stringify(value), "session");
     dirty.clear();
   }
   function remember(key: string, value: T) {
@@ -49,6 +52,7 @@ export function sessionCache<T extends Timed>(prefix: string, maxAge: number) {
   }
   function set(key: string, value: T) {
     remember(key, value);
+    if (!persist) return;
     dirty.set(key, value);
     if (!listening) {
       listening = true;

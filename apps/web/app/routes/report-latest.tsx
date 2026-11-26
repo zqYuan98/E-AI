@@ -9,7 +9,7 @@ import { beijingDate } from "@aihot/contracts/time";
 import { EmptyState } from "../components/ui/Page";
 import { ReportLayout } from "../features/report/ReportLayout";
 import { ReportPaper, reportOutline } from "../features/report/ReportPaper";
-import { KIND_LABEL, feedLink, kindFromPath } from "../features/report/format";
+import { KIND_LABEL, feedLinks, kindFromPath } from "../features/report/format";
 import type { Screen } from "../components/shell/screens";
 
 export const handle: Screen = { tab: "daily", name: "日报" };
@@ -33,7 +33,7 @@ export function meta({ loaderData, location }: Route.MetaArgs) {
     image: `/og/pages/${kind}.png`,
     // The latest issue, described at this page's own address (its canonical).
     jsonLd: report ? reportLd(report, location.pathname, report.lead?.leadParagraph ?? description) : undefined,
-  }), feedLink(kind)];
+  }), ...feedLinks(kind)];
 }
 
 export default function ReportLatestPage() {

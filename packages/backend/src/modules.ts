@@ -263,6 +263,12 @@ export interface ServerModule {
   /** Its part of the backups (ModuleBackup). */
   backup?: ModuleBackup;
   on?: Partial<EngineHooks>;
+  /**
+   * Its part of an item page (publication/detail.ts loadItemDetail): what it adds about this report, under its
+   * name in SiteItemDetail.modules; null when it has nothing to add. Read with the page, so a report withdrawn or
+   * moved to another category loses it at once; its web module draws it (itemPage).
+   */
+  item?: (articleId: string) => Promise<unknown>;
   /** Topic pages (publication/topics.ts). */
   topics?: {
     /**
@@ -354,6 +360,17 @@ export function remoteBackupDenied(): boolean {
 /** No module veto means public indexing is allowed, independently of backup policy. */
 export function indexSubmissionDenied(): boolean {
   return installed.some((m) => m.indexing?.submit === "deny");
+}
+
+/** The installed modules' parts of an item page (ServerModule.item) by module name; null when none adds one. */
+export async function itemParts(articleId: string): Promise<Record<string, unknown> | null> {
+  const parts: Record<string, unknown> = {};
+  for (const m of installed) {
+    if (!m.item) continue;
+    const part = await m.item(articleId);
+    if (part !== null && part !== undefined) parts[m.name] = part;
+  }
+  return Object.keys(parts).length ? parts : null;
 }
 
 /** The first installed module's reminder for the person behind this request, at this exit. */

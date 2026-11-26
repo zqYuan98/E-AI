@@ -6,7 +6,7 @@
 // page's code: the page waits for its parts while its own code loads (site-modules.ts `loadParts`) and then
 // renders them like any import.
 import type { ComponentType, ReactNode } from "react";
-import type { TopicSummary } from "@aihot/contracts/site";
+import type { SiteItemDetail, TopicSummary } from "@aihot/contracts/site";
 import type { NavItem, Tab } from "./components/shell/nav";
 
 export interface AdminNavEntry {
@@ -113,6 +113,12 @@ export interface TopicPagePart {
   news: (data: unknown) => string[];
 }
 
+/** A module's part of an item page (routes/item.tsx), from what its server module's `item` returned for it. */
+export interface ItemPagePart {
+  /** Drawn under the article's title, above its summary. */
+  Block: ComponentType<{ data: unknown; item: SiteItemDetail }>;
+}
+
 export interface WebModule {
   /** Its folder under modules/. */
   name: string;
@@ -145,8 +151,14 @@ export interface WebModule {
     /** Headers the document's own request to the api carries (the root loader). */
     documentHeaders?: (request: Request) => Record<string, string>;
   };
+  /**
+   * The signed-in account (an access module): its name and what to do with it, drawn at the foot of the
+   * desktop sidebar (components/shell/Sidebar.tsx) and atop the 我的 page (routes/more.tsx).
+   */
+  account?: ComponentType<{ place: "sidebar" | "more" }>;
   agent?: Part<AgentPart>;
   topicPage?: Part<TopicPagePart>;
+  itemPage?: Part<ItemPagePart>;
   /** Paths of the marks it serves that are drawn in white, for a dark tile (components/BrandMark.tsx). */
   darkMarks?: string[];
   /** The starred page (routes/starred.tsx): buttons ahead of 导入文件 that bring stars in from elsewhere, each resolving to the line it reports. */

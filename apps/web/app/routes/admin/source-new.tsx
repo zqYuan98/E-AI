@@ -18,16 +18,32 @@ const TEMPLATES: Record<string, Record<string, unknown>> = {
   mp_account: { ghid: "gh_", nickname: "" },
   external: {},
 };
-
+const template = (kind: string) => JSON.stringify(TEMPLATES[kind] ?? {}, null, 2);
 
 export default function NewSource() {
   const navigate = useNavigate();
   const { run, pending } = useAdminAction();
   const [form, setForm] = useState({ id: "", name: "", kind: "rss", tier: "T2", participation_mode: "editorial", interval_minutes: 30, first_party: false, site_fulltext: SOURCE_DEFAULTS.siteFulltext, syndicate_fulltext: false, tags: "" });
-  const [config, setConfig] = useState(JSON.stringify(TEMPLATES.rss, null, 2));
+  const [config, setConfig] = useState(template("rss"));
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<AdminSourcePreview | null>(null);
   const [duplicate, setDuplicate] = useState<{ id: string; name: string } | null>(null);
+  // A type picked while the config holds edits: switching would replace them with the new type's template.
+  const [kindAsked, setKindAsked] = useState<string | null>(null);
+
+  const switchKind = (kind: string, keepConfig = false) => {
+    setForm((f) => ({ ...f, kind }));
+    if (!keepConfig) setConfig(template(kind));
+    setPreview(null);
+    setKindAsked(null);
+  };
+  const configUntouched = () => {
+    try {
+      return JSON.stringify(JSON.parse(config)) === JSON.stringify(TEMPLATES[form.kind] ?? {});
+    } catch {
+      return false;
+    }
+  };
 
   const parsed = () => {
     try {
@@ -45,20 +61,13 @@ export default function NewSource() {
         <Card title="信源定义">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="ID" hint="小写字母、数字和连字符，创建后不可改">
-              <Input value={form.id} onChange={(e) => setForm({ ...form, id: e.target.value.toLowerCase() })} placeholder="openai-blog" />
+              <Input value={form.id} onChange={(e) => setForm({ ...form, id: e.target.value.toLowerCase() })} placeholder="web-sgcc-hb-gsyw" />
             </Field>
             <Field label="名称">
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="OpenAI 博客" />
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="国网湖北电力·公司要闻" />
             </Field>
             <Field label="类型">
-              <Select
-                value={form.kind}
-                onChange={(e) => {
-                  setForm({ ...form, kind: e.target.value });
-                  setConfig(JSON.stringify(TEMPLATES[e.target.value] ?? {}, null, 2));
-                  setPreview(null);
-                }}
-              >
+              <Select value={form.kind} onChange={(e) => (configUntouched() ? switchKind(e.target.value) : setKindAsked(e.target.value))}>
                 {Object.entries(KIND_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </Select>
             </Field>
@@ -90,6 +99,14 @@ export default function NewSource() {
               ))}
             </div>
           </div>
+          {kindAsked && (
+            <div className="mt-4 flex flex-wrap items-center gap-2 rounded-card bg-amber/10 px-4 py-2.5 text-[13px] text-ink-2 ring-1 ring-amber/25">
+              <span className="mr-auto">采集配置改过了。换成「{KIND_LABEL[kindAsked] ?? kindAsked}」时，要用它的模板替换配置吗？替换后改过的内容不保留。</span>
+              <Button size="sm" tone="danger" onClick={() => switchKind(kindAsked)}>换成模板</Button>
+              <Button size="sm" onClick={() => switchKind(kindAsked, true)}>只改类型</Button>
+              <Button size="sm" tone="ghost" onClick={() => setKindAsked(null)}>取消</Button>
+            </div>
+          )}
           <div className="mt-4">
             <Field label="采集配置（JSON）">
               <Textarea className="font-mono !text-[12px]" rows={10} value={config} onChange={(e) => setConfig(e.target.value)} spellCheck={false} />

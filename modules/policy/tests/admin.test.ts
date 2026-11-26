@@ -1,10 +1,11 @@
-// 政策库管理：隐藏、删除、重新抽取和网址导入；一篇资料换了文件时，旧文件没有资料就删掉，有的话换主资料。
+// 政策规划库管理：隐藏、删除、重新抽取和网址导入，页面上的模型调用状态；一篇资料换了文件时，旧文件没有资料就删掉，有的话换主资料。
 import { pointModels, stub, tag } from "../../../tests/setup.ts";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { closeDb, sql } from "@aihot/backend/db";
 import { stopBoss } from "@aihot/backend/jobs/queue";
 import { installModules } from "@aihot/backend/modules";
+import { setRunSwitch } from "@aihot/backend/operations/switches";
 import { upsertMaterial } from "@aihot/backend/content/materials";
 import { ExtractSchema, storeDocument, type Extracted } from "../backend/extract.ts";
 import { listPolicies } from "../backend/read.ts";
@@ -100,4 +101,18 @@ test("imports are queued once, processed by the worker with the model, and failu
     delete process.env.POLICY_MODEL;
     await provider.close();
   }
+});
+
+test("the page shows whether model calls run; a confirmed re-import of the seeds keeps its reason", async () => {
+  assert.deepEqual((await policyAdmin()).modelCalls, { allowed: true, running: true });
+  await setRunSwitch("models", false, "暂停", "test");
+  try {
+    assert.deepEqual((await policyAdmin()).modelCalls, { allowed: true, running: false }, "paused on the settings page: imports wait");
+  } finally {
+    await setRunSwitch("models", true, "恢复", "test");
+  }
+  await importUrls({ seeds: true, reason: "换了提示词" }, "test");
+  const [row] = await sql<{ reason: string | null; after: { seeds: boolean } }[]>`SELECT reason, after FROM audit_log WHERE action = 'policy.import' ORDER BY id DESC LIMIT 1`;
+  assert.equal(row!.reason, "换了提示词");
+  assert.equal(row!.after.seeds, true);
 });

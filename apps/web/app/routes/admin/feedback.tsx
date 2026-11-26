@@ -22,9 +22,19 @@ const TONE: Record<string, "accent" | "warn" | "ok" | "muted"> = { new: "accent"
 function FeedbackCard({ f }: { f: AdminFeedbackRow }) {
   const { run, pending } = useAdminAction();
   const [note, setNote] = useState(f.note ?? "");
+  const [savedNote, setSavedNote] = useState(f.note ?? "");
+  if ((f.note ?? "") !== savedNote) {
+    // The note was saved (here or by someone else): follow it, unless an unsaved one is being written.
+    if (note === savedNote) setNote(f.note ?? "");
+    setSavedNote(f.note ?? "");
+  }
+  const noteChanged = note !== (f.note ?? "");
   const [dialog, setDialog] = useState<null | "ban" | "erase">(null);
   const base = `/api/admin/feedback/${f.id}`;
   const version = new Date(f.updated_at).toISOString();
+  // A note being written goes in with the status, so it is not left behind unsaved.
+  const setStatus = (status: string) =>
+    run("PATCH", base, noteChanged ? { status, note: note || null, version } : { status, version }, { label: "status", success: noteChanged ? "状态和备注已保存" : "状态已更新" });
   return (
     <article className="rounded-panel bg-surface p-4 ring-1 ring-line">
       <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-ink-3">
@@ -52,13 +62,13 @@ function FeedbackCard({ f }: { f: AdminFeedbackRow }) {
           aria-label="处理状态"
           value={f.status}
           disabled={!!pending}
-          onChange={(e) => run("PATCH", base, { status: e.target.value, version }, { label: "status", success: "状态已更新" })}
+          onChange={(e) => setStatus(e.target.value)}
         >
           {Object.entries(FEEDBACK_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </Select>
         <Textarea rows={1} className="!min-h-[38px]" placeholder="处理备注（仅内部可见）" value={note} onChange={(e) => setNote(e.target.value)} />
         <div className="flex gap-1.5">
-          <Button size="md" disabled={note === (f.note ?? "")} busy={pending === "note"} onClick={() => run("PATCH", base, { note: note || null, version }, { label: "note", success: "备注已保存" })}>
+          <Button size="md" disabled={!noteChanged} busy={pending === "note"} onClick={() => run("PATCH", base, { note: note || null, version }, { label: "note", success: "备注已保存" })}>
             保存备注
           </Button>
           <Button tone="ghost" onClick={() => setDialog(f.banned ? null : "ban")} disabled={f.banned} title="拒绝这个来源的后续反馈">封禁来源</Button>
@@ -105,7 +115,7 @@ export default function FeedbackAdmin({ loaderData }: Route.ComponentProps) {
         </Form>
       </div>
       <div className="space-y-3">
-        {rows.length ? rows.map((f) => <FeedbackCard key={`${f.id}-${f.updated_at}`} f={f} />) : <Card><Empty>没有符合条件的反馈</Empty></Card>}
+        {rows.length ? rows.map((f) => <FeedbackCard key={f.id} f={f} />) : <Card><Empty>没有符合条件的反馈</Empty></Card>}
       </div>
       <Pager page={page} hasMore={rows.length === 50} />
       {bans.length > 0 && (

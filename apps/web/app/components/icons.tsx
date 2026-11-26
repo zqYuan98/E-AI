@@ -17,6 +17,9 @@ export const IconUsers = (p: P) => (<Svg {...p}><path d="M16 20v-1.5a3.5 3.5 0 0
 export const IconDoc = (p: P) => (<Svg {...p}><rect x="5" y="3.5" width="14" height="17" rx="2" /><path d="M8.5 8h7M8.5 12h7M8.5 16h4" /></Svg>);
 export const IconList = (p: P) => (<Svg {...p}><path d="M8 6h13M8 12h13M8 18h13" /><circle cx="3.5" cy="6" r="1" /><circle cx="3.5" cy="12" r="1" /><circle cx="3.5" cy="18" r="1" /></Svg>);
 export const IconFlame = (p: P) => (<Svg {...p}><path d="M12 22c4 0 7-2.7 7-7 0-3.6-2.4-6.2-4-8-.5 2-1.6 3.4-3 4 .3-3-1-6-4-8 0 4-4 6.5-4 11 0 4.3 3 8 8 8z" /></Svg>);
+export const IconLandmark = (p: P) => (<Svg {...p}><path d="M3.5 9.5L12 4.5l8.5 5M5.5 10v7.5M9.8 10v7.5M14.2 10v7.5M18.5 10v7.5M3.5 20h17" /></Svg>);
+export const IconBook = (p: P) => (<Svg {...p}><path d="M12 6.8C10.4 5.3 7.9 4.8 4.5 4.8v13.6c3.4 0 5.9.5 7.5 2 1.6-1.5 4.1-2 7.5-2V4.8c-3.4 0-5.9.5-7.5 2z" /><path d="M12 6.8v13.6" /></Svg>);
+export const IconBriefcase = (p: P) => (<Svg {...p}><rect x="3.5" y="7.5" width="17" height="12.5" rx="2" /><path d="M9 7.5V5.8A1.3 1.3 0 0110.3 4.5h3.4A1.3 1.3 0 0115 5.8v1.7M3.5 12.8h17" /></Svg>);
 export const IconGrid = (p: P) => (<Svg {...p}><rect x="3.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="3.5" y="13.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="13.5" width="7" height="7" rx="1.5" /></Svg>);
 export const IconBookmark = (p: P & { filled?: boolean }) => { const { filled, ...rest } = p; return (<Svg {...rest}><path d="M6 3.5h12v17l-6-4-6 4z" fill={filled ? "currentColor" : "none"} /></Svg>); };
 export const IconChart = (p: P) => (<Svg {...p}><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></Svg>);

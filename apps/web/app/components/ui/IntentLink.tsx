@@ -34,7 +34,7 @@ export function IntentLink({ onFocus, onBlur, onMouseEnter, onMouseLeave, onTouc
   };
   const cancel = () => { clear(); setReady(false); };
   useEffect(() => { cancel(); return clear; }, [props.to]);
-  return <><Link {...props} reloadDocument={!!ACCESS || props.reloadDocument} prefetch={shouldPrefetch ? "render" : "none"}
+  return <><Link {...props} prefetch={shouldPrefetch ? "render" : "none"}
     onFocus={(e) => { onFocus?.(e); if (!e.defaultPrevented) start(); }}
     onBlur={(e) => { onBlur?.(e); cancel(); }}
     onMouseEnter={(e) => { onMouseEnter?.(e); if (!e.defaultPrevented) start(); }}

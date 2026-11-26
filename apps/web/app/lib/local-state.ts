@@ -333,12 +333,17 @@ const LAST_PAGE_KEY = "aihot:last-page";
 const NOT_A_PLACE = /^\/(feedback|more)(\/|$)|^\/admin(\/|$)/;
 
 /** Called on every in-site navigation: remembers the latest real page, never feedback, "更多" or the admin. */
+// An internal site stores nothing in the browser: there the last page is kept for this document only.
+let lastPageHere: string | null = null;
+
 export function rememberPage(path: string) {
-  if (!NOT_A_PLACE.test(path)) writeRaw(LAST_PAGE_KEY, path, "session");
+  if (NOT_A_PLACE.test(path)) return;
+  if (ACCESS) lastPageHere = path;
+  else writeRaw(LAST_PAGE_KEY, path, "session");
 }
 
 export function lastPage(): string | null {
-  const v = readRaw(LAST_PAGE_KEY, "session");
+  const v = ACCESS ? lastPageHere : readRaw(LAST_PAGE_KEY, "session");
   return v && v.startsWith("/") && !v.startsWith("//") ? v : null;
 }
 
