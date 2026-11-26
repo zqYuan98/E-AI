@@ -5,6 +5,7 @@ import { CATEGORY_KEYS, CATEGORY_LABELS } from "@aihot/contracts/taxonomy";
 import type { Route } from "./+types/content-item";
 import type { AdminContentChain } from "@aihot/contracts/admin";
 import { adminGet } from "../../lib/admin.server";
+import { ACCESS } from "../../lib/access";
 import { useAdminAction } from "../../features/admin/action";
 import { bj, money } from "../../features/admin/format";
 import { KIND_LABEL, MODE_LABEL, VISIBILITY_LABEL } from "../../features/admin/labels";
@@ -84,7 +85,8 @@ export default function ContentItem({ loaderData }: Route.ComponentProps) {
       actions={
         <>
           <Button onClick={() => { setVisibility(p?.visibility ?? "public"); setDialog("visibility"); }}>公开范围</Button>
-          {p && <Button onClick={() => setDialog("seo")}>{p.indexable ? "取消收录" : "标记收录"}</Button>}
+          {/* An internal site is never indexed and submits nothing to search engines: no switch for it. */}
+          {p && !ACCESS && <Button onClick={() => setDialog("seo")}>{p.indexable ? "取消收录" : "标记收录"}</Button>}
           <Button onClick={openOverride}>人工修正</Button>
           <Button onClick={() => setDialog("analyze")}>重新评估</Button>
         </>
@@ -182,7 +184,7 @@ export default function ContentItem({ loaderData }: Route.ComponentProps) {
                     [
                       "正文展示",
                       `${p.body_mode}${p.syndicate ? " · 对外可带全文" : ""}${
-                        p.indexable ? (p.seo_indexed_at ? " · 可收录（手动标记）" : " · 可收录（精选自动）") : p.seo_excluded_at ? " · 不收录（手动排除）" : " · 不收录"
+                        ACCESS ? "" : p.indexable ? (p.seo_indexed_at ? " · 可收录（手动标记）" : " · 可收录（精选自动）") : p.seo_excluded_at ? " · 不收录（手动排除）" : " · 不收录"
                       }`,
                     ],
                   ]}
