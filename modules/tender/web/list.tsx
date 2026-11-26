@@ -124,7 +124,7 @@ export default function TenderList() {
         <Form method="get" action="/procurement" preventScrollReset className="flex gap-2">
           {KEYS.filter((k) => k !== "q" && params.get(k)).map((k) => <input key={k} type="hidden" name={k} value={params.get(k)!} />)}
           <input
-            type="search" name="q" defaultValue={data.q ?? ""} maxLength={40} placeholder="搜标题、采购人或中标人，例如 布控球、国网宁夏"
+            key={data.q ?? ""} type="search" name="q" defaultValue={data.q ?? ""} maxLength={40} placeholder="搜标题、采购人或中标人，例如 布控球、国网宁夏"
             className="h-9 min-w-0 flex-1 rounded-full border border-line bg-surface px-4 text-[13.5px] text-ink outline-none focus:border-accent"
           />
           <button type="submit" className="h-9 shrink-0 rounded-full border border-line bg-surface px-4 text-[13px] text-ink-2 hover:text-accent">搜索</button>

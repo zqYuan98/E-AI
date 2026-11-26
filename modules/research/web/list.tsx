@@ -71,7 +71,7 @@ export default function ResearchList() {
       <div className="mt-4 space-y-2.5">
         <Form method="get" action="/research" preventScrollReset className="flex gap-2">
           {current && <input type="hidden" name="topic" value={current} />}
-          <input type="search" name="q" defaultValue={params.get("q") ?? ""} maxLength={40} placeholder="搜标题、机构、摘要或要点，例如 虚拟电厂、算力"
+          <input key={params.get("q") ?? ""} type="search" name="q" defaultValue={params.get("q") ?? ""} maxLength={40} placeholder="搜标题、机构、摘要或要点，例如 虚拟电厂、算力"
             className="h-9 min-w-0 flex-1 rounded-full border border-line bg-surface px-4 text-[13.5px] text-ink outline-none focus:border-accent" />
           <button type="submit" className="h-9 shrink-0 rounded-full border border-line bg-surface px-4 text-[13px] text-ink-2 hover:text-accent">搜索</button>
         </Form>

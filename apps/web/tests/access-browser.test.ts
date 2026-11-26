@@ -168,6 +168,52 @@ test("dual-cookie admin creates, resets and disables members using the admin CSR
 });
 
 
+test("the router's record of visited paths never reaches storage; a shown password is cleared when the page goes away", async () => {
+  rows = [];
+  const ctx = await context(chrome);
+  try {
+    const page = await login(ctx);
+    await page.goto(web.origin + "/more");
+    await page.getByRole("link", { name: "意见反馈" }).click();
+    await expect(page).toHaveURL(web.origin + "/feedback");
+    await page.locator("aside").getByRole("button", { name: "退出登录", exact: true }).click();
+    await expect(page).toHaveURL(/\/login/);
+    assert.equal(await page.evaluate(() => sessionStorage.getItem("remix-router-transitions")), null);
+
+    await login(ctx);
+    await ctx.addCookies([{ name: "aihot_admin", value: "fixture-admin", url: web.origin, httpOnly: true, sameSite: "Lax" }]);
+    const admin = await ctx.newPage();
+    await admin.goto(web.origin + "/admin/access");
+    await admin.getByLabel("初始密码", { exact: false }).fill("sensitive-shown-password");
+    await admin.getByRole("button", { name: "显示", exact: true }).click();
+    await expect(admin.getByLabel("初始密码", { exact: false })).toHaveAttribute("type", "text");
+    await admin.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted: true })));
+    assert.equal(await admin.evaluate(() => document.querySelector<HTMLInputElement>('input[name="password"]')!.value), "");
+  } finally { await ctx.close(); }
+});
+
+test("a sign-in change elsewhere covers the page until it is checked; a quick switch to another window does not", async () => {
+  const ctx = await context(chrome);
+  try {
+    const page = await login(ctx);
+    const paused = () => page.evaluate(() => document.documentElement.hasAttribute("data-access-paused"));
+    const coveredAtOnce = await page.evaluate(() => {
+      window.dispatchEvent(new StorageEvent("storage", { key: "aihot:access-epoch", newValue: "elsewhere" }));
+      return document.documentElement.hasAttribute("data-access-paused");
+    });
+    assert.equal(coveredAtOnce, true);
+    await expect.poll(paused).toBe(false);
+    const flickered = await page.evaluate(() => {
+      const state = (value: string) => Object.defineProperty(document, "visibilityState", { configurable: true, get: () => value });
+      state("hidden"); document.dispatchEvent(new Event("visibilitychange"));
+      state("visible"); document.dispatchEvent(new Event("visibilitychange"));
+      return document.documentElement.hasAttribute("data-access-paused");
+    });
+    assert.equal(flickered, false);
+    await expect(page.getByRole("region", { name: "当前成员" })).toContainText("成员甲");
+  } finally { await ctx.close(); }
+});
+
 test("a delayed business response cannot repopulate a revoked document", async () => {
   const ctx = await context(chrome);
   try {

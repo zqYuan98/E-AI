@@ -26,7 +26,8 @@ function Account({ place }: { place: "sidebar" | "more" }) {
   const member = principal.kind === "member";
   const actions = (
     <>
-      {member ? <Link to="/account" className="hover:text-ink">修改密码</Link> : <Link to="/admin" className="hover:text-ink">进入后台</Link>}
+      {/* The admin is another sign-in: a new document there checks the admin's session from the start. */}
+      {member ? <Link to="/account" className="hover:text-ink">修改密码</Link> : <Link to="/admin" reloadDocument className="hover:text-ink">进入后台</Link>}
       <button type="button" disabled={busy} onClick={logout} className="hover:text-ink disabled:opacity-50">{busy ? "正在退出…" : "退出登录"}</button>
     </>
   );

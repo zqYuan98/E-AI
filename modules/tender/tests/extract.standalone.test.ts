@@ -154,3 +154,29 @@ test("时刻：下午换算成 24 小时制；只写日期的按当天结束；�
   assert.equal(bj(run("某项目招标公告", "投标截止时间：2026-12-03").deadline), "2026-12-03 23:59");
   assert.equal(run("某项目招标公告", "投标截止时间：2026年2月30日 9:00").deadline, null);
 });
+
+test("时刻整段认：秒、句号结尾、中午、无效时刻、“时”后面隔空格的条款编号", () => {
+  const exact = (m: Moment | null) => m && new Date(new Date(m.value).getTime() + 8 * 3600_000).toISOString().slice(0, 19).replace("T", " ");
+  assert.equal(bj(run("某项目招标公告", "投标截止时间：2026年12月17日 18:45. 交电子文件").deadline), "2026-12-17 18:45");
+  assert.equal(exact(run("某项目招标公告", "投标截止时间：2026年12月17日 10:30:45（北京时间）").deadline), "2026-12-17 10:30:45");
+  assert.equal(bj(run("某项目招标公告", "投标截止时间：2026年12月17日 中午1点").deadline), "2026-12-17 13:00");
+  assert.equal(run("某项目招标公告", "投标截止时间：2026年12月17日 24:30").deadline, null, "不成立的时刻不认");
+  assert.equal(bj(run("某项目招标公告", "获取文件截止时间：2026年12月17日 17时 4 文件获取").signup), "2026-12-17 17:00");
+});
+
+test("更正隔着分号也取新的；“详见附件，开标时间：…”不把开标时间当投标截止", () => {
+  const changed = run("某项目变更公告", "原投标截止时间：2026-12-17 10:00；现变更为2026-12-18 15:00。");
+  assert.equal(bj(changed.deadline), "2026-12-18 15:00");
+  const opening = run("某项目招标公告", "投标截止时间：详见附件，开标时间：2026年12月17日 11:00。");
+  assert.equal(opening.deadline?.label, "开标", "如实标成开标时间");
+  assert.equal(bj(opening.deadline), "2026-12-17 11:00");
+});
+
+test("金额要整段读完：拆开的数字、百分比、数量、外币和区间都不当成一个人民币金额；引文不带出后面的联系人", () => {
+  for (const text of ["预算金额（万元）：1 200。", "预算金额（元）：123.45%。", "预算金额（万元）：1000个。", "预算金额：100万美元。", "预算金额（万元）：120-150万元。"]) {
+    assert.equal(run("某项目招标公告", text).amount, null, text);
+  }
+  const f = run("某项目招标公告", "预算金额：100万元，联系人李雷，电话0951-0000000。");
+  assert.equal(f.amount?.value, 1_000_000);
+  assert.doesNotMatch(f.amount!.quote, /李雷|电话/);
+});

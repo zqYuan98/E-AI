@@ -102,3 +102,42 @@ test("条目页：招采类公开条目带上“标讯要素”，撤回的和�
   await sql`UPDATE publications SET category = 'industry' WHERE article_id = ${soon}`;
   assert.equal(await tenderFactsFor(soon), null, "改了类别就不再当标讯展示");
 });
+
+test("改了标签（或信源名）会重新认：阶段跟着变", async () => {
+  const id = await notice("retag", `关于开展数字化能力建设工作的通知 ${T}`, `请各单位于${cn(8).replace(/ 9时30分$/, "")}前报送材料。`);
+  while ((await extractPending(50)).extracted > 0) { /* drain */ }
+  const before = await sql<{ stage: string | null }[]>`SELECT stage FROM tender_facts WHERE article_id = ${id}`;
+  assert.equal(before[0]?.stage, null);
+  await sql`UPDATE publications SET tags = ${["申报通知"]} WHERE article_id = ${id}`;
+  assert.equal((await extractPending(50)).extracted, 1, "标签变了，重新认");
+  const after = await sql<{ stage: string | null }[]>`SELECT stage FROM tender_facts WHERE article_id = ${id}`;
+  assert.equal(after[0]?.stage, "call");
+});
+
+test("已截止的另列一页：没截止的占满一页时，展开后照样看得到已截止的", async () => {
+  const key = `bulk-${T}`;
+  const at = new Date();
+  await sql`INSERT INTO articles (id, source_id, identity_key, url, title, body_text, body_status, published_at, timeline_at, discovered_at)
+    SELECT ${key} || '-' || i, ${SOURCE}, ${key} || '-' || i, 'https://example.org/' || ${key} || '-' || i, ${key} || ' 招标公告 ' || i, '正文', 'ok', ${at}, ${at}, ${at}
+    FROM generate_series(1, 201) AS i`;
+  await sql`INSERT INTO publications (article_id, source_id, title, summary, url, published_at, timeline_at, discovered_at, sort_at, eligible, channel, category)
+    SELECT id, source_id, title, '摘要', url, published_at, timeline_at, discovered_at, timeline_at, true, 'news', 'procurement' FROM articles WHERE id LIKE ${`${key}-%`}`;
+  const deadline = (days: number) => ({ deadline: { value: new Date(at.getTime() + days * DAY).toISOString(), day: false, label: "投标截止", quote: "投标截止时间" } });
+  await sql`INSERT INTO tender_facts (article_id, revision, version, basis, stage, region, deadline_at, facts)
+    SELECT id, 1, 999, 'fixed', 'tender', NULL, ${new Date(at.getTime() + 5 * DAY)}, ${sql.json({ stage: "tender", ...deadline(5), signup: null, amount: null, purchaser: null, agent: null, winner: null, projectNo: null, region: null } as never)}
+    FROM articles WHERE id LIKE ${`${key}-%`} AND id <> ${`${key}-201`}`;
+  await sql`INSERT INTO tender_facts (article_id, revision, version, basis, stage, region, deadline_at, facts)
+    VALUES (${`${key}-201`}, 1, 999, 'fixed', 'tender', NULL, ${new Date(at.getTime() - DAY)}, ${sql.json({ stage: "tender", ...deadline(-1), signup: null, amount: null, purchaser: null, agent: null, winner: null, projectNo: null, region: null } as never)})`;
+  const closed = await listTenders({ q: key });
+  assert.equal(closed.rows.length, 200);
+  assert.equal(closed.hiddenPast, 1);
+  const shown = await listTenders({ q: key, past: "1" });
+  assert.ok(shown.rows.some((r) => r.id === `${key}-201`), "展开后看得到那一条已截止的");
+});
+
+test("重复的查询参数取第一个，和网页一致，不报错", async () => {
+  const list = await listTenders({ q: [T, "另一个词"], region: ["宁夏", "广东"], view: ["open", "result"] });
+  assert.equal(list.q, T);
+  assert.equal(list.region, "宁夏");
+  assert.equal(list.view, "open");
+});

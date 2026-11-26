@@ -11,7 +11,7 @@ export const tender: ServerModule = {
   item: (articleId) => tenderFactsFor(articleId),
   http: (app) => {
     app.get("/api/site/procurement", async (req, reply) => {
-      const q = req.query as Record<string, string | undefined>;
+      const q = req.query as Record<string, unknown>;
       // Countdowns move: a minute at most.
       reply.header("cache-control", "public, max-age=60, s-maxage=60");
       return listTenders({ view: q.view, region: q.region, q: q.q, past: q.past });

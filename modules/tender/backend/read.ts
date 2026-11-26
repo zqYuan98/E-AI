@@ -14,16 +14,21 @@ const UNKNOWN_OPEN_DAYS = 21;
 /** 各视图往回看多少天。 */
 const WINDOW_DAYS = 90;
 const PAGE = 200;
+/** 已截止的另列一页，不和没截止的争同一个上限。 */
+const PAST_PAGE = 100;
 const DAY = 86_400_000;
 
-export interface TenderFilters { view?: string; region?: string; q?: string; past?: string }
+/** The query as the api received it: a repeated parameter arrives as a list and counts as its first value, as on the page. */
+export interface TenderFilters { view?: unknown; region?: unknown; q?: unknown; past?: unknown }
+const first = (v: unknown): string | undefined => (typeof v === "string" ? v : Array.isArray(v) && typeof v[0] === "string" ? v[0] : undefined);
 
 interface Row {
   id: string; title: string; url: string; source_name: string; published_at: Date | null; timeline_at: Date; selected: boolean;
   facts: TenderFacts;
 }
 
-export async function listTenders(f: TenderFilters, now = new Date()): Promise<TenderListResponse> {
+export async function listTenders(filters: TenderFilters, now = new Date()): Promise<TenderListResponse> {
+  const f = { view: first(filters.view), region: first(filters.region), q: first(filters.q), past: first(filters.past) };
   const view: TenderView = (VIEWS as readonly string[]).includes(f.view ?? "") ? f.view as TenderView : "open";
   const region = f.region === FOCUS ? FOCUS : f.region?.trim().slice(0, 12) || null;
   const q = f.q?.trim().slice(0, 40) || null;
@@ -60,14 +65,17 @@ export async function listTenders(f: TenderFilters, now = new Date()): Promise<T
   const regions = await sql<Array<{ region: string; count: number }>>`
     SELECT t.region, count(*)::int AS count ${base} AND ${inView(view)} ${timed(view) && !past ? sql`AND ${open}` : sql``} AND t.region IS NOT NULL ${qCondition}
     GROUP BY t.region`;
-  const order = timed(view)
-    ? sql`ORDER BY ${open} DESC, CASE WHEN ${open} THEN t.deadline_at END ASC NULLS LAST, CASE WHEN NOT ${open} THEN t.deadline_at END DESC NULLS LAST, ${at} DESC, p.article_id`
-    : sql`ORDER BY ${at} DESC, p.article_id`;
-  const rows = await sql<Row[]>`
-    SELECT p.article_id AS id, p.title, p.url, s.name AS source_name, p.published_at, p.timeline_at, p.selected, t.facts
-    ${base} AND ${inView(view)} ${timed(view) && !past ? sql`AND ${open}` : sql``} ${regionCondition} ${qCondition}
-    ${order}
-    LIMIT ${PAGE}`;
+  const columns = sql`SELECT p.article_id AS id, p.title, p.url, s.name AS source_name, p.published_at, p.timeline_at, p.selected, t.facts`;
+  const rows = timed(view)
+    ? await sql<Row[]>`${columns} ${base} AND ${inView(view)} AND ${open} ${regionCondition} ${qCondition}
+        ORDER BY t.deadline_at ASC NULLS LAST, ${at} DESC, p.article_id LIMIT ${PAGE}`
+    : await sql<Row[]>`${columns} ${base} AND ${inView(view)} ${regionCondition} ${qCondition}
+        ORDER BY ${at} DESC, p.article_id LIMIT ${PAGE}`;
+  // Expired notices follow, latest deadline first, on a page of their own.
+  if (timed(view) && past) {
+    rows.push(...await sql<Row[]>`${columns} ${base} AND ${inView(view)} AND NOT ${open} ${regionCondition} ${qCondition}
+      ORDER BY t.deadline_at DESC NULLS LAST, ${at} DESC, p.article_id LIMIT ${PAST_PAGE}`);
+  }
 
   const focus = new Set(FOCUS_REGIONS);
   return {

@@ -8,7 +8,7 @@ import type { Moment, Quoted, TenderFacts, TenderStage } from "../types.ts";
 
 export type { Moment, Quoted, TenderFacts, TenderStage };
 
-export const EXTRACTOR_VERSION = 1;
+export const EXTRACTOR_VERSION = 2;
 
 export interface TenderInput {
   /** 原文标题（不是改写后的标题）。 */
@@ -35,27 +35,46 @@ const anyOf = (words: readonly string[]) => `(?:${words.map(spaced).join("|")})`
 
 // ── 日期 ────────────────────────────────────────────────────────────────────────────────
 
-// 数字之间也可能夹一个空格：“202 6 年 1 2 月 1 7 日”。
+// 数字之间也可能夹一个空格：“202 6 年 1 2 月 1 7 日”“09 时00分”。
 const N2 = "\\d(?:\\s?\\d)?";
 const YEAR = "2\\s?0\\s?\\d\\s?\\d";
+// 时刻整段认下来再解析（clock）：“09:30”“10:30:45”“9时30分”“10时整”“17时30”。“时”后面隔着空格的数字只有带“分”才算
+// 分钟：“17时 4.2 文件获取”“17时 4 文件获取”里的 4 是条款编号。
+const TIME = `(${N2}\\s*[:：]\\s*\\d\\s?\\d(?!\\d)(?:\\s*[:：]\\s*\\d\\s?\\d(?!\\d))?|${N2}\\s*[时点](?:\\s*${N2}\\s*分(?:\\s*${N2}\\s*秒)?|\\s*整|\\s*半|\\d\\d(?!\\d))?)`;
 const DATE = `(${YEAR})\\s*(?:年|-|/|\\.)\\s*(${N2})\\s*(?:月|-|/|\\.)\\s*(${N2})(?!\\d)\\s*日?`
   + "(?:\\s*[（(](?:星期|周)[^）)]{1,3}[）)])?"
   + "(?:\\s*(上午|下午|中午|晚上))?"
-  // 分钟后面要么是“分”“秒”或秒数，要么是括号、空白后的文字：“17时 4.2 文件获取”里的 4 是条款编号，不是分钟。
-  + `(?:\\s*(${N2})\\s*(?:[:：]|时|点)\\s*(?:(${N2})(?=\\s*分|\\s*秒|\\s*[:：]\\s*\\d|\\s*[（(]|\\s*$|\\s+[^\\d.\\s]|[^\\d.\\s])\\s*分?)?(?:\\s*[:：]\\s*\\d\\s?\\d|\\s*\\d\\s?\\d\\s*秒)?)?`;
+  + `(?:\\s*${TIME})?`;
+/** DATE 的捕获组：年、月、日、上下午、时刻。日期总是一个匹配的最后这几组。 */
+const DATE_GROUPS = 5;
 const digits = (s: string | undefined) => (s ?? "").replace(/\s/g, "");
 
-/** 一个日期匹配换成北京时间的时刻；不成立的日期给 null。 */
+/** “09:30”“10时整”“下午2:30”换成时、分、秒；不成立的时刻给 null，没写时刻给 undefined。 */
+function clock(token: string | undefined, half: string | undefined): { h: number; m: number; s: number } | null | undefined {
+  if (!token) return undefined;
+  const t = digits(token);
+  const colon = /^(\d{1,2})[:：](\d{2})(?:[:：](\d{2}))?$/.exec(t);
+  const word = colon ? null : /^(\d{1,2})[时点](?:(\d{1,2})分(?:(\d{1,2})秒)?|(整)|(半)|(\d{2}))?$/.exec(t);
+  let h: number, m: number, s: number;
+  if (colon) [h, m, s] = [Number(colon[1]), Number(colon[2]), Number(colon[3] ?? 0)];
+  else if (word) [h, m, s] = [Number(word[1]), word[5] ? 30 : Number(word[2] ?? word[6] ?? 0), Number(word[3] ?? 0)];
+  else return null;
+  if ((half === "下午" || half === "晚上") && h < 12) h += 12;
+  // 中午 1 点是 13 点，中午 12 点还是 12 点。
+  if (half === "中午" && h < 11) h += 12;
+  // 24:00 是当天结束；24:30 之类不成立。
+  if (h === 24 && m === 0 && s === 0) return { h, m, s };
+  return h > 23 || m > 59 || s > 59 ? null : { h, m, s };
+}
+
+/** 一个日期匹配换成北京时间的时刻；不成立的日期或时刻给 null。 */
 function moment(m: RegExpExecArray, at = 1): { iso: string; day: boolean; ms: number } | null {
   const y = Number(digits(m[at])), mo = Number(digits(m[at + 1])), d = Number(digits(m[at + 2]));
-  const half = m[at + 3];
-  let h = m[at + 4] === undefined ? null : Number(digits(m[at + 4]));
-  const min = m[at + 5] === undefined ? 0 : Number(digits(m[at + 5]));
   if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
-  if (h !== null && (half === "下午" || half === "晚上") && h < 12) h += 12;
-  if (h !== null && (h > 24 || min > 59)) return null;
-  const day = h === null;
-  const ms = day || h === 24 ? Date.UTC(y, mo - 1, d, 23 - 8, 59, 59) : Date.UTC(y, mo - 1, d, h! - 8, min);
+  const c = clock(m[at + 4], m[at + 3]);
+  if (c === null) return null;
+  const day = c === undefined;
+  const ms = !c || c.h === 24 ? Date.UTC(y, mo - 1, d, 23 - 8, 59, 59) : Date.UTC(y, mo - 1, d, c.h - 8, c.m, c.s);
   const check = new Date(ms + 8 * 3600_000);
   if (check.getUTCDate() !== d) return null; // 2 月 30 日之类
   return { iso: new Date(ms).toISOString(), day, ms };
@@ -68,9 +87,9 @@ function plausible(ms: number, publishedAt: Date | null | undefined): boolean {
   return year >= 2020 && year <= 2040;
 }
 
-/** 原文片段：从标签开始，到值后面一点，最长 90 字。 */
+/** 原文片段：从标签开始，到认出的值为止（不往后多带字，免得带出紧跟着的联系人），最长 90 字。 */
 function quoteOf(text: string, start: number, end: number): string {
-  const s = text.slice(start, Math.min(text.length, Math.max(end, start) + 6)).trim();
+  const s = text.slice(start, Math.max(end, start)).trim();
   return s.length > 90 ? `${s.slice(0, 89)}…` : s;
 }
 
@@ -99,20 +118,21 @@ const SIGNUP_LABEL = new RegExp(
   ].join("|"),
   "g",
 );
-const CHANGED_TO = new RegExp(`^[^。；;]{0,30}?(?:延期|延长|推迟|顺延|变更|调整|更改|改)\\s*(?:至|为|到)\\s*${DATE}`);
+// 更正：“延期至 / 变更为 / 现为 新日期”，可以隔着分号接在旧日期后面（“原截止时间：A；现变更为 B”）。
+const CHANGED_TO = new RegExp(`^[^。]{0,40}?(?:延期|延长|推迟|顺延|变更|调整|更改|改|现)\\s*(?:至|为|到)\\s*${DATE}`);
+// 标签和日期之间隔着别的字段（“详见附件，开标时间：…”），这个日期就不是这个标签的。
+const OTHER_FIELD = /详见|见附件|[，,；;]\s*(?:开标|开启|获取|报名|澄清|答疑|踏勘|递交|提交|公示|发布)/;
 const RANGE_END = new RegExp(`^[^。；;]{0,24}?${DATE}[^。；;\\d]{0,12}?(?:至|到|—|–|~|～|-)\\s*${DATE}`);
 
-/** 标签后面紧跟的第一个日期（同一句里，40 字以内）；后面写了“延期至/变更为 新日期”的取新日期。 */
+/** 标签后面紧跟的第一个日期（同一句里，40 字以内，中间不隔别的字段）；后面写了“延期至 / 变更为 新日期”的取新日期。 */
 function dateAfter(text: string, labelEnd: number): RegExpExecArray | null {
-  const window = text.slice(labelEnd, labelEnd + 60);
-  const m = new RegExp(`^[^。；;]{0,40}?${DATE}`).exec(window);
-  if (!m) return null;
+  const window = text.slice(labelEnd, labelEnd + 140);
+  const m = new RegExp(`^([^。；;]{0,40}?)${DATE}`).exec(window);
+  if (!m || OTHER_FIELD.test(m[1]!)) return null;
   const changed = CHANGED_TO.exec(window.slice(m[0].length));
   if (changed) {
-    const shift = m[0].length;
-    const out = changed as RegExpExecArray;
-    out.index = labelEnd + shift + changed.index;
-    return out;
+    changed.index = labelEnd + m[0].length;
+    return changed;
   }
   m.index = labelEnd;
   return m;
@@ -124,7 +144,7 @@ function firstMoment(text: string, labels: RegExp, label: (raw: string) => strin
     if (skip?.test(before)) continue;
     const m = dateAfter(text, l.index! + l[0].length);
     if (!m) continue;
-    const t = moment(m, m.length - 6);
+    const t = moment(m, m.length - DATE_GROUPS);
     if (!t || !plausible(t.ms, publishedAt)) continue;
     return { value: t.iso, day: t.day, label: label(l[0]), quote: quoteOf(text, l.index!, m.index + m[0].length) };
   }
@@ -164,8 +184,8 @@ function signupDeadline(text: string, publishedAt: Date | null | undefined): Mom
     if (range) m = range;
     else if (/截止/.test(l[0]) || /^[^。；;]{0,6}截止/.test(window)) m = dateAfter(text, end);
     if (!m) continue;
-    // 日期总在匹配的最后六组：范围取后一个日期。
-    const t = moment(m, m.length - 6);
+    // 范围取后一个日期（日期总是匹配的最后几组）。
+    const t = moment(m, m.length - DATE_GROUPS);
     if (!t || !plausible(t.ms, publishedAt)) continue;
     const quoteEnd = range ? end + range[0].length : m.index + m[0].length;
     return { value: t.iso, day: t.day, label: /报名/.test(l[0]) ? "报名截止" : "获取文件截止", quote: quoteOf(text, l.index!, quoteEnd) };
@@ -177,9 +197,13 @@ function signupDeadline(text: string, publishedAt: Date | null | undefined): Mom
 
 const NUMBER = "(\\d{1,3}(?:[,，]\\d{3})+(?:\\.\\d+)?|\\d+(?:\\.\\d+)?)";
 const UNIT = "(亿元|万元|元|万)";
+// 数字到此为止，并且是一个人民币金额：后面不再连着数字或小数（“1 200”“123.45%”不能只认前半截），也不是百分比、
+// 数量、区间（“120-150万元”）或外币（“100万美元”）。
+const NUMBER_END = "(?![\\d.,，])(?!\\s\\d)"
+  + "(?!\\s*(?:[万亿]\\s*)?(?:美元|美金|欧元|日元|港元|港币|英镑|USD|EUR)|\\s*[%％年个天月日台套件次份项]|\\s*[-~～—至到]\\s*\\d)";
 // 标签后面紧跟金额：中间只能有单位括号、冒号、“为”和“人民币”“¥”。表头（“预计采购金额（万元） 最高投标限价…”）不算。
 const amountAfter = (label: string) => new RegExp(
-  `(${label})\\s*(?:[（(]\\s*${UNIT}\\s*[)）])?\\s*(?:[:：]|为|是|\\s)\\s*(?:人民币|RMB)?\\s*[¥￥]?\\s*${NUMBER}\\s*${UNIT}?(?!\\s*[%％年个天月日])`,
+  `(${label})\\s*(?:[（(]\\s*${UNIT}\\s*[)）])?\\s*(?:[:：]|为|是|\\s)\\s*(?:人民币|RMB)?\\s*[¥￥]?\\s*${NUMBER}${NUMBER_END}\\s*${UNIT}?`,
   "g",
 );
 const BUDGET = amountAfter(`${anyOf(["项目", "采购", "招标"])}?${spaced("预算")}${anyOf(["金额", "总金额", "总额", "价", "资金"])}?`);
@@ -255,9 +279,9 @@ const PURCHASER = ["采购人", "招标人", "采购单位", "招标单位", "�
 const AGENT = ["采购代理机构", "招标代理机构", "代理机构", "招标代理", "采购代理", "采购机构"];
 const WINNER = ["中标人", "中标单位", "中标供应商", "成交供应商", "成交人", "成交单位", "中选人", "中选单位", "第一中标候选人", "第一成交候选人", "第一候选人", "联合体牵头人"];
 
-const CANDIDATE = new RegExp(`${anyOf(["第一中标候选人", "第一成交候选人", "第一候选人"])}\\s*(?:[:：]|为)?\\s*${ORG}\\s*(?:${anyOf(["投标报价", "报价"])}\\s*[:：]?\\s*)?[¥￥]?\\s*${NUMBER}\\s*${UNIT}`);
+const CANDIDATE = new RegExp(`${anyOf(["第一中标候选人", "第一成交候选人", "第一候选人"])}\\s*(?:[:：]|为)?\\s*${ORG}\\s*(?:${anyOf(["投标报价", "报价"])}\\s*[:：]?\\s*)?[¥￥]?\\s*${NUMBER}${NUMBER_END}\\s*${UNIT}`);
 
-const CCGP_RESULT = new RegExp(`${spaced("供应商名称")}\\s+${spaced("供应商地址")}\\s+${anyOf(["中标（成交）金额", "中标(成交)金额", "中标金额", "成交金额"])}(?:\\s+${spaced("评审价格")})?\\s+${ORG}\\s+\\S{2,60}?\\s+[¥￥]?\\s*${NUMBER}\\s*${UNIT}`);
+const CCGP_RESULT = new RegExp(`${spaced("供应商名称")}\\s+${spaced("供应商地址")}\\s+${anyOf(["中标（成交）金额", "中标(成交)金额", "中标金额", "成交金额"])}(?:\\s+${spaced("评审价格")})?\\s+${ORG}\\s+\\S{2,60}?\\s+[¥￥]?\\s*${NUMBER}${NUMBER_END}\\s*${UNIT}`);
 
 /** 政府采购网结果公告里只有一个采购包时的供应商表；多个包各有中标人，只报一个会误导，就不报。 */
 function ccgpResult(text: string): { winner: string; amount: Quoted<number> } | null {

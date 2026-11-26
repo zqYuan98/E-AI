@@ -10,6 +10,7 @@ export const CATEGORY_KNOWN = (CATEGORY_KEYS as readonly string[]).includes(CATE
 
 interface Pending {
   article_id: string;
+  basis: string;
   title: string;
   text: string | null;
   revision: number;
@@ -21,24 +22,26 @@ interface Pending {
 /** 认一批（新的在前）；返回认了几篇。一次最多 limit 篇，剩下的下一轮接着认。 */
 export async function extractPending(limit = 300): Promise<{ extracted: number }> {
   if (!CATEGORY_KNOWN) return { extracted: 0 };
+  // The body is the article's revision; the title, the tags (the stage) and the source's name (the region) are the rest.
+  const basis = sql`md5(a.title || chr(31) || array_to_string(p.tags, chr(31)) || chr(31) || s.name)`;
   const rows = await sql<Pending[]>`
-    SELECT p.article_id, a.title, coalesce(a.body_text, a.excerpt) AS text, a.revision, a.published_at, s.name AS source_name, p.tags
+    SELECT p.article_id, ${basis} AS basis, a.title, coalesce(a.body_text, a.excerpt) AS text, a.revision, a.published_at, s.name AS source_name, p.tags
     FROM publications p
     JOIN articles a ON a.id = p.article_id
     JOIN sources s ON s.id = p.source_id
     LEFT JOIN tender_facts t ON t.article_id = p.article_id
     WHERE p.category = ${CATEGORY}
-      AND (t.article_id IS NULL OR t.revision <> a.revision OR t.version <> ${EXTRACTOR_VERSION})
+      AND (t.article_id IS NULL OR t.revision <> a.revision OR t.version <> ${EXTRACTOR_VERSION} OR t.basis <> ${basis})
     ORDER BY p.timeline_at DESC, p.article_id
     LIMIT ${limit}`;
   for (const r of rows) {
     // The article's own title, not the rewritten one: notice wording ("中标结果公告") decides the stage.
     const facts = extractTender({ title: r.title, text: r.text, sourceName: r.source_name, tags: r.tags, publishedAt: r.published_at });
     await sql`
-      INSERT INTO tender_facts (article_id, revision, version, stage, region, deadline_at, facts, extracted_at)
-      VALUES (${r.article_id}, ${r.revision}, ${EXTRACTOR_VERSION}, ${facts.stage}, ${facts.region}, ${facts.deadline?.value ?? null}, ${sql.json(facts as never)}, now())
+      INSERT INTO tender_facts (article_id, revision, version, basis, stage, region, deadline_at, facts, extracted_at)
+      VALUES (${r.article_id}, ${r.revision}, ${EXTRACTOR_VERSION}, ${r.basis}, ${facts.stage}, ${facts.region}, ${facts.deadline?.value ?? null}, ${sql.json(facts as never)}, now())
       ON CONFLICT (article_id) DO UPDATE SET
-        revision = EXCLUDED.revision, version = EXCLUDED.version, stage = EXCLUDED.stage, region = EXCLUDED.region,
+        revision = EXCLUDED.revision, version = EXCLUDED.version, basis = EXCLUDED.basis, stage = EXCLUDED.stage, region = EXCLUDED.region,
         deadline_at = EXCLUDED.deadline_at, facts = EXCLUDED.facts, extracted_at = now()`;
   }
   return { extracted: rows.length };
