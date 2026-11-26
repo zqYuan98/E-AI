@@ -1,5 +1,5 @@
 // 政策规划库：国家部委、两网和发电集团的规划、方案、意见等文件，每份一行，要素回原文核对。
-// 入库由定时任务做（backend/extract.ts），后台“政策库管理”登记的导入每分钟处理几条（backend/import.ts），页面只读库里已有的结果。
+// 入库由定时任务做（backend/extract.ts），后台“政策规划库管理”登记的导入每分钟处理几条（backend/import.ts），页面只读库里已有的结果。
 import type { ServerModule } from "@aihot/backend/modules";
 import { actorOf } from "@aihot/backend/admin/auth";
 import { adminHandler } from "../../apps/api/src/routes/admin-auth.ts";

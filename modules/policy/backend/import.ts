@@ -1,4 +1,4 @@
-// 政策文件的导入：读原文页正文，存成“政策规划·手动收录”信源的资料，再用模型抽取入库。后台“政策库管理”登记网址，
+// 政策文件的导入：读原文页正文，存成“政策规划·手动收录”信源的资料，再用模型抽取入库。后台“政策规划库管理”登记网址，
 // worker 每分钟处理几条（processImports）；命令行脚本 scripts/import.ts 直接调用同一套。
 import { readFileSync } from "node:fs";
 import * as cheerio from "cheerio";

@@ -44,6 +44,7 @@ const toForm = (p: Provider): ProviderForm => ({
   reasoningTokens: p.reasoningTokens ? String(p.reasoningTokens) : "", maxConcurrency: p.maxConcurrency ? String(p.maxConcurrency) : "", jsonMode: p.jsonMode, vision: p.vision, enabled: p.enabled,
 });
 const secs = (ms: number | null) => (ms == null ? "—" : ms >= 10_000 ? `${Math.round(ms / 1000)} s` : `${(ms / 1000).toFixed(1)} s`);
+type Check = { model: string; ok: boolean; ms: number; error: string | null };
 
 export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
   const { run, pending } = useAdminAction();
@@ -52,24 +53,25 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
   // Whole-site provider change: pick a model, test it, then move every step to it.
   const [all, setAll] = useState<string>(m.choices[0]?.key ?? "default");
   const [allOpen, setAllOpen] = useState(false);
-  const [checked, setChecked] = useState<{ model: string; ok: boolean; ms: number; error: string | null } | null>(null);
+  // The latest connectivity test of each model, shown where it was asked for (a provider's row, the whole-site card).
+  const [checks, setChecks] = useState<Record<string, Check>>({});
+  const checked = checks[all];
   // Providers entered on this page: add, edit, stop, remove.
   const [form, setForm] = useState<{ isNew: boolean; values: ProviderForm } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [toggling, setToggling] = useState<Provider | null>(null);
   const [removing, setRemoving] = useState<Provider | null>(null);
   const setField = <K extends keyof ProviderForm>(name: K, value: ProviderForm[K]) => setForm((f) => (f ? { ...f, values: { ...f.values, [name]: value } } : f));
-  const testModelKey = async (model: string) => {
-    setAll(model);
-    const r = await run<{ model: string; ok: boolean; ms: number; error: string | null }>("POST", "/api/admin/model-test", { model }, { label: "check", revalidate: false });
-    if (r) setChecked(r);
+  const testModel = async (model: string) => {
+    const r = await run<Check>("POST", "/api/admin/model-test", { model }, { label: `check-${model}`, revalidate: false });
+    if (r) setChecks((c) => ({ ...c, [model]: r }));
   };
   const labelOf = (key: string) => m.capabilities.find((c) => `capability:${c.key}` === key)?.label ?? key;
 
   return (
     <AdminPage
       title="模型与评测"
-      subtitle="每项能力当前用哪个模型、来自哪里（后台切换 > 环境变量 > 代码默认），以及近期的成功率、耗时与费用。切换只影响之后的新任务，已有结果不重算；换精选模型前先看 SelectBench 同批对比。"
+      subtitle="每项能力当前用哪个模型、来自哪里（后台切换 > 环境变量 > 代码默认），以及近期的成功率、耗时与费用。切换只影响之后的新任务，已有结果不重算；换精选模型前先看“精选评测”的同批对比。"
       actions={<FilterChips param="days" options={[{ value: "1", label: "24 小时" }, { value: "", label: "7 天" }, { value: "30", label: "30 天" }]} />}
     >
       <Card
@@ -97,14 +99,24 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
                 key: "a",
                 label: "",
                 align: "right",
-                render: (p) => (
-                  <span className="inline-flex gap-1.5">
-                    <Button size="sm" busy={pending === "check"} disabled={!p.enabled || !p.keyReadable} onClick={() => testModelKey(p.key)}>测试</Button>
-                    {p.source === "admin" && <Button size="sm" onClick={() => { setFormError(null); setForm({ isNew: false, values: toForm(p) }); }}>编辑</Button>}
-                    {p.source === "admin" && <Button size="sm" onClick={() => setToggling(p)}>{p.enabled ? "停用" : "启用"}</Button>}
-                    {p.source === "admin" && <Button size="sm" tone="danger" onClick={() => setRemoving(p)}>删除</Button>}
-                  </span>
-                ),
+                render: (p) => {
+                  const c = checks[p.key];
+                  return (
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="inline-flex gap-1.5">
+                        <Button size="sm" busy={pending === `check-${p.key}`} disabled={!p.enabled || !p.keyReadable} onClick={() => testModel(p.key)}>测试</Button>
+                        {p.source === "admin" && <Button size="sm" onClick={() => { setFormError(null); setForm({ isNew: false, values: toForm(p) }); }}>编辑</Button>}
+                        {p.source === "admin" && <Button size="sm" onClick={() => setToggling(p)}>{p.enabled ? "停用" : "启用"}</Button>}
+                        {p.source === "admin" && <Button size="sm" tone="danger" onClick={() => setRemoving(p)}>删除</Button>}
+                      </span>
+                      {c && (
+                        <span className={`line-clamp-2 max-w-[320px] text-[12px] ${c.ok ? "text-ok" : "text-hot"}`} title={c.error ?? undefined}>
+                          {c.ok ? `可用，耗时 ${secs(c.ms)}` : `调用失败：${c.error}`}
+                        </span>
+                      )}
+                    </div>
+                  );
+                },
               },
             ]}
           />
@@ -125,19 +137,17 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-[260px]">
             <Field label="模型">
-              <Select value={all} onChange={(e) => { setAll(e.target.value); setChecked(null); }}>
+              <Select value={all} onChange={(e) => setAll(e.target.value)}>
                 {m.choices.map((x) => <option key={x.key} value={x.key}>{x.key}（{x.service}）</option>)}
               </Select>
             </Field>
           </div>
-          <Button busy={pending === "check"} onClick={async () => { const r = await run<{ model: string; ok: boolean; ms: number; error: string | null }>("POST", "/api/admin/model-test", { model: all }, { label: "check", revalidate: false }); if (r) setChecked(r); }}>测试连通</Button>
-          <Button tone="primary" disabled={checked?.model !== all || !checked.ok} title={checked?.ok ? undefined : "先测试连通"} onClick={() => setAllOpen(true)}>全部步骤切换到它</Button>
+          <Button busy={pending === `check-${all}`} onClick={() => testModel(all)}>测试连通</Button>
+          <Button tone="primary" disabled={!checked?.ok} onClick={() => setAllOpen(true)}>全部步骤切换到它</Button>
         </div>
-        {checked && (
-          <p className={`mt-3 text-[13px] ${checked.ok ? "text-ink-2" : "text-hot"}`}>
-            {checked.ok ? `${checked.model} 可用，耗时 ${secs(checked.ms)}。` : `${checked.model} 调用失败：${checked.error}`}
-          </p>
-        )}
+        <p className={`mt-3 text-[13px] ${!checked ? "text-ink-4" : checked.ok ? "text-ink-2" : "text-hot"}`}>
+          {!checked ? "先“测试连通”，通过后才能全部步骤切换。" : checked.ok ? `${checked.model} 可用，耗时 ${secs(checked.ms)}。` : `${checked.model} 调用失败：${checked.error}`}
+        </p>
       </Card>
 
       <div className="grid gap-5">
@@ -229,7 +239,7 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
             <Empty>还没有在后台切换过模型</Empty>
           )}
         </Card>
-        <Card title="同批样本对比（SelectBench）" right={<Link to="/admin/selectbench" className="text-accent">全部运行</Link>} pad={false}>
+        <Card title="精选评测（同批样本对比）" right={<Link to="/admin/selectbench" className="text-accent">全部运行</Link>} pad={false}>
           {m.benches.length ? (
             <DataTable
               dense
@@ -342,7 +352,8 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
         open={!!removing}
         danger
         title={`删除：${removing?.label ?? ""}`}
-        description={removing?.usedBy.length ? `还有步骤在用它：${removing.usedBy.join("、")}。先把这些步骤切换到别的模型，才能删除。` : "删除后密钥也一并删除，不能恢复。"}
+        description={removing?.usedBy.length ? `现在还不能删除：这些步骤在用它（${removing.usedBy.join("、")}）。先在下面把它们切换到别的模型，再来删除。` : "删除后密钥也一并删除，不能恢复。"}
+        blocked={!!removing?.usedBy.length}
         confirmLabel="删除"
         busy={pending === "provider"}
         onClose={() => setRemoving(null)}

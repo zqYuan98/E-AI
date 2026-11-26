@@ -1,4 +1,4 @@
-// 后台“研报库管理”：单篇填写或批量导入（JSON），已有研报的隐藏和删除。同一个链接再导入就是更新。
+// 后台“研报库管理”：单篇填写或批量导入（JSON），已有研报的隐藏、恢复显示和删除。同一个链接再导入就是更新。
 import { useState } from "react";
 import { Link, useLoaderData, type LoaderFunctionArgs } from "react-router";
 import { adminGet } from "@aihot/web/lib/admin.server";
@@ -27,87 +27,110 @@ const EXAMPLE = `[
 ]`;
 
 const BLANK = { title: "", institution: "", date: "", url: "", summary: "", topics: "", points: "" };
+/** 服务端校验报错里的字段名（“url: …”），单篇填写时换成表单上的叫法。 */
+const FIELD: Record<string, string> = { title: "标题", institution: "机构", date: "发布日期", url: "原文链接", summary: "摘要", points: "要点", topics: "主题" };
+const required = (label: string) => <>{label} <span className="text-hot" aria-hidden>*</span></>;
+const ACTION_LABEL = { hide: "隐藏", show: "恢复显示", delete: "删除" } as const;
 
 export default function ResearchAdmin() {
   const { reports } = useLoaderData<typeof loader>();
   const { run, pending } = useAdminAction();
   const [json, setJson] = useState("");
   const [form, setForm] = useState(BLANK);
+  // 两边的结果各自显示在自己的按钮旁边：单篇的一行提示，批量的汇总和逐条原因。
+  const [one, setOne] = useState<{ ok: boolean; text: string } | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [jsonError, setJsonError] = useState<string | null>(null);
   const [action, setAction] = useState<{ kind: "hide" | "show" | "delete"; row: Row } | null>(null);
+  const [showHidden, setShowHidden] = useState(false);
+  const shown = reports.filter((r) => showHidden || !r.hidden);
+  const hiddenCount = reports.filter((r) => r.hidden).length;
 
-  const submit = async (items: unknown) => {
-    setError(null);
-    const r = await run<ImportResult>("POST", "/api/admin/research/import", { reports: items }, { label: "import" });
-    if (r) setResult(r);
-    return r;
-  };
+  const submit = (items: unknown, label: string) => run<ImportResult>("POST", "/api/admin/research/import", { reports: items }, { label });
   const importJson = async () => {
+    setJsonError(null);
+    setResult(null);
     let items: unknown;
-    try { items = JSON.parse(json); } catch { return setError("不是合法的 JSON，请检查括号和引号"); }
-    if ((await submit(items))?.errors.length === 0) setJson("");
+    try { items = JSON.parse(json); } catch { return setJsonError("不是合法的 JSON，请检查括号和引号"); }
+    const r = await submit(items, "import");
+    if (!r) return;
+    setResult(r);
+    if (r.errors.length === 0) setJson("");
   };
   // 单篇填写：要点每行一条，“概括｜原话”。
   const addOne = async () => {
+    setOne(null);
+    if (!/^https?:\/\/\S+$/.test(form.url.trim())) return setOne({ ok: false, text: "原文链接要以 http:// 或 https:// 开头" });
     const points = form.points.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l) => {
       const [text, ...quote] = l.split(/[｜|]/);
       return { text: text!.trim(), quote: quote.join("｜").trim() };
     });
-    if (points.some((p) => !p.quote)) return setError("要点每行写成“概括｜原话”，原话不能空");
+    if (points.some((p) => !p.quote)) return setOne({ ok: false, text: "要点每行写成“概括｜原话”，原话不能空" });
     const item = {
       title: form.title, institution: form.institution, date: form.date || null, url: form.url, summary: form.summary, points,
       topics: form.topics.split(/[,，、\s]+/).map((t) => t.trim()).filter(Boolean),
     };
-    if ((await submit([item]))?.errors.length === 0) setForm(BLANK);
+    const r = await submit([item], "one");
+    if (!r) return;
+    const bad = r.errors[0];
+    if (bad) {
+      const [path, ...rest] = bad.message.split(": ");
+      return setOne({ ok: false, text: `${FIELD[path!.split(".")[0]!] ?? path}：${rest.join(": ")}` });
+    }
+    setForm(BLANK);
+    setOne({ ok: true, text: r.updated ? "这个链接已有研报，已按刚填的内容更新" : "已保存" });
   };
-  const set = (k: keyof typeof BLANK) => (e: { target: { value: string } }) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const set = (k: keyof typeof BLANK) => (e: { target: { value: string } }) => {
+    setOne(null);
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+  };
 
   return (
     <AdminPage title="研报库管理" subtitle="录入研报的标题、机构、日期、摘要和带原话的要点，同事在站内浏览和搜索，点链接到研报网站看原文。不存 PDF 和全文；原话只摘一句，最长 200 字。">
       <div className="grid gap-5 xl:grid-cols-2">
         <Card title="单篇填写">
           <div className="space-y-3">
-            <Field label="标题"><Input value={form.title} onChange={set("title")} maxLength={300} /></Field>
+            <Field label={required("标题")}><Input value={form.title} onChange={set("title")} maxLength={300} required /></Field>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="机构"><Input value={form.institution} onChange={set("institution")} maxLength={100} /></Field>
               <Field label="发布日期"><Input type="date" value={form.date} onChange={set("date")} /></Field>
             </div>
-            <Field label="原文链接" hint="研报网站上这篇报告的页面地址"><Input value={form.url} onChange={set("url")} placeholder="https://www.djyanbao.com/…" /></Field>
+            <Field label={required("原文链接")} hint="研报网站上这篇报告的页面地址"><Input value={form.url} onChange={set("url")} placeholder="https://www.djyanbao.com/…" required /></Field>
             <Field label="摘要"><Textarea rows={3} value={form.summary} onChange={set("summary")} maxLength={800} /></Field>
             <Field label="要点（可选）" hint="每行一条：概括｜研报里的一句原话"><Textarea rows={4} value={form.points} onChange={set("points")} placeholder="2030 年虚拟电厂调节能力目标｜到2030年，全国虚拟电厂调节能力达到5000万千瓦以上" /></Field>
             <Field label="主题（可选）" hint={`逗号分隔，常用：${RESEARCH_TOPICS.join("、")}`}><Input value={form.topics} onChange={set("topics")} /></Field>
-            <Button tone="primary" busy={pending === "import"} disabled={!form.title.trim() || !form.url.trim()} onClick={addOne}>保存</Button>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button tone="primary" busy={pending === "one"} disabled={!form.title.trim() || !form.url.trim()} onClick={addOne}>保存</Button>
+              {one ? (
+                <p role={one.ok ? "status" : "alert"} className={`text-[13px] ${one.ok ? "text-ok" : "text-hot"}`}>{one.text}</p>
+              ) : (
+                (!form.title.trim() || !form.url.trim()) && <p className="text-[12.5px] text-ink-4">填好带 * 的标题和原文链接就能保存</p>
+              )}
+            </div>
           </div>
         </Card>
         <Card title="批量导入（JSON）">
           <p className="mb-3 text-[13px] leading-6 text-ink-3">一次最多 200 篇。不合格的会逐条列出原因，其余照常保存；同一个链接再导入就是更新。</p>
-          <Textarea rows={14} value={json} onChange={(e) => setJson(e.target.value)} placeholder={EXAMPLE} className="font-mono text-[12px]" />
-          <div className="mt-3"><Button tone="primary" busy={pending === "import"} disabled={!json.trim()} onClick={importJson}>导入</Button></div>
+          <Textarea rows={14} value={json} onChange={(e) => { setJson(e.target.value); setJsonError(null); }} placeholder={EXAMPLE} className="font-mono text-[12px]" />
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <Button tone="primary" busy={pending === "import"} disabled={!json.trim()} onClick={importJson}>导入</Button>
+            {jsonError && <p role="alert" className="text-[13px] text-hot">{jsonError}</p>}
+            {result && <p role="status" className="text-[13px] text-ink-2">新增 {result.created} 篇，更新 {result.updated} 篇{result.errors.length ? `，${result.errors.length} 篇没导入：` : "。"}</p>}
+          </div>
+          {result && result.errors.length > 0 && (
+            <ul className="mt-2 space-y-1 text-[12.5px] text-hot">
+              {result.errors.map((e) => <li key={e.index}>第 {e.index + 1} 篇{e.title ? `《${e.title}》` : ""}：{e.message}</li>)}
+            </ul>
+          )}
         </Card>
       </div>
 
-      {(error || result) && (
-        <Card className="mt-5" title="导入结果">
-          {error && <p role="alert" className="text-[13px] text-hot">{error}</p>}
-          {result && (
-            <>
-              <p className="text-[13px] text-ink-2">新增 {result.created} 篇，更新 {result.updated} 篇{result.errors.length ? `，${result.errors.length} 篇没导入：` : "。"}</p>
-              {result.errors.length > 0 && (
-                <ul className="mt-2 space-y-1 text-[12.5px] text-hot">
-                  {result.errors.map((e) => <li key={e.index}>第 {e.index + 1} 篇{e.title ? `《${e.title}》` : ""}：{e.message}</li>)}
-                </ul>
-              )}
-            </>
-          )}
-        </Card>
-      )}
-
-      <Card className="mt-5" title={`研报（${reports.length}）`} pad={false}>
-        {reports.length ? (
+      <Card className="mt-5" title={`研报（${reports.length - hiddenCount}${hiddenCount ? ` · 已隐藏 ${hiddenCount}` : ""}）`} pad={false}
+        right={hiddenCount > 0 && <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} />显示已隐藏</label>}>
+        {shown.length ? (
           <DataTable
             dense
-            rows={reports}
+            rows={shown}
             rowKey={(r) => r.id}
             columns={[
               { key: "t", label: "研报", render: (r) => <div className="min-w-[260px]"><Link to={`/research/${r.id}`} className="font-medium text-ink hover:text-accent">{r.title}</Link><div className="mt-0.5 text-[11.5px] text-ink-4">{[r.institution, r.date, r.topics.join("、")].filter(Boolean).join(" · ")}</div></div> },
@@ -118,7 +141,7 @@ export default function ResearchAdmin() {
                 render: (r) => (
                   <span className="inline-flex gap-1.5">
                     {r.hidden && <Badge>已隐藏</Badge>}
-                    <Button size="sm" onClick={() => setAction({ kind: r.hidden ? "show" : "hide", row: r })}>{r.hidden ? "显示" : "隐藏"}</Button>
+                    <Button size="sm" onClick={() => setAction({ kind: r.hidden ? "show" : "hide", row: r })}>{r.hidden ? "恢复显示" : "隐藏"}</Button>
                     <Button size="sm" tone="danger" onClick={() => setAction({ kind: "delete", row: r })}>删除</Button>
                   </span>
                 ),
@@ -126,16 +149,16 @@ export default function ResearchAdmin() {
             ]}
           />
         ) : (
-          <Empty>还没有研报。上面单篇填写，或者粘贴 JSON 批量导入。</Empty>
+          <Empty>{reports.length ? "研报都隐藏了，勾选右上角“显示已隐藏”查看。" : "还没有研报。上面单篇填写，或者粘贴 JSON 批量导入。"}</Empty>
         )}
       </Card>
 
       <ReasonDialog
         open={!!action}
         danger={action?.kind === "delete"}
-        title={action ? `${{ hide: "隐藏", show: "重新显示", delete: "删除" }[action.kind]}：${action.row.title}` : ""}
-        description={action?.kind === "delete" ? "删除后不能恢复，只能重新导入。" : action?.kind === "hide" ? "隐藏后同事看不到，数据保留。" : undefined}
-        confirmLabel={action ? { hide: "隐藏", show: "显示", delete: "删除" }[action.kind] : "确认"}
+        title={action ? `${ACTION_LABEL[action.kind]}：${action.row.title}` : ""}
+        description={action ? { hide: "隐藏后同事看不到，数据保留，随时可以恢复显示。", show: "恢复后同事又能在研报库里看到。", delete: "删除后不能恢复，只能重新导入。" }[action.kind] : undefined}
+        confirmLabel={action ? ACTION_LABEL[action.kind] : "确认"}
         busy={pending === "row"}
         onClose={() => setAction(null)}
         onSubmit={async (reason) => {

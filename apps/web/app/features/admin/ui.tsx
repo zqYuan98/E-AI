@@ -1,7 +1,7 @@
 // Shared admin building blocks: page frame, cards, stats, badges, tables, buttons, fields and a
 // reason dialog (manual changes always carry a reason for the audit log).
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router";
 import { ago, bj } from "./format";
 
@@ -179,12 +179,12 @@ export function ButtonLink({ to, children, tone = "secondary", size = "md" }: { 
 
 const INPUT = "w-full rounded-control bg-surface px-3 py-2 text-[13.5px] text-ink ring-1 ring-line-strong outline-none transition-shadow placeholder:text-ink-4 focus:ring-2 focus:ring-accent";
 
+/** A labelled control: the label wraps it, so a click on the label focuses it. */
 export function Field({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
-  const id = useId();
   return (
-    <label htmlFor={id} className="block">
+    <label className="block">
       <span className="mb-1 block text-[12.5px] font-medium text-ink-2">{label}</span>
-      <span className="[&>*]:w-full" id={id}>{children}</span>
+      <span className="[&>*]:w-full">{children}</span>
       {hint && <span className="mt-1 block text-[12px] text-ink-4">{hint}</span>}
     </label>
   );
@@ -265,7 +265,8 @@ export function Json({ value, collapsed = true, label = "原始数据" }: { valu
 /**
  * A modal that collects a reason (and optional extra fields) before a manual change. The submit
  * handler receives the reason; returning true closes the dialog. `note={false}` makes it a plain
- * confirmation, for changes whose record has no place for a note.
+ * confirmation, for changes whose record has no place for a note. A `blocked` change cannot be made
+ * now (the description says why): no reason is asked and the confirm button stays off.
  */
 export function ReasonDialog({
   open,
@@ -275,6 +276,7 @@ export function ReasonDialog({
   danger,
   requireReason = true,
   note = true,
+  blocked,
   children,
   onClose,
   onSubmit,
@@ -287,6 +289,7 @@ export function ReasonDialog({
   danger?: boolean;
   requireReason?: boolean;
   note?: boolean;
+  blocked?: boolean;
   children?: ReactNode;
   onClose: () => void;
   onSubmit: (reason: string) => Promise<boolean | void> | boolean | void;
@@ -321,7 +324,7 @@ export function ReasonDialog({
             className="relative max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-sheet bg-raised p-5 shadow-2xl ring-1 ring-line-strong"
             onSubmit={async (e) => {
               e.preventDefault();
-              if (note && requireReason && !reason.trim()) return;
+              if (blocked || (note && requireReason && !reason.trim())) return;
               const closed = await onSubmit(reason.trim());
               if (closed !== false) onClose();
             }}
@@ -329,7 +332,7 @@ export function ReasonDialog({
             <h2 className="text-[16px] font-semibold text-ink">{title}</h2>
             {description && <div className="mt-1.5 text-[13px] leading-relaxed text-ink-3">{description}</div>}
             {children && <div className="mt-4 space-y-3">{children}</div>}
-            {note && (
+            {note && !blocked && (
               <div className="mt-4">
                 <Field label={requireReason ? "原因（写进审计记录）" : "备注（可选）"}>
                   <Textarea ref={ref} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={requireReason ? "为什么做这个改动" : ""} rows={2} />
@@ -337,8 +340,8 @@ export function ReasonDialog({
               </div>
             )}
             <div className="mt-5 flex justify-end gap-2">
-              <Button tone="ghost" onClick={onClose}>取消</Button>
-              <Button type="submit" tone={danger ? "danger" : "primary"} busy={busy} disabled={note && requireReason && !reason.trim()}>
+              <Button tone="ghost" onClick={onClose}>{blocked ? "关闭" : "取消"}</Button>
+              <Button type="submit" tone={danger ? "danger" : "primary"} busy={busy} disabled={blocked || (note && requireReason && !reason.trim())}>
                 {confirmLabel}
               </Button>
             </div>
