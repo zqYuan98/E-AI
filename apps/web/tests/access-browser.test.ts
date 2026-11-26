@@ -48,7 +48,12 @@ const api = createServer((req, res) => {
     if (!admin) return json(403, {});
     if (path === "/api/admin/access/members") return body(input => { rows.push({ id: rows.length + 1, username: input.username, name: input.name, disabled: false }); json(200, { member: rows.at(-1) }); });
     const member = rows.find(row => path.includes(`/members/${row.id}/`));
-    if (member && path.endsWith("/disable")) { member.disabled = true; return json(200, { member }); }
+    // Like the real api (Fastify): a JSON content type with an empty body is refused.
+    if (member && path.endsWith("/disable")) {
+      if (/json/.test(String(req.headers["content-type"] ?? "")) && !Number(req.headers["content-length"] ?? 0)) return json(400, { code: "FST_ERR_CTP_EMPTY_JSON_BODY" });
+      member.disabled = true;
+      return json(200, { member });
+    }
     if (member && path.endsWith("/reset")) return body(() => json(200, { member }));
     return json(404, {});
   }

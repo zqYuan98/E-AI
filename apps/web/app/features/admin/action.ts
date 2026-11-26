@@ -38,7 +38,8 @@ export function useAdminAction() {
         const res = await fetch(path, {
           method,
           credentials: "same-origin",
-          headers: { "content-type": "application/json", "x-csrf-token": me.csrf, "idempotency-key": key },
+          // A JSON type without a body is refused by the api (empty JSON body): commands without one send neither.
+          headers: { ...(body === undefined ? {} : { "content-type": "application/json" }), "x-csrf-token": me.csrf, "idempotency-key": key },
           body: body === undefined ? undefined : JSON.stringify(body),
         });
         if (res.status === 401) {

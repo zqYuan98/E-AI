@@ -98,7 +98,7 @@ export default function TenderList() {
     const active = (data.region ?? null) === value;
     return (
       <IntentLink key={value ?? "all"} to={hrefWith(params, { region: value })} preventScrollReset
-        className={`rounded-full border px-3 py-1 text-[12.5px] transition-colors ${active ? "border-accent bg-accent text-white" : "border-line bg-surface text-ink-3 hover:text-accent"}`}>
+        className={`shrink-0 rounded-full border px-3 py-1 text-[12.5px] transition-colors ${active ? "border-accent bg-accent text-white" : "border-line bg-surface text-ink-3 hover:text-accent"}`}>
         {label}{count !== undefined && <span className={`num ml-1 ${active ? "text-white/80" : "text-ink-4"}`}>{count}</span>}
       </IntentLink>
     );
@@ -130,7 +130,8 @@ export default function TenderList() {
           <button type="submit" className="h-9 shrink-0 rounded-full border border-line bg-surface px-4 text-[13px] text-ink-2 hover:text-accent">搜索</button>
         </Form>
         {(data.regions.length > 0 || data.region) && (
-          <div className="flex flex-wrap gap-1.5">
+          // A phone keeps the regions on one line it can swipe, so the list starts on the first screen.
+          <div className="scrollbar-none -mx-[var(--gutter-l)] flex gap-1.5 overflow-x-auto px-[var(--gutter-l)] lg:mx-0 lg:flex-wrap lg:px-0">
             {chip(null, "全部地区")}
             {(focusCount > 0 || data.region === FOCUS) && chip(FOCUS, FOCUS_LABEL, focusCount)}
             {data.regions.map((r) => chip(r.region, r.region, r.count))}
