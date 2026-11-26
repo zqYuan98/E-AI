@@ -1,4 +1,5 @@
 import { SITE } from "@aihot/site";
+import { ENTITIES } from "@aihot/industry/taxonomy";
 import { useState } from "react";
 import { Link } from "react-router";
 import type { Route } from "./+types/source";
@@ -6,7 +7,7 @@ import type { AdminSource, AdminSourceDetail, AdminSourcePreview } from "@aihot/
 import { adminGet } from "../../lib/admin.server";
 import { useAdminAction } from "../../features/admin/action";
 import { bj, duration, num } from "../../features/admin/format";
-import { HEALTH_LABEL, KIND_LABEL, MODE_LABEL, TIER_LABEL, VISIBILITY_LABEL } from "../../features/admin/labels";
+import { HEALTH_LABEL, KIND_LABEL, MODE_LABEL, RUN_STATUS_LABEL, SOURCE_FIELD_LABEL, TIER_LABEL, VISIBILITY_LABEL } from "../../features/admin/labels";
 import { AdminPage, Badge, Button, Card, DataTable, Dot, Empty, Field, healthTone, Input, Json, KV, ReasonDialog, Select, Stat, Textarea, Time } from "../../features/admin/ui";
 
 
@@ -42,15 +43,27 @@ export default function SourceDetail({ loaderData }: Route.ComponentProps) {
   const { source: s, runs, items, stats, history } = loaderData;
   const { run, pending } = useAdminAction();
   const [draft, setDraft] = useState<Draft>(() => draftOf(s));
-  const [draftFor, setDraftFor] = useState(s.updated_at);
+  // The saved source the draft started from, and what changed in it under unsaved edits.
+  const [draftFrom, setDraftFrom] = useState(s);
+  const [moved, setMoved] = useState<{ changed: string[]; both: string[] } | null>(null);
   const [preview, setPreview] = useState<AdminSourcePreview | null>(null);
   const [dialog, setDialog] = useState<null | "save" | "toggle">(null);
   const [configError, setConfigError] = useState<string | null>(null);
-  if (draftFor !== s.updated_at) {
-    // The source changed (our own save or someone else's): start from the saved state.
-    setDraft(draftOf(s));
-    setDraftFor(s.updated_at);
+  if (draftFrom.updated_at !== s.updated_at) {
+    // The source changed (our own save, a pause, someone else's edit). Edits not saved yet stay; every
+    // other field follows the saved source, so saving the draft does not undo the other change.
+    const unsaved = patchPreview(draft, s);
+    const kept = Object.keys(patchPreview(draft, draftFrom)).filter((k) => unsaved[k]);
+    // first_party has no field here: it follows the tier.
+    const changed = Object.keys(patchPreview(draftOf(draftFrom), s)).filter((k) => k !== "first_party");
+    setDraft({ ...draftOf(s), ...Object.fromEntries(kept.map((k) => [k, draft[k as keyof Draft]])) });
+    setMoved(kept.length && changed.length ? { changed, both: changed.filter((k) => kept.includes(k)) } : null);
+    setDraftFrom(s);
   }
+  const reset = () => {
+    setDraft(draftOf(s));
+    setMoved(null);
+  };
   const base = `/api/admin/sources/${encodeURIComponent(s.id)}`;
 
   const patch = (): Record<string, unknown> | null => {
@@ -64,7 +77,7 @@ export default function SourceDetail({ loaderData }: Route.ComponentProps) {
     }
     const next: Record<string, unknown> = {
       ...draft,
-      tags: draft.tags.split(/[,，]/).map((t) => t.trim()).filter(Boolean),
+      tags: splitTags(draft.tags),
       config,
       interval_minutes: Number(draft.interval_minutes),
       signal_group_id: draft.signal_group_id || null,
@@ -107,7 +120,7 @@ export default function SourceDetail({ loaderData }: Route.ComponentProps) {
           >
             预览抓取
           </Button>
-          <Button busy={pending === "fetch"} onClick={() => run("POST", `${base}/fetch`, {}, { label: "fetch", success: "已加入采集队列" })}>
+          <Button busy={pending === "fetch"} onClick={() => run("POST", `${base}/fetch`, {}, { label: "fetch", success: changes ? "已加入采集队列：按已保存的设置采集，未保存的修改不生效" : "已加入采集队列" })}>
             立即采集
           </Button>
           <Button tone={s.enabled ? "danger" : "primary"} onClick={() => setDialog("toggle")}>
@@ -174,8 +187,12 @@ export default function SourceDetail({ loaderData }: Route.ComponentProps) {
               <Field label="讨论分组 ID" hint="同一机构的多个账号共用，热度只算一次">
                 <Input value={draft.signal_group_id ?? ""} onChange={(e) => setDraft({ ...draft, signal_group_id: e.target.value })} />
               </Field>
-              <Field label="运营主体 ID">
-                <Input value={draft.owner_entity_id ?? ""} onChange={(e) => setDraft({ ...draft, owner_entity_id: e.target.value })} />
+              <Field label="运营主体" hint="信源属于哪家公司或机构；同一主体的几个信源，热度只算一次">
+                <Select value={draft.owner_entity_id ?? ""} onChange={(e) => setDraft({ ...draft, owner_entity_id: e.target.value || null })}>
+                  <option value="">无</option>
+                  {Object.entries(ENTITIES).map(([id, e]) => <option key={id} value={id}>{e.name}</option>)}
+                  {draft.owner_entity_id && !ENTITIES[draft.owner_entity_id] && <option value={draft.owner_entity_id}>{draft.owner_entity_id}（不在名录里）</option>}
+                </Select>
               </Field>
               <Field label="标签（逗号分隔）">
                 <Input value={draft.tags} onChange={(e) => setDraft({ ...draft, tags: e.target.value })} />
@@ -198,9 +215,18 @@ export default function SourceDetail({ loaderData }: Route.ComponentProps) {
               </Field>
               {configError && <div className="mt-1 text-[12.5px] text-hot">{configError}</div>}
             </div>
+            {moved && changes > 0 && (
+              <div className="mt-4 flex flex-wrap items-center gap-2 rounded-card bg-amber/10 px-4 py-2.5 text-[13px] text-ink-2 ring-1 ring-amber/25">
+                <span className="mr-auto">
+                  这个信源刚被更新（{fieldNames(moved.changed)}）：没改过的项已换成最新值，你未保存的修改还在
+                  {moved.both.length > 0 && `；${fieldNames(moved.both)}两边都改过，保存会用你的`}。
+                </span>
+                <Button size="sm" onClick={reset}>载入最新</Button>
+              </div>
+            )}
             <div className="mt-4 flex items-center justify-end gap-2">
               {changes > 0 && <span className="text-[12.5px] text-ink-3">{changes} 项改动未保存</span>}
-              <Button tone="ghost" disabled={!changes} onClick={() => setDraft(draftOf(s))}>还原</Button>
+              <Button tone="ghost" disabled={!changes} onClick={reset}>还原</Button>
               <Button tone="primary" disabled={!changes} onClick={() => patch() && setDialog("save")}>保存</Button>
             </div>
           </Card>
@@ -250,7 +276,7 @@ export default function SourceDetail({ loaderData }: Route.ComponentProps) {
                   label: "结果",
                   render: (r) => (
                     <span className="inline-flex gap-1">
-                      <Badge tone={r.status === "ok" ? "ok" : r.status === "failed" ? "bad" : "muted"} title={r.error ?? undefined}>{r.status}</Badge>
+                      <Badge tone={r.status === "ok" ? "ok" : r.status === "failed" ? "bad" : "muted"} title={r.error ?? r.status}>{RUN_STATUS_LABEL[r.status] ?? r.status}</Badge>
                       {!!r.detail?.dropped && <Badge tone="bad" title="有一段更早的帖子没能读完，其中的内容可能漏采">可能漏采</Badge>}
                       {!r.detail?.dropped && !!r.detail?.backlog && <Badge tone="warn" title="帖子多于一轮能读的页数，余下的在后面几轮接着读">续读 {r.detail.backlog} 段</Badge>}
                     </span>
@@ -281,7 +307,7 @@ export default function SourceDetail({ loaderData }: Route.ComponentProps) {
       <ReasonDialog
         open={dialog === "save"}
         title="保存信源设置"
-        description={`将修改：${Object.keys(patchPreview(draft, s)).join("、") || "无"}`}
+        description={`将修改：${fieldNames(Object.keys(patchPreview(draft, s))) || "无"}`}
         busy={pending === "save"}
         onClose={() => setDialog(null)}
         onSubmit={async (reason) => {
@@ -308,6 +334,16 @@ export default function SourceDetail({ loaderData }: Route.ComponentProps) {
   );
 }
 
+/** Draft field names as the page shows them. */
+function fieldNames(keys: string[]): string {
+  return keys.map((k) => SOURCE_FIELD_LABEL[k] ?? k).join("、");
+}
+
+/** The tags field as the list that is saved. */
+function splitTags(tags: string): string[] {
+  return tags.split(/[,，]/).map((t) => t.trim()).filter(Boolean);
+}
+
 /** Field names that differ from the saved source (for the confirmation text). */
 function patchPreview(draft: Draft, s: AdminSource): Record<string, true> {
   const out: Record<string, true> = {};
@@ -319,6 +355,9 @@ function patchPreview(draft: Draft, s: AdminSource): Record<string, true> {
       } catch {
         out.config = true;
       }
+    } else if (k === "tags") {
+      // Compared as the list that would be saved: "a,b" and "a, b" are the same tags.
+      if (JSON.stringify(splitTags(draft.tags)) !== JSON.stringify(s.tags)) out.tags = true;
     } else if (String(draft[k] ?? "") !== String(saved[k] ?? "")) out[k] = true;
   }
   return out;

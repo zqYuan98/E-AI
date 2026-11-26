@@ -1,4 +1,4 @@
-// 后台“政策库管理”：粘贴网址导入（worker 每分钟处理几条），看导入结果；文件的隐藏、删除和重新抽取。
+// 后台“政策规划库管理”：粘贴网址导入（worker 每分钟处理几条），看导入结果；文件的隐藏、删除和重新抽取。
 import { useState } from "react";
 import { Link, useLoaderData, type LoaderFunctionArgs } from "react-router";
 import { adminGet } from "@aihot/web/lib/admin.server";
@@ -8,12 +8,12 @@ import { AI_RELEVANCE } from "../types.ts";
 
 interface Doc { id: number; name: string; levelLabel: string; docType: string; docNo: string | null; date: string | null; aiRelevance: keyof typeof AI_RELEVANCE; targets: number; aiClauses: number; links: number; hidden: boolean }
 interface Import { id: number; url: string; status: "pending" | "document" | "not_document" | "failed"; docId: number | null; docName: string | null; error: string | null; requestedBy: string; updatedAt: string }
-interface Data { docs: Doc[]; imports: Import[]; pending: number; failed: number; seeds: number }
+interface Data { docs: Doc[]; imports: Import[]; pending: number; failed: number; seeds: number; modelCalls: { allowed: boolean; running: boolean } }
 
 export async function loader({ request }: LoaderFunctionArgs) {
   return adminGet<Data>(request, "/api/admin/policy");
 }
-export const meta = () => [{ title: "政策库管理" }, { name: "robots", content: "noindex, nofollow" }];
+export const meta = () => [{ title: "政策规划库管理" }, { name: "robots", content: "noindex, nofollow" }];
 
 const STATUS: Record<Import["status"], { label: string; tone: "muted" | "ok" | "warn" | "bad" }> = {
   pending: { label: "排队中", tone: "muted" },
@@ -23,11 +23,23 @@ const STATUS: Record<Import["status"], { label: string; tone: "muted" | "ok" | "
 };
 type Action = { kind: "hide" | "show" | "delete" | "reextract"; doc: Doc };
 const ACTION = {
-  hide: { title: "隐藏", hint: "隐藏后不在政策库里显示，数据保留，随时可以再显示。", path: "hidden", body: { hidden: true } },
-  show: { title: "重新显示", hint: "重新出现在政策库里。", path: "hidden", body: { hidden: false } },
+  hide: { title: "隐藏", hint: "隐藏后不在政策规划库里显示，数据保留，随时可以恢复显示。", path: "hidden", body: { hidden: true } },
+  show: { title: "恢复显示", hint: "恢复后重新出现在政策规划库里。", path: "hidden", body: { hidden: false } },
   delete: { title: "删除", hint: "删除这份文件；它的资料不会再被自动收回来。要恢复只能重新导入原文网址。", path: "delete", body: {} },
   reextract: { title: "重新抽取", hint: "用当前的模型和提示词把这份文件的资料重新读一遍，几分钟内完成。", path: "reextract", body: {} },
 } as const;
+
+/** “模型调用”现在的状态（和设置页的运行开关同一套叫法）：导入只在它运行时处理。 */
+function ModelCalls({ state }: { state: Data["modelCalls"] }) {
+  if (state.running) return <p className="mb-3 flex items-center gap-2 text-[13px] text-ink-3">模型调用<Badge tone="ok">运行中</Badge></p>;
+  return (
+    <p className="mb-3 flex flex-wrap items-center gap-2 rounded-card bg-amber/10 px-3 py-2 text-[13px] text-ink-2 ring-1 ring-amber/25">
+      模型调用<Badge tone={state.allowed ? "warn" : "bad"}>{state.allowed ? "已暂停" : "服务器已禁用"}</Badge>
+      <span>登记的网址先排队，{state.allowed ? "恢复后" : "服务器打开后"}自动处理。</span>
+      <Link to="/admin/settings" className="font-medium text-accent hover:underline">去设置页{state.allowed ? "恢复" : "查看"} →</Link>
+    </p>
+  );
+}
 
 export default function PolicyAdmin() {
   const data = useLoaderData<typeof loader>();
@@ -35,24 +47,31 @@ export default function PolicyAdmin() {
   const [urls, setUrls] = useState("");
   const [action, setAction] = useState<Action | null>(null);
   const [showHidden, setShowHidden] = useState(false);
+  const [reseed, setReseed] = useState(false);
   const docs = data.docs.filter((d) => showHidden || !d.hidden);
   const hiddenCount = data.docs.filter((d) => d.hidden).length;
-  const submit = async (body: { urls?: string; seeds?: boolean }) => {
-    const r = await run<{ queued: number; skipped: number }>("POST", "/api/admin/policy/imports", body, { label: "import" });
-    if (r) setUrls("");
+  const submit = async (body: { urls?: string; seeds?: boolean; reason?: string }, label = "import") => {
+    const r = await run<{ queued: number; skipped: number }>("POST", "/api/admin/policy/imports", body, { label });
+    if (r && body.urls) setUrls("");
     return r;
   };
 
   return (
-    <AdminPage title="政策库管理" subtitle="导入国家部委、两网和发电集团的政策规划文件；模型抽取文号、日期、目标和 AI 条款，原话核对不上的不保存。">
+    <AdminPage title="政策规划库管理" subtitle="导入国家部委、两网和发电集团的政策规划文件；模型抽取文号、日期、目标和 AI 条款，原话核对不上的不保存。">
       <Card title="导入原文网址" className="mb-5">
         <p className="mb-3 text-[13px] leading-6 text-ink-3">
-          每行一个原文页面的网址（政府网站、两网官网的正文页）。登记后每分钟处理几条：抓正文、调用模型抽取、入库，结果在下面的“导入记录”里。需要“模型调用”在运行中（设置页）。
+          每行一个原文页面的网址（政府网站、两网官网的正文页）。登记后每分钟处理几条：抓正文、调用模型抽取、入库，结果在下面的“导入记录”里。
         </p>
+        <ModelCalls state={data.modelCalls} />
         <Textarea rows={5} value={urls} onChange={(e) => setUrls(e.target.value)} placeholder={"https://www.nea.gov.cn/…\nhttps://www.gov.cn/zhengce/…"} />
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button tone="primary" busy={pending === "import"} disabled={!urls.trim()} onClick={() => submit({ urls })}>导入</Button>
-          <Button busy={pending === "import"} onClick={() => submit({ seeds: true })}>导入首批种子（{data.seeds} 个网址）</Button>
+          {/* 库里已有文件时，导入种子就是把种子全部重新抽取一遍：降成次要按钮，先确认。 */}
+          {data.docs.length ? (
+            <Button tone="ghost" busy={pending === "seeds"} onClick={() => setReseed(true)}>再次导入首批种子（{data.seeds} 个网址）</Button>
+          ) : (
+            <Button busy={pending === "seeds"} onClick={() => submit({ seeds: true }, "seeds")}>导入首批种子（{data.seeds} 个网址）</Button>
+          )}
           {data.pending > 0 && <Badge>排队 {data.pending}</Badge>}
           {data.failed > 0 && <Badge tone="bad">失败 {data.failed}</Badge>}
         </div>
@@ -76,7 +95,7 @@ export default function PolicyAdmin() {
                   <span className="inline-flex gap-1.5">
                     {d.hidden ? <Badge>已隐藏</Badge> : null}
                     <Button size="sm" onClick={() => setAction({ kind: "reextract", doc: d })}>重新抽取</Button>
-                    <Button size="sm" onClick={() => setAction({ kind: d.hidden ? "show" : "hide", doc: d })}>{d.hidden ? "显示" : "隐藏"}</Button>
+                    <Button size="sm" onClick={() => setAction({ kind: d.hidden ? "show" : "hide", doc: d })}>{d.hidden ? "恢复显示" : "隐藏"}</Button>
                     <Button size="sm" tone="danger" onClick={() => setAction({ kind: "delete", doc: d })}>删除</Button>
                   </span>
                 ),
@@ -84,7 +103,7 @@ export default function PolicyAdmin() {
             ]}
           />
         ) : (
-          <Empty>还没有文件。上面粘贴原文网址导入，或者导入首批种子。</Empty>
+          <Empty>{data.docs.length ? "文件都隐藏了，勾选右上角“显示已隐藏”查看。" : "还没有文件。上面粘贴原文网址导入，或者导入首批种子。"}</Empty>
         )}
       </Card>
 
@@ -106,6 +125,15 @@ export default function PolicyAdmin() {
         )}
       </Card>
 
+      <ReasonDialog
+        open={reseed}
+        title="再次导入首批种子"
+        description={`库里已经有 ${data.docs.length} 份文件。首批种子的 ${data.seeds} 个网址会全部重新排队：每个都重新抓原文、再调用一次模型抽取（计费），已入库的按新结果更新。只想补几份，在上面粘贴网址就行。`}
+        confirmLabel="全部重新导入"
+        busy={pending === "seeds"}
+        onClose={() => setReseed(false)}
+        onSubmit={async (reason) => (await submit({ seeds: true, reason }, "seeds")) !== null}
+      />
       <ReasonDialog
         open={!!action}
         danger={action?.kind === "delete"}

@@ -1,5 +1,5 @@
 // 手动收录政策文件（首批种子、抓不到的原文）：读原文页正文，存成“政策规划·手动收录”信源的资料，再立即抽取入库。
-// 后台“政策库管理”可以做同样的事（粘贴网址，worker 逐条处理）；这个脚本留给服务器上批量导入。
+// 后台“政策规划库管理”可以做同样的事（粘贴网址，worker 逐条处理）；这个脚本留给服务器上批量导入。
 //   node --env-file=.env modules/policy/scripts/import.ts <原文网址> [<原文网址> ...]
 //   node --env-file=.env modules/policy/scripts/import.ts --file <每行一个网址的文本文件>
 import { readFileSync } from "node:fs";
